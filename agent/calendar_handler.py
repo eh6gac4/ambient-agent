@@ -1,34 +1,30 @@
 """
 agent/calendar_handler.py
-当日のカレンダーイベントを取得し、日次ブリーフィングをメール送信する。
+当日のカレンダーイベントを取得し、日次ブリーフィングを Telegram に送信する。
 """
-import base64
 import logging
-import os
 from datetime import datetime, timezone, timedelta
-from email.mime.text import MIMEText
 
 from googleapiclient.discovery import build
 
 from agent.google_auth import get_credentials
 from agent.notion_handler import get_pending_tasks
 from agent.claude_agent import summarize_day
+from agent.telegram_notifier import send_message
 
 logger = logging.getLogger(__name__)
 JST = timezone(timedelta(hours=9))
 
 
 def send_daily_briefing():
-    """当日の予定 + Notion タスクを要約してメール送信する。"""
+    """当日の予定 + Notion タスクを要約して Telegram に送信する。"""
     logger.info("Generating daily briefing...")
     try:
         events = _get_todays_events()
         tasks = get_pending_tasks()
         summary = summarize_day(events, tasks)
-        _send_email(
-            subject=f"📅 日次ブリーフィング {datetime.now(JST).strftime('%Y-%m-%d')}",
-            body=summary,
-        )
+        date_str = datetime.now(JST).strftime('%Y-%m-%d')
+        send_message(f"*📅 日次ブリーフィング {date_str}*\n\n{summary}")
         logger.info("Daily briefing sent.")
     except Exception:
         logger.exception("Error in send_daily_briefing")
@@ -56,14 +52,3 @@ def _get_todays_events() -> list[dict]:
     return events
 
 
-def _send_email(subject: str, body: str):
-    """自分自身にメールを送信する。"""
-    service = build("gmail", "v1", credentials=get_credentials())
-    to = os.getenv("BRIEFING_EMAIL", "me")
-    message = MIMEText(body)
-    message["to"] = to
-    message["subject"] = subject
-    raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
-    service.users().messages().send(
-        userId="me", body={"raw": raw}
-    ).execute()
