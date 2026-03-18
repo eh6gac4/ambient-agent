@@ -38,9 +38,11 @@ def _serve_auth_url(auth_url: str, port: int = 9999) -> str:
     t.daemon = True
     t.start()
 
-    # LAN IPを取得
+    # LAN IPを取得（外向きソケットで実際のLAN IPを特定）
     try:
-        ip = socket.gethostbyname(socket.gethostname())
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
     except Exception:
         ip = "このPCのIPアドレス"
 
