@@ -29,8 +29,15 @@ def get_credentials() -> Credentials:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            flow = InstalledAppFlow.from_client_secrets_file(CREDS_PATH, SCOPES)
-            creds = flow.run_local_server(port=0)
+            flow = InstalledAppFlow.from_client_secrets_file(
+                CREDS_PATH, SCOPES,
+                redirect_uri="urn:ietf:wg:oauth:2.0:oob",
+            )
+            auth_url, _ = flow.authorization_url(prompt="consent")
+            print(f"\n以下のURLをブラウザで開いてください:\n{auth_url}\n")
+            code = input("認証後に表示されたコードを貼り付けてください: ")
+            flow.fetch_token(code=code)
+            creds = flow.credentials
         with open(TOKEN_PATH, "w") as f:
             f.write(creds.to_json())
 

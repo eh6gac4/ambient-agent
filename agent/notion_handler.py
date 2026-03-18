@@ -5,7 +5,7 @@ DB のプロパティ構成（最低限）:
   - Name (title)
   - Due (date)
   - Priority (select: high / medium / low)
-  - Status (select: pending / done)
+  - Status (status: 未着手 / ...)
   - Source (rich_text) … "Gmail" などの抽出元
 """
 import logging
@@ -26,8 +26,8 @@ def add_task(task: dict):
         return
 
     properties: dict = {
-        "Name": {"title": [{"text": {"content": task.get("title", "")}}]},
-        "Status": {"select": {"name": "pending"}},
+        "タイトル": {"title": [{"text": {"content": task.get("title", "")}}]},
+        "Status": {"status": {"name": "未着手"}},
         "Source": {"rich_text": [{"text": {"content": task.get("source", "Gmail")}}]},
     }
 
@@ -52,12 +52,12 @@ def get_pending_tasks() -> list[dict]:
 
     results = _notion.databases.query(
         database_id=DB_ID,
-        filter={"property": "Status", "select": {"equals": "pending"}},
+        filter={"property": "Status", "status": {"equals": "未着手"}},
     )
     tasks = []
     for page in results.get("results", []):
         props = page["properties"]
-        title = props.get("Name", {}).get("title", [])
+        title = props.get("タイトル", {}).get("title", [])
         title_text = title[0]["text"]["content"] if title else ""
         due_obj = props.get("Due", {}).get("date")
         due = due_obj["start"] if due_obj else None
