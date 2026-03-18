@@ -1,0 +1,8 @@
+anthropic>=0.25.0
+google-auth>=2.29.0
+google-auth-oauthlib>=1.2.0
+google-auth-httplib2>=0.2.0
+google-api-python-client>=2.127.0
+notion-client>=2.2.1
+APScheduler>=3.10.4
+python-dotenv>=1.0.1
