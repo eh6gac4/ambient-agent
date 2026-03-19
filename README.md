@@ -62,13 +62,13 @@ docker compose logs -f
 
 ### 定期ジョブ（APScheduler）
 
-| 時刻 / 間隔 | ジョブ |
-|---|---|
-| 08:00 | 日次ブリーフィング（Google Calendar → Telegram） |
-| 08:05 | API コストレポート（Telegram） |
-| 09:00 | 期限切れタスクアラート（Telegram） |
-| 3時間毎 | タスクリマインド（Telegram） |
-| 15分毎 | Gmail チェック → タスク抽出 → Notion 登録 |
+| 時刻 / 間隔 | ジョブ | 詳細 |
+|---|---|---|
+| 08:00 | 日次ブリーフィング | 当日の Google Calendar イベントと Notion 未着手タスクを Claude で要約し Telegram に送信 |
+| 08:05 | API コストレポート | 前日分の Claude API 利用コストを Telegram に送信 |
+| 09:00 | 期限切れタスクアラート | Due が今日より前の未着手タスクを Telegram に送信 |
+| 3時間毎 | タスクリマインド | Notion の未着手タスク一覧を Telegram に送信 |
+| 15分毎 | Gmail チェック | 未読メールを取得 → Claude でタスク抽出 → Notion に登録 |
 
 ## ファイル構成
 
