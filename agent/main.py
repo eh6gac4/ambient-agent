@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from apscheduler.schedulers.blocking import BlockingScheduler
 
 from agent.gmail_handler import process_unread_emails
-from agent.calendar_handler import send_daily_briefing
+from agent.calendar_handler import send_daily_briefing, send_task_reminder
 
 load_dotenv()
 logging.basicConfig(
@@ -28,6 +28,15 @@ def main():
         "interval",
         minutes=interval_min,
         id="gmail_check",
+    )
+
+    # タスクリマインド（指定時間毎）
+    reminder_hours = int(os.getenv("TASK_REMINDER_INTERVAL_HOURS", 3))
+    scheduler.add_job(
+        send_task_reminder,
+        "interval",
+        hours=reminder_hours,
+        id="task_reminder",
     )
 
     # 日次ブリーフィング（毎朝指定時刻）

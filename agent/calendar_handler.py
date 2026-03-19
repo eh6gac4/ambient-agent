@@ -16,6 +16,25 @@ logger = logging.getLogger(__name__)
 JST = timezone(timedelta(hours=9))
 
 
+def send_task_reminder():
+    """未完了タスクを Telegram にリマインド送信する。"""
+    logger.info("Sending task reminder...")
+    try:
+        tasks = get_pending_tasks()
+        if not tasks:
+            logger.info("No pending tasks.")
+            return
+        lines = []
+        for t in tasks:
+            due = f" (期限: {t['due']})" if t.get("due") else ""
+            lines.append(f"• [{t.get('priority', '?')}] {t['title']}{due}")
+        body = "\n".join(lines)
+        send_message(f"*📋 未完了タスク ({len(tasks)}件)*\n\n{body}")
+        logger.info(f"Task reminder sent ({len(tasks)} tasks).")
+    except Exception:
+        logger.exception("Error in send_task_reminder")
+
+
 def send_daily_briefing():
     """当日の予定 + Notion タスクを要約して Telegram に送信する。"""
     logger.info("Generating daily briefing...")
