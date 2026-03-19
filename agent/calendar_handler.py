@@ -58,12 +58,13 @@ def send_overdue_alert():
 
 
 def send_daily_briefing():
-    """当日の予定 + Notion タスクを要約して Telegram に送信する。"""
+    """当日の予定 + Notion タスク（期限切れ含む）を要約して Telegram に送信する。"""
     logger.info("Generating daily briefing...")
     try:
         events = _get_todays_events()
         tasks = get_pending_tasks()
-        summary = summarize_day(events, tasks)
+        overdue = get_overdue_tasks()
+        summary = summarize_day(events, tasks, overdue)
         date_str = datetime.now(JST).strftime('%Y-%m-%d')
         send_message(f"*📅 日次ブリーフィング {date_str}*\n\n{summary}")
         logger.info("Daily briefing sent.")
