@@ -45,6 +45,34 @@ def add_task(task: dict):
     )
 
 
+def get_overdue_tasks() -> list[dict]:
+    """期限切れ（Due < 今日）かつ未着手のタスク一覧を返す。"""
+    if not DB_ID:
+        return []
+
+    today = __import__("datetime").date.today().isoformat()
+    results = _notion.databases.query(
+        database_id=DB_ID,
+        filter={
+            "and": [
+                {"property": "Status", "status": {"equals": "未着手"}},
+                {"property": "Due", "date": {"before": today}},
+            ]
+        },
+    )
+    tasks = []
+    for page in results.get("results", []):
+        props = page["properties"]
+        title = props.get("タイトル", {}).get("title", [])
+        title_text = title[0]["text"]["content"] if title else ""
+        due_obj = props.get("Due", {}).get("date")
+        due = due_obj["start"] if due_obj else None
+        priority_obj = props.get("Priority", {}).get("select")
+        priority = priority_obj["name"] if priority_obj else "medium"
+        tasks.append({"title": title_text, "due": due, "priority": priority, "url": page.get("url", "")})
+    return tasks
+
+
 def get_pending_tasks() -> list[dict]:
     """Status = pending のタスク一覧を返す。"""
     if not DB_ID:

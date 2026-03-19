@@ -8,7 +8,7 @@ from datetime import datetime, timezone, timedelta
 from googleapiclient.discovery import build
 
 from agent.google_auth import get_credentials
-from agent.notion_handler import get_pending_tasks
+from agent.notion_handler import get_pending_tasks, get_overdue_tasks
 from agent.claude_agent import summarize_day
 from agent.telegram_notifier import send_message
 
@@ -35,6 +35,26 @@ def send_task_reminder():
         logger.info(f"Task reminder sent ({len(tasks)} tasks).")
     except Exception:
         logger.exception("Error in send_task_reminder")
+
+
+def send_overdue_alert():
+    """期限切れタスクを Telegram にアラート送信する。"""
+    logger.info("Checking overdue tasks...")
+    try:
+        tasks = get_overdue_tasks()
+        if not tasks:
+            logger.info("No overdue tasks.")
+            return
+        lines = []
+        for t in tasks:
+            url = t.get("url", "")
+            link = f" [開く]({url})" if url else ""
+            lines.append(f"• [{t.get('priority', '?')}] {t['title']} (期限: {t['due']}){link}")
+        body = "\n".join(lines)
+        send_message(f"*⚠️ 期限切れタスク ({len(tasks)}件)*\n\n{body}")
+        logger.info(f"Overdue alert sent ({len(tasks)} tasks).")
+    except Exception:
+        logger.exception("Error in send_overdue_alert")
 
 
 def send_daily_briefing():
