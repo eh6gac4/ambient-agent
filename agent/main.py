@@ -10,7 +10,7 @@ from apscheduler.events import EVENT_JOB_ERROR
 
 from agent.gmail_handler import process_unread_emails
 from agent.calendar_handler import send_daily_briefing, send_task_reminder, send_overdue_alert
-from agent.telegram_handler import process_telegram_messages
+from agent.telegram_handler import run_listener
 from agent.telegram_notifier import send_message
 from agent.usage_tracker import send_cost_report
 
@@ -36,13 +36,8 @@ def main():
     scheduler = BlockingScheduler(timezone="Asia/Tokyo")
     scheduler.add_listener(_on_job_error, EVENT_JOB_ERROR)
 
-    # Telegram メッセージ取得・タスク抽出（1分毎）
-    scheduler.add_job(
-        process_telegram_messages,
-        "interval",
-        minutes=1,
-        id="telegram_check",
-    )
+    # Telegram ロングポーリング（メッセージ着信時即時処理）
+    run_listener()
 
     # Gmail → Notion タスク抽出（15分毎）
     interval_min = int(os.getenv("GMAIL_CHECK_INTERVAL_MINUTES", 15))

@@ -96,42 +96,24 @@ def _handle_command(text: str):
         send_message("使えるコマンド:\n`/tasks` — タスク一覧\n`/done <番号>` — 完了にする\n`/add <タスク名>` — タスクを追加")
 
 
-def process_telegram_messages():
-    """未読メッセージを取得してタスク抽出・Notion 登録する。"""
-    token = _get_token()
-    if not token:
-        logger.error("TELEGRAM_BOT_TOKEN が未設定です。")
-        return
-
-    offset = _load_offset()
-    url = f"{TELEGRAM_API_BASE.format(token=token)}/getUpdates"
-    resp = requests.get(url, params={"offset": offset, "timeout": 5}, timeout=10)
-    resp.raise_for_status()
-    updates = resp.json().get("result", [])
-
-    if not updates:
-        return
-
-    logger.info(f"Telegram: {len(updates)} update(s) received.")
+def _process_updates(updates: list):
+    """受信した update リストを処理する。"""
+    allowed_chat_id = os.getenv("TELEGRAM_CHAT_ID", "")
     for update in updates:
         message = update.get("message", {})
         text = message.get("text", "").strip()
         chat_id = str(message.get("chat", {}).get("id", ""))
-        allowed_chat_id = os.getenv("TELEGRAM_CHAT_ID", "")
 
-        # 自分のチャット以外は無視
         if chat_id != allowed_chat_id:
             continue
 
         if not text:
             continue
 
-        # コマンド処理
         if text.startswith("/"):
             _handle_command(text)
             continue
 
-        # 転送メッセージはその旨を件名に含める
         is_forwarded = "forward_origin" in message or "forward_from" in message or "forward_from_chat" in message
         subject = "転送メッセージ" if is_forwarded else "Telegram メッセージ"
 
@@ -147,6 +129,43 @@ def process_telegram_messages():
             send_message("ℹ️ タスクは見つかりませんでした")
             logger.info("Telegram: no tasks extracted.")
 
-    # 次回から処理済みをスキップ
-    last_update_id = updates[-1]["update_id"]
-    _save_offset(last_update_id + 1)
+
+def run_listener():
+    """ロングポーリングでメッセージを常時待機し、届いた瞬間に処理する。"""
+    import threading
+    token = _get_token()
+    if not token:
+        logger.error("TELEGRAM_BOT_TOKEN が未設定です。")
+        return
+
+    url = f"{TELEGRAM_API_BASE.format(token=token)}/getUpdates"
+    offset = _load_offset()
+    logger.info("Telegram listener started (long polling).")
+
+    stop_event = threading.Event()
+
+    def loop():
+        nonlocal offset
+        while not stop_event.is_set():
+            try:
+                resp = requests.get(
+                    url,
+                    params={"offset": offset, "timeout": 30},
+                    timeout=35,
+                )
+                resp.raise_for_status()
+                updates = resp.json().get("result", [])
+                if updates:
+                    logger.info(f"Telegram: {len(updates)} update(s) received.")
+                    _process_updates(updates)
+                    offset = updates[-1]["update_id"] + 1
+                    _save_offset(offset)
+            except requests.exceptions.Timeout:
+                pass  # タイムアウトは正常（メッセージなし）
+            except Exception as e:
+                logger.error("Telegram listener error: %s", e)
+                stop_event.wait(5)  # エラー時は5秒待ってリトライ
+
+    t = threading.Thread(target=loop, daemon=True, name="telegram-listener")
+    t.start()
+    return stop_event
