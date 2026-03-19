@@ -9,6 +9,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 
 from agent.gmail_handler import process_unread_emails
 from agent.calendar_handler import send_daily_briefing, send_task_reminder, send_overdue_alert
+from agent.telegram_handler import process_telegram_messages
 
 load_dotenv()
 logging.basicConfig(
@@ -20,6 +21,14 @@ logger = logging.getLogger(__name__)
 
 def main():
     scheduler = BlockingScheduler(timezone="Asia/Tokyo")
+
+    # Telegram メッセージ取得・タスク抽出（1分毎）
+    scheduler.add_job(
+        process_telegram_messages,
+        "interval",
+        minutes=1,
+        id="telegram_check",
+    )
 
     # Gmail → Notion タスク抽出（15分毎）
     interval_min = int(os.getenv("GMAIL_CHECK_INTERVAL_MINUTES", 15))
