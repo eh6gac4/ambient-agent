@@ -50,6 +50,26 @@ docker compose up -d
 docker compose logs -f
 ```
 
+## スケジュール
+
+### システム稼働時間（cron）
+
+| 時刻 | 動作 |
+|---|---|
+| 07:55 | Docker 起動 |
+| 20:00 | Docker 停止（夜間停止） |
+| reboot 時 | 自動起動 |
+
+### 定期ジョブ（APScheduler）
+
+| 時刻 / 間隔 | ジョブ |
+|---|---|
+| 08:00 | 日次ブリーフィング（Google Calendar → Telegram） |
+| 08:05 | API コストレポート（Telegram） |
+| 09:00 | 期限切れタスクアラート（Telegram） |
+| 3時間毎 | タスクリマインド（Telegram） |
+| 15分毎 | Gmail チェック → タスク抽出 → Notion 登録 |
+
 ## ファイル構成
 
 ```
