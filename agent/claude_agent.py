@@ -4,6 +4,7 @@ Claude API を呼び出す薄いラッパー。
 """
 import os
 import anthropic
+from agent.usage_tracker import record_usage
 
 _client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 MODEL = "claude-sonnet-4-20250514"
@@ -26,6 +27,7 @@ def extract_tasks_from_email(subject: str, body: str) -> list[dict]:
         system=system_prompt,
         messages=[{"role": "user", "content": user_message}],
     )
+    record_usage("extract_tasks", response.usage.input_tokens, response.usage.output_tokens)
 
     import json, re
     text = response.content[0].text
@@ -66,4 +68,5 @@ def summarize_day(calendar_events: list[dict], notion_tasks: list[dict]) -> str:
         max_tokens=512,
         messages=[{"role": "user", "content": prompt}],
     )
+    record_usage("summarize_day", response.usage.input_tokens, response.usage.output_tokens)
     return response.content[0].text

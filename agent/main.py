@@ -12,6 +12,7 @@ from agent.gmail_handler import process_unread_emails
 from agent.calendar_handler import send_daily_briefing, send_task_reminder, send_overdue_alert
 from agent.telegram_handler import process_telegram_messages
 from agent.telegram_notifier import send_message
+from agent.usage_tracker import send_cost_report
 
 load_dotenv()
 logging.basicConfig(
@@ -79,6 +80,16 @@ def main():
         hour=briefing_hour,
         minute=0,
         id="daily_briefing",
+    )
+
+    # コストレポート（毎朝日次ブリーフィングの直後）
+    cost_report_hour = int(os.getenv("COST_REPORT_HOUR", briefing_hour))
+    scheduler.add_job(
+        send_cost_report,
+        "cron",
+        hour=cost_report_hour,
+        minute=5,
+        id="cost_report",
     )
 
     logger.info("Ambient Agent started.")
