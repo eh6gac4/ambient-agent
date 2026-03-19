@@ -56,16 +56,52 @@ def _handle_command(text: str):
     arg = parts[1].strip() if len(parts) > 1 else ""
 
     if command == "/tasks":
+        import datetime
         tasks = get_pending_tasks()
         if not tasks:
             send_message("✅ 未着手のタスクはありません")
             return
         _save_task_cache(tasks)
+
+        today = datetime.date.today()
+        week_end = today + datetime.timedelta(days=7)
+
+        def due_key(t):
+            d = t.get("due")
+            if not d:
+                return (3, "")
+            try:
+                dt = datetime.date.fromisoformat(d[:10])
+                if dt < today:
+                    return (0, d)
+                if dt <= week_end:
+                    return (1, d)
+                return (2, d)
+            except ValueError:
+                return (3, d)
+
+        def fmt_due(d):
+            try:
+                dt = datetime.date.fromisoformat(d[:10])
+                return dt.strftime("%Y年%m月%d日")
+            except (ValueError, TypeError):
+                return d
+
+        sorted_tasks = sorted(tasks, key=due_key)
+        _save_task_cache(sorted_tasks)
+
+        group_labels = {0: "⚠️ 期限切れ", 1: "📅 今週中", 2: "📆 それ以降", 3: "📌 期限なし"}
+        current_group = None
         lines = []
-        for i, t in enumerate(tasks, 1):
-            due = f" (期限: {t['due']})" if t.get("due") else ""
+        for i, t in enumerate(sorted_tasks, 1):
+            grp = due_key(t)[0]
+            if grp != current_group:
+                current_group = grp
+                lines.append(f"\n*{group_labels[grp]}*")
+            due = f"（{fmt_due(t['due'])}）" if t.get("due") else ""
             lines.append(f"{i}. [{t.get('priority', '?')}] {t['title']}{due}")
-        send_message(f"*📋 未着手タスク ({len(tasks)}件)*\n\n" + "\n".join(lines) + "\n\n`/done <番号>` で完了にできます")
+
+        send_message(f"*📋 未着手タスク ({len(sorted_tasks)}件)*" + "\n".join(lines) + "\n\n`/done <番号>` で完了にできます")
 
     elif command == "/done":
         if not arg.isdigit():
