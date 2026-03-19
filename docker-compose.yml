@@ -4,6 +4,8 @@ services:
     container_name: ambient-agent
     restart: no
     env_file: .env
+    environment:
+      - TZ=Asia/Tokyo
     volumes:
       - ./data:/app/data          # token.json などの永続化
       - ./prompts:/app/prompts
