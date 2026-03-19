@@ -2,7 +2,7 @@ services:
   agent:
     build: .
     container_name: ambient-agent
-    restart: unless-stopped
+    restart: no
     env_file: .env
     volumes:
       - ./data:/app/data          # token.json などの永続化
