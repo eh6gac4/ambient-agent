@@ -69,7 +69,7 @@ def get_overdue_tasks() -> list[dict]:
         due = due_obj["start"] if due_obj else None
         priority_obj = props.get("Priority", {}).get("select")
         priority = priority_obj["name"] if priority_obj else "medium"
-        tasks.append({"title": title_text, "due": due, "priority": priority, "url": page.get("url", "")})
+        tasks.append({"title": title_text, "due": due, "priority": priority, "url": page.get("url", ""), "page_id": page["id"]})
     return tasks
 
 
@@ -91,5 +91,13 @@ def get_pending_tasks() -> list[dict]:
         due = due_obj["start"] if due_obj else None
         priority_obj = props.get("Priority", {}).get("select")
         priority = priority_obj["name"] if priority_obj else "medium"
-        tasks.append({"title": title_text, "due": due, "priority": priority, "url": page.get("url", "")})
+        tasks.append({"title": title_text, "due": due, "priority": priority, "url": page.get("url", ""), "page_id": page["id"]})
     return tasks
+
+
+def complete_task(page_id: str):
+    """指定ページのステータスを完了に更新する。"""
+    _notion.pages.update(
+        page_id=page_id,
+        properties={"Status": {"status": {"name": "完了"}}},
+    )

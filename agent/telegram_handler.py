@@ -1,6 +1,7 @@
 """
 agent/telegram_handler.py
 Telegram Bot のメッセージを取得し、タスクを抽出して Notion に登録する。
+コマンド: /tasks, /done <番号>, /add <テキスト>
 """
 import logging
 import os
@@ -8,13 +9,14 @@ import json
 import requests
 
 from agent.claude_agent import extract_tasks_from_email
-from agent.notion_handler import add_task
+from agent.notion_handler import add_task, get_pending_tasks, complete_task
 from agent.telegram_notifier import send_message
 
 logger = logging.getLogger(__name__)
 
 TELEGRAM_API_BASE = "https://api.telegram.org/bot{token}"
 _OFFSET_FILE = "data/telegram_offset.json"
+_TASK_CACHE_FILE = "data/task_cache.json"
 
 
 def _get_token() -> str:
@@ -32,6 +34,66 @@ def _load_offset() -> int:
 def _save_offset(offset: int):
     with open(_OFFSET_FILE, "w") as f:
         json.dump({"offset": offset}, f)
+
+
+def _save_task_cache(tasks: list[dict]):
+    with open(_TASK_CACHE_FILE, "w") as f:
+        json.dump(tasks, f, ensure_ascii=False)
+
+
+def _load_task_cache() -> list[dict]:
+    try:
+        with open(_TASK_CACHE_FILE) as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+
+
+def _handle_command(text: str):
+    """コマンドを解析して処理する。"""
+    parts = text.strip().split(None, 1)
+    command = parts[0].lower()
+    arg = parts[1].strip() if len(parts) > 1 else ""
+
+    if command == "/tasks":
+        tasks = get_pending_tasks()
+        if not tasks:
+            send_message("✅ 未着手のタスクはありません")
+            return
+        _save_task_cache(tasks)
+        lines = []
+        for i, t in enumerate(tasks, 1):
+            due = f" (期限: {t['due']})" if t.get("due") else ""
+            lines.append(f"{i}. [{t.get('priority', '?')}] {t['title']}{due}")
+        send_message(f"*📋 未着手タスク ({len(tasks)}件)*\n\n" + "\n".join(lines) + "\n\n`/done <番号>` で完了にできます")
+
+    elif command == "/done":
+        if not arg.isdigit():
+            send_message("使い方: `/done 2`（番号は `/tasks` で確認）")
+            return
+        index = int(arg) - 1
+        tasks = _load_task_cache()
+        if not tasks:
+            send_message("先に `/tasks` でタスク一覧を取得してください")
+            return
+        if index < 0 or index >= len(tasks):
+            send_message(f"番号が範囲外です（1〜{len(tasks)}）")
+            return
+        task = tasks[index]
+        complete_task(task["page_id"])
+        send_message(f"✅ 完了にしました\n\n*{task['title']}*")
+        logger.info(f"Task completed: {task['title']}")
+
+    elif command == "/add":
+        if not arg:
+            send_message("使い方: `/add 〇〇を確認する`")
+            return
+        add_task({"title": arg, "source": "Telegram", "priority": "medium"})
+        send_message(f"✅ タスクを追加しました\n\n*{arg}*")
+        logger.info(f"Task added via /add: {arg}")
+
+    else:
+        send_message("使えるコマンド:\n`/tasks` — タスク一覧\n`/done <番号>` — 完了にする\n`/add <タスク名>` — タスクを追加")
 
 
 def process_telegram_messages():
@@ -61,22 +123,29 @@ def process_telegram_messages():
         if chat_id != allowed_chat_id:
             continue
 
+        if not text:
+            continue
+
+        # コマンド処理
+        if text.startswith("/"):
+            _handle_command(text)
+            continue
+
         # 転送メッセージはその旨を件名に含める
         is_forwarded = "forward_origin" in message or "forward_from" in message or "forward_from_chat" in message
         subject = "転送メッセージ" if is_forwarded else "Telegram メッセージ"
 
-        if text:
-            tasks = extract_tasks_from_email(subject, text)
-            if tasks:
-                for task in tasks:
-                    task["source"] = "Telegram"
-                    add_task(task)
-                    logger.info(f"Task added from Telegram: {task.get('title')}")
-                titles = "\n".join(f"• {t['title']}" for t in tasks)
-                send_message(f"✅ タスクを登録しました\n\n{titles}")
-            else:
-                send_message("ℹ️ タスクは見つかりませんでした")
-                logger.info("Telegram: no tasks extracted.")
+        tasks = extract_tasks_from_email(subject, text)
+        if tasks:
+            for task in tasks:
+                task["source"] = "Telegram"
+                add_task(task)
+                logger.info(f"Task added from Telegram: {task.get('title')}")
+            titles = "\n".join(f"• {t['title']}" for t in tasks)
+            send_message(f"✅ タスクを登録しました\n\n{titles}")
+        else:
+            send_message("ℹ️ タスクは見つかりませんでした")
+            logger.info("Telegram: no tasks extracted.")
 
     # 次回から処理済みをスキップ
     last_update_id = updates[-1]["update_id"]
