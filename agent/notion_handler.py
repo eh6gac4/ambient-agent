@@ -15,6 +15,34 @@ from notion_client import Client
 logger = logging.getLogger(__name__)
 _notion = Client(auth=os.getenv("NOTION_TOKEN"))
 DB_ID = os.getenv("NOTION_TASKS_DB_ID", "")
+_data_source_id: str | None = None
+
+
+def _get_data_source_id() -> str | None:
+    """DB_ID に対応する data_source_id をキャッシュして返す。"""
+    global _data_source_id
+    if _data_source_id:
+        return _data_source_id
+    if not DB_ID:
+        return None
+    db = _notion.databases.retrieve(database_id=DB_ID)
+    sources = db.get("data_sources", [])
+    if sources:
+        _data_source_id = sources[0]["id"]
+    return _data_source_id
+
+
+def _query_db(filter_body: dict) -> dict:
+    """data_sources.query を使ってDBをフィルタ検索する。"""
+    ds_id = _get_data_source_id()
+    if ds_id:
+        return _notion.data_sources.query(data_source_id=ds_id, filter=filter_body)
+    # フォールバック（data_sources が取得できない場合）
+    return _notion.request(
+        path=f"databases/{DB_ID}/query",
+        method="POST",
+        body={"filter": filter_body},
+    )
 
 
 def add_task(task: dict):
@@ -51,18 +79,12 @@ def get_overdue_tasks() -> list[dict]:
         return []
 
     today = __import__("datetime").date.today().isoformat()
-    results = _notion.request(
-        path=f"databases/{DB_ID}/query",
-        method="POST",
-        body={
-            "filter": {
-                "and": [
-                    {"property": "Status", "status": {"equals": "未着手"}},
-                    {"property": "Due", "date": {"before": today}},
-                ]
-            }
-        },
-    )
+    results = _query_db({
+        "and": [
+            {"property": "Status", "status": {"equals": "未着手"}},
+            {"property": "Due", "date": {"before": today}},
+        ]
+    })
     tasks = []
     for page in results.get("results", []):
         props = page["properties"]
@@ -81,11 +103,7 @@ def get_pending_tasks() -> list[dict]:
     if not DB_ID:
         return []
 
-    results = _notion.request(
-        path=f"databases/{DB_ID}/query",
-        method="POST",
-        body={"filter": {"property": "Status", "status": {"equals": "未着手"}}},
-    )
+    results = _query_db({"property": "Status", "status": {"equals": "未着手"}})
     tasks = []
     for page in results.get("results", []):
         props = page["properties"]
