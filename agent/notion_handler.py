@@ -63,5 +63,5 @@ def get_pending_tasks() -> list[dict]:
         due = due_obj["start"] if due_obj else None
         priority_obj = props.get("Priority", {}).get("select")
         priority = priority_obj["name"] if priority_obj else "medium"
-        tasks.append({"title": title_text, "due": due, "priority": priority})
+        tasks.append({"title": title_text, "due": due, "priority": priority, "url": page.get("url", "")})
     return tasks

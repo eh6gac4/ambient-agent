@@ -27,7 +27,9 @@ def send_task_reminder():
         lines = []
         for t in tasks:
             due = f" (期限: {t['due']})" if t.get("due") else ""
-            lines.append(f"• [{t.get('priority', '?')}] {t['title']}{due}")
+            url = t.get("url", "")
+            link = f" [開く]({url})" if url else ""
+            lines.append(f"• [{t.get('priority', '?')}] {t['title']}{due}{link}")
         body = "\n".join(lines)
         send_message(f"*📋 未完了タスク ({len(tasks)}件)*\n\n{body}")
         logger.info(f"Task reminder sent ({len(tasks)} tasks).")
