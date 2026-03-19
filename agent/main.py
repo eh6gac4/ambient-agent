@@ -6,10 +6,12 @@ import logging
 import os
 from dotenv import load_dotenv
 from apscheduler.schedulers.blocking import BlockingScheduler
+from apscheduler.events import EVENT_JOB_ERROR
 
 from agent.gmail_handler import process_unread_emails
 from agent.calendar_handler import send_daily_briefing, send_task_reminder, send_overdue_alert
 from agent.telegram_handler import process_telegram_messages
+from agent.telegram_notifier import send_message
 
 load_dotenv()
 logging.basicConfig(
@@ -19,8 +21,19 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def _on_job_error(event):
+    exc = event.exception
+    msg = f"⚠️ *Ambient Agent エラー*\nJob: `{event.job_id}`\n```\n{type(exc).__name__}: {exc}\n```"
+    logger.error("Job %s failed: %s", event.job_id, exc)
+    try:
+        send_message(msg)
+    except Exception as e:
+        logger.error("Failed to send error notification: %s", e)
+
+
 def main():
     scheduler = BlockingScheduler(timezone="Asia/Tokyo")
+    scheduler.add_listener(_on_job_error, EVENT_JOB_ERROR)
 
     # Telegram メッセージ取得・タスク抽出（1分毎）
     scheduler.add_job(

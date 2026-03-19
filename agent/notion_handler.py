@@ -51,13 +51,16 @@ def get_overdue_tasks() -> list[dict]:
         return []
 
     today = __import__("datetime").date.today().isoformat()
-    results = _notion.databases.query(
-        database_id=DB_ID,
-        filter={
-            "and": [
-                {"property": "Status", "status": {"equals": "未着手"}},
-                {"property": "Due", "date": {"before": today}},
-            ]
+    results = _notion.request(
+        path=f"databases/{DB_ID}/query",
+        method="POST",
+        body={
+            "filter": {
+                "and": [
+                    {"property": "Status", "status": {"equals": "未着手"}},
+                    {"property": "Due", "date": {"before": today}},
+                ]
+            }
         },
     )
     tasks = []
@@ -78,9 +81,10 @@ def get_pending_tasks() -> list[dict]:
     if not DB_ID:
         return []
 
-    results = _notion.databases.query(
-        database_id=DB_ID,
-        filter={"property": "Status", "status": {"equals": "未着手"}},
+    results = _notion.request(
+        path=f"databases/{DB_ID}/query",
+        method="POST",
+        body={"filter": {"property": "Status", "status": {"equals": "未着手"}}},
     )
     tasks = []
     for page in results.get("results", []):
