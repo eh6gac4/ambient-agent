@@ -17,6 +17,17 @@ docker compose logs -f
 - **Notion API は `data_sources.query` を使う。** `notion_handler.py` の `_query_db()` 参照。
 - **409 Conflict が出たら**、同一 Bot Token で複数プロセスが動いている。`docker compose ps` と `ps aux` で確認して重複プロセスを停止する。
 
+## ドキュメント更新ルール
+
+コードを変更したら、影響する箇所を README.md に反映する。
+
+| 変更内容 | 更新箇所 |
+|---|---|
+| ジョブの追加・削除・時刻変更 | スケジュール表 |
+| Telegram コマンドの追加・変更 | Telegram コマンド表 |
+| ファイルの追加・削除 | ファイル構成 |
+| Notion DB プロパティの変更 | Notion DB 必須プロパティ表 |
+
 ## アーキテクチャ
 
 - APScheduler（BlockingScheduler）でジョブ管理
