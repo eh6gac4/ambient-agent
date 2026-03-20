@@ -40,12 +40,12 @@ def main():
     # Telegram ロングポーリング（メッセージ着信時即時処理）
     run_listener()
 
-    # Gmail → Notion タスク抽出（15分毎）
-    interval_min = int(os.getenv("GMAIL_CHECK_INTERVAL_MINUTES", 15))
+    # Gmail → Notion タスク抽出（08:00-19:45、15分毎）
     scheduler.add_job(
         process_unread_emails,
-        "interval",
-        minutes=interval_min,
+        "cron",
+        hour="8-19",
+        minute="*/15",
         id="gmail_check",
     )
 

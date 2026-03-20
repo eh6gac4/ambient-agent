@@ -3,6 +3,7 @@ agent/telegram_handler.py
 Telegram Bot のメッセージを取得し、タスクを抽出して Notion に登録する。
 コマンド: /tasks, /done <番号>, /add <テキスト>
 """
+import datetime
 import json
 import logging
 import os
@@ -142,6 +143,12 @@ def _process_updates(updates: list):
 
         if text.startswith("/"):
             _handle_command(text)
+            continue
+
+        # 夜間（20:00-07:59）は Claude API を使う処理をスキップ
+        hour = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9))).hour
+        if not (8 <= hour < 20):
+            send_message("🌙 夜間はタスク抽出を停止中です（8:00-20:00 に受け付けます）")
             continue
 
         url_match = _URL_PATTERN.match(text)

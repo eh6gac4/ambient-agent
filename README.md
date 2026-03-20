@@ -53,13 +53,14 @@ docker compose logs -f
 
 ## スケジュール
 
-### システム稼働時間（cron）
+### システム稼働（cron）
 
-| 時刻 | 動作 |
+| タイミング | 動作 |
 |---|---|
-| 07:55 | Docker 起動 |
-| 20:00 | Docker 停止 |
-| reboot 時 | 自動起動 |
+| reboot 時 | `docker compose up -d` で自動起動 |
+| 5分毎 | watchdog でコンテナ死活監視（停止時に Telegram 通知） |
+
+サービスは **24時間365日稼働**。コストのかかる Claude API 呼び出しのみ 08:00〜20:00 JST に制限。
 
 ### 定期ジョブ（APScheduler）
 
@@ -69,7 +70,7 @@ docker compose logs -f
 | 08:00 | 日次ブリーフィング | 当日の Google Calendar イベント・Notion 未着手タスク・期限切れタスクを Claude で要約し Telegram に送信 |
 | 08:05 | API コストレポート | 前日分の Claude API 利用コストを Telegram に送信 |
 | 11:00 / 14:00 / 17:00 | タスクリマインド | Notion の未着手タスク一覧を Telegram に送信 |
-| 15分毎 | Gmail チェック | 未読メールを取得 → Claude でタスク抽出 → Notion に登録 |
+| 08:00〜19:45、15分毎 | Gmail チェック | 未読メールを取得 → Claude でタスク抽出 → Notion に登録 |
 
 ## Telegram コマンド
 

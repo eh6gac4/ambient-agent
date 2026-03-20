@@ -2,7 +2,7 @@ services:
   agent:
     build: .
     container_name: ambient-agent
-    restart: no
+    restart: unless-stopped
     env_file: .env
     environment:
       - TZ=Asia/Tokyo
