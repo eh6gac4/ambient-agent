@@ -77,6 +77,10 @@ def add_task(task: dict):
         "Source": {"rich_text": [{"text": {"content": task.get("source", "Gmail")}}]},
     }
 
+    source_url = task.get("source_url")
+    if source_url:
+        properties["SourceURL"] = {"url": source_url}
+
     due = task.get("due")
     if due:
         properties["Due"] = {"date": {"start": due}}

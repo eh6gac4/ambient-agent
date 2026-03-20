@@ -27,6 +27,7 @@ Notion DB の必須プロパティ:
 | Priority | セレクト | high / medium / low |
 | Status | ステータス | 未着手 / 完了 |
 | Source | テキスト | Gmail / Telegram など |
+| SourceURL | URL | メール元タスクの Gmail リンク |
 
 ### 3. 環境変数
 

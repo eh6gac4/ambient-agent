@@ -95,7 +95,9 @@ def process_unread_emails():
             body = body[:3000]
             tasks = extract_tasks_from_email(subject, body)
 
+            gmail_url = f"https://mail.google.com/mail/u/0/#all/{msg_id}"
             for task in tasks:
+                task["source_url"] = gmail_url
                 add_task(task)
                 logger.info(f"Task added: {task.get('title')}")
 
