@@ -89,17 +89,12 @@ def main():
     )
 
     def _shutdown(signum, frame):
-        try:
-            send_message("🔴 *Ambient Agent 停止*")
-        except Exception:
-            pass
         scheduler.shutdown(wait=False)
 
     signal.signal(signal.SIGTERM, _shutdown)
 
     logger.info("Ambient Agent started.")
     try:
-        send_message("🟢 *Ambient Agent 起動*")
         scheduler.start()
     except (KeyboardInterrupt, SystemExit):
         logger.info("Shutting down.")
