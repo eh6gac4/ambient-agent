@@ -7,7 +7,7 @@ import anthropic
 from agent.usage_tracker import record_usage
 
 _client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-MODEL = "claude-sonnet-4-20250514"
+MODEL = "claude-haiku-4-5-20251001"
 
 
 def extract_tasks_from_email(subject: str, body: str) -> list[dict]:
