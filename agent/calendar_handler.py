@@ -8,7 +8,7 @@ from datetime import datetime, timezone, timedelta
 from googleapiclient.discovery import build
 
 from agent.google_auth import get_credentials
-from agent.notion_handler import get_pending_tasks, get_overdue_tasks
+from agent.notion_handler import get_pending_tasks, get_overdue_tasks, escalate_priority_tasks
 from agent.claude_agent import summarize_day
 from agent.telegram_notifier import send_message
 
@@ -55,6 +55,21 @@ def send_overdue_alert():
         logger.info(f"Overdue alert sent ({len(tasks)} tasks).")
     except Exception:
         logger.exception("Error in send_overdue_alert")
+
+
+def send_escalation_notice():
+    """期限3日以内の medium タスクを high に昇格し、変更があれば Telegram に通知する。"""
+    logger.info("Checking priority escalations...")
+    try:
+        escalated = escalate_priority_tasks()
+        if not escalated:
+            logger.info("No tasks escalated.")
+            return
+        lines = [f"• {t['title']}（期限: {t['due']}）" for t in escalated]
+        send_message(f"*⬆️ 優先度を high に昇格しました ({len(escalated)}件)*\n\n" + "\n".join(lines))
+        logger.info(f"Escalated {len(escalated)} tasks.")
+    except Exception:
+        logger.exception("Error in send_escalation_notice")
 
 
 def send_daily_briefing():

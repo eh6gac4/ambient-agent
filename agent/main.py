@@ -10,7 +10,7 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.events import EVENT_JOB_ERROR
 
 from agent.gmail_handler import process_unread_emails
-from agent.calendar_handler import send_daily_briefing, send_task_reminder
+from agent.calendar_handler import send_daily_briefing, send_task_reminder, send_escalation_notice
 from agent.telegram_handler import run_listener
 from agent.telegram_notifier import send_message
 from agent.usage_tracker import send_cost_report
@@ -61,6 +61,15 @@ def main():
 
     # 日次ブリーフィング（毎朝指定時刻）
     briefing_hour = int(os.getenv("DAILY_BRIEFING_HOUR", 8))
+
+    # 優先度昇格（毎朝ブリーフィング前）
+    scheduler.add_job(
+        send_escalation_notice,
+        "cron",
+        hour=briefing_hour - 1,
+        minute=58,
+        id="priority_escalation",
+    )
     scheduler.add_job(
         send_daily_briefing,
         "cron",

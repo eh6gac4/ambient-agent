@@ -117,6 +117,41 @@ def get_pending_tasks() -> list[dict]:
     return tasks
 
 
+def escalate_priority_tasks() -> list[dict]:
+    """期限3日以内の medium タスクを high に昇格し、変更したタスク一覧を返す。"""
+    if not DB_ID:
+        return []
+
+    import datetime
+    today = datetime.date.today()
+    deadline = (today + datetime.timedelta(days=3)).isoformat()
+    today_str = today.isoformat()
+
+    results = _query_db({
+        "and": [
+            {"property": "Status", "status": {"equals": "未着手"}},
+            {"property": "Priority", "select": {"equals": "medium"}},
+            {"property": "Due", "date": {"on_or_before": deadline}},
+            {"property": "Due", "date": {"on_or_after": today_str}},
+        ]
+    })
+
+    escalated = []
+    for page in results.get("results", []):
+        props = page["properties"]
+        title = props.get("タイトル", {}).get("title", [])
+        title_text = title[0]["text"]["content"] if title else ""
+        due_obj = props.get("Due", {}).get("date")
+        due = due_obj["start"] if due_obj else None
+        _notion.pages.update(
+            page_id=page["id"],
+            properties={"Priority": {"select": {"name": "high"}}},
+        )
+        escalated.append({"title": title_text, "due": due, "page_id": page["id"]})
+
+    return escalated
+
+
 def complete_task(page_id: str):
     """指定ページのステータスを完了に更新する。"""
     _notion.pages.update(
