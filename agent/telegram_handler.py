@@ -125,6 +125,7 @@ def _handle_url(url: str):
 
     for task in tasks:
         task["source"] = "URL"
+        task["source_url"] = url
         add_task(task)
         logger.info(f"Task added from URL: {task.get('title')}")
     titles = "\n".join(f"• {t['title']}" for t in tasks)
