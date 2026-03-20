@@ -36,7 +36,7 @@ def notify_unread_emails():
         service = build("gmail", "v1", credentials=get_credentials())
         results = service.users().messages().list(
             userId="me",
-            q="is:unread -category:promotions -category:social",
+            q="is:unread in:inbox -category:promotions -category:social",
             maxResults=20,
         ).execute()
 
@@ -73,7 +73,7 @@ def process_unread_emails():
         service = build("gmail", "v1", credentials=get_credentials())
         results = service.users().messages().list(
             userId="me",
-            q="is:unread -category:promotions -category:social",
+            q="is:unread in:inbox -category:promotions -category:social",
             maxResults=20,
         ).execute()
 
