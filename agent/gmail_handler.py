@@ -9,6 +9,7 @@ from googleapiclient.discovery import build
 from agent.google_auth import get_credentials
 from agent.claude_agent import extract_tasks_from_email
 from agent.notion_handler import add_task
+from agent.telegram_notifier import send_message
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,43 @@ def _load_processed_ids() -> set[str]:
 def _save_processed_id(msg_id: str):
     with open(_PROCESSED_IDS_FILE, "a") as f:
         f.write(msg_id + "\n")
+
+
+def notify_unread_emails():
+    """未読メールの件名・送信者を Telegram に通知する（Claude 呼び出しなし）。"""
+    logger.info("Notifying unread emails...")
+    try:
+        service = build("gmail", "v1", credentials=get_credentials())
+        results = service.users().messages().list(
+            userId="me",
+            q="is:unread -category:promotions -category:social",
+            maxResults=20,
+        ).execute()
+
+        messages = results.get("messages", [])
+        if not messages:
+            logger.info("No unread messages.")
+            return
+
+        lines = []
+        for msg_meta in messages:
+            msg = service.users().messages().get(
+                userId="me", id=msg_meta["id"], format="metadata",
+                metadataHeaders=["Subject", "From"],
+            ).execute()
+            headers = {h["name"]: h["value"] for h in msg["payload"].get("headers", [])}
+            subject = headers.get("Subject", "(件名なし)")
+            sender = headers.get("From", "")
+            # "名前 <email>" → "名前" だけ取り出す
+            sender_name = sender.split("<")[0].strip().strip('"') or sender
+            lines.append(f"• {subject}（{sender_name}）")
+
+        body = "\n".join(lines)
+        send_message(f"*📧 未読メール {len(messages)}件*\n\n{body}")
+        logger.info(f"Notified {len(messages)} unread email(s).")
+
+    except Exception:
+        logger.exception("Error in notify_unread_emails")
 
 
 def process_unread_emails():

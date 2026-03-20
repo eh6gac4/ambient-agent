@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.events import EVENT_JOB_ERROR
 
-from agent.gmail_handler import process_unread_emails
+from agent.gmail_handler import process_unread_emails, notify_unread_emails
 from agent.calendar_handler import send_daily_briefing, send_task_reminder, send_escalation_notice
 from agent.telegram_handler import run_listener
 from agent.telegram_notifier import send_message
@@ -40,12 +40,24 @@ def main():
     # Telegram ロングポーリング（メッセージ着信時即時処理）
     run_listener()
 
-    # Gmail → Notion タスク抽出（08:00-19:45、15分毎）
+    # 日次ブリーフィング（毎朝指定時刻）
+    briefing_hour = int(os.getenv("DAILY_BRIEFING_HOUR", 8))
+
+    # Gmail 未読通知（9:00 / 12:00 / 15:00 / 18:00、Claude 呼び出しなし）
+    scheduler.add_job(
+        notify_unread_emails,
+        "cron",
+        hour="9,12,15,18",
+        minute=0,
+        id="gmail_notify",
+    )
+
+    # Gmail → Notion タスク抽出（朝のみ、まだ未読のメールに Claude を実行）
     scheduler.add_job(
         process_unread_emails,
         "cron",
-        hour="8-19",
-        minute="*/15",
+        hour=briefing_hour,
+        minute=10,
         id="gmail_check",
     )
 
@@ -58,9 +70,6 @@ def main():
         minute=0,
         id="task_reminder",
     )
-
-    # 日次ブリーフィング（毎朝指定時刻）
-    briefing_hour = int(os.getenv("DAILY_BRIEFING_HOUR", 8))
 
     # 優先度昇格（毎朝ブリーフィング前）
     scheduler.add_job(
