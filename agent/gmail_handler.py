@@ -54,6 +54,7 @@ def process_unread_emails():
             ).execute()
 
             subject, body = _parse_message(msg)
+            body = body[:3000]
             tasks = extract_tasks_from_email(subject, body)
 
             for task in tasks:
