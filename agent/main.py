@@ -52,12 +52,12 @@ def main():
         id="gmail_notify",
     )
 
-    # Gmail → Notion タスク抽出（朝のみ、まだ未読のメールに Claude を実行）
+    # Gmail → Notion タスク抽出（ブリーフィング5分前、まだ未読のメールに Claude を実行）
     scheduler.add_job(
         process_unread_emails,
         "cron",
-        hour=briefing_hour,
-        minute=10,
+        hour=briefing_hour - 1,
+        minute=55,
         id="gmail_check",
     )
 

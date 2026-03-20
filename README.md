@@ -71,7 +71,7 @@ docker compose logs -f
 | 08:05 | API コストレポート | 前日分の Claude API 利用コストを Telegram に送信 |
 | 11:00 / 14:00 / 17:00 | タスクリマインド | Notion の未着手タスク一覧を Telegram に送信 |
 | 09:00 / 12:00 / 15:00 / 18:00 | Gmail 未読通知 | 未読メールの件名・送信者を Telegram に通知（Claude 呼び出しなし） |
-| 08:10 | Gmail タスク抽出 | 朝時点でまだ未読のメールに Claude を実行 → Notion に登録 |
+| 07:55 | Gmail タスク抽出 | 朝時点でまだ未読のメールに Claude を実行 → Notion に登録（ブリーフィング前） |
 
 ## Telegram コマンド
 
