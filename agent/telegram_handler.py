@@ -14,6 +14,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from agent.claude_agent import extract_tasks_from_email, extract_tasks_from_url_content
+from agent.config import OPERATING_START_HOUR, OPERATING_END_HOUR
 from agent.notion_handler import add_task, get_pending_tasks, complete_task
 from agent.task_formatter import format_task_list, sort_tasks
 from agent.telegram_notifier import send_message
@@ -145,10 +146,10 @@ def _process_updates(updates: list):
             _handle_command(text)
             continue
 
-        # 夜間（20:00-07:59）は Claude API を使う処理をスキップ
+        # 稼働時間外は Claude API を使う処理をスキップ
         hour = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=9))).hour
-        if not (8 <= hour < 20):
-            send_message("🌙 夜間はタスク抽出を停止中です（8:00-20:00 に受け付けます）")
+        if not (OPERATING_START_HOUR <= hour < OPERATING_END_HOUR):
+            send_message(f"🌙 夜間はタスク抽出を停止中です（{OPERATING_START_HOUR}:00-{OPERATING_END_HOUR}:00 に受け付けます）")
             continue
 
         url_match = _URL_PATTERN.match(text)

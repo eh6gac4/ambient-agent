@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.events import EVENT_JOB_ERROR
 
+from agent.config import OPERATING_START_HOUR, OPERATING_END_HOUR
 from agent.gmail_handler import process_unread_emails, notify_unread_emails
 from agent.calendar_handler import send_daily_briefing, send_task_reminder, send_escalation_notice
 from agent.telegram_handler import run_listener
@@ -43,11 +44,12 @@ def main():
     # 日次ブリーフィング（毎朝指定時刻）
     briefing_hour = int(os.getenv("DAILY_BRIEFING_HOUR", 8))
 
-    # Gmail 未読通知（9:00 / 12:00 / 15:00 / 18:00、Claude 呼び出しなし）
+    # Gmail 未読通知（稼働時間内を3時間おき、Claude 呼び出しなし）
+    notify_hours = ",".join(str(h) for h in range(OPERATING_START_HOUR + 1, OPERATING_END_HOUR, 3))
     scheduler.add_job(
         notify_unread_emails,
         "cron",
-        hour="9,12,15,18",
+        hour=notify_hours,
         minute=0,
         id="gmail_notify",
     )
