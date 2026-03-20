@@ -3,15 +3,18 @@ agent/telegram_handler.py
 Telegram Bot のメッセージを取得し、タスクを抽出して Notion に登録する。
 コマンド: /tasks, /done <番号>, /add <テキスト>
 """
+import json
 import logging
 import os
-import json
 import re
+import threading
+
 import requests
 from bs4 import BeautifulSoup
 
 from agent.claude_agent import extract_tasks_from_email, extract_tasks_from_url_content
 from agent.notion_handler import add_task, get_pending_tasks, complete_task
+from agent.task_formatter import format_task_list, sort_tasks
 from agent.telegram_notifier import send_message
 
 logger = logging.getLogger(__name__)
@@ -19,6 +22,7 @@ logger = logging.getLogger(__name__)
 TELEGRAM_API_BASE = "https://api.telegram.org/bot{token}"
 _OFFSET_FILE = "data/telegram_offset.json"
 _TASK_CACHE_FILE = "data/task_cache.json"
+_URL_PATTERN = re.compile(r"https?://\S+")
 
 
 def _get_token() -> str:
@@ -58,36 +62,14 @@ def _handle_command(text: str):
     arg = parts[1].strip() if len(parts) > 1 else ""
 
     if command == "/tasks":
-        import datetime
         tasks = get_pending_tasks()
         if not tasks:
             send_message("✅ 未着手のタスクはありません")
             return
-
-        def fmt_due(d):
-            try:
-                dt = datetime.date.fromisoformat(d[:10])
-                return dt.strftime("%Y年%m月%d日")
-            except (ValueError, TypeError):
-                return d
-
-        priority_order = {"high": 0, "medium": 1, "low": 2}
-        priority_labels = {"high": "🔴 High", "medium": "🟡 Medium", "low": "🟢 Low"}
-
-        sorted_tasks = sorted(tasks, key=lambda t: (priority_order.get(t.get("priority", "medium"), 1), t.get("due") or ""))
+        sorted_tasks = sort_tasks(tasks)
         _save_task_cache(sorted_tasks)
-
-        current_group = None
-        lines = []
-        for i, t in enumerate(sorted_tasks, 1):
-            grp = t.get("priority", "medium")
-            if grp != current_group:
-                current_group = grp
-                lines.append(f"\n*{priority_labels.get(grp, grp)}*")
-            due = f"（{fmt_due(t['due'])}）" if t.get("due") else ""
-            lines.append(f"{i}. {t['title']}{due}")
-
-        send_message(f"*📋 未着手タスク ({len(sorted_tasks)}件)*" + "\n".join(lines) + "\n\n`/done <番号>` で完了にできます")
+        body = format_task_list(tasks, numbered=True)
+        send_message(f"*📋 未着手タスク ({len(sorted_tasks)}件)*{body}\n\n`/done <番号>` で完了にできます")
 
     elif command == "/done":
         if not arg.isdigit():
@@ -118,9 +100,6 @@ def _handle_command(text: str):
         send_message("使えるコマンド:\n`/tasks` — タスク一覧\n`/done <番号>` — 完了にする\n`/add <タスク名>` — タスクを追加")
 
 
-_URL_PATTERN = re.compile(r"https?://\S+")
-
-
 def _handle_url(url: str):
     """URL のページ内容を取得し、タスクを抽出して Notion に登録する。"""
     try:
@@ -137,7 +116,6 @@ def _handle_url(url: str):
 
     tasks = extract_tasks_from_url_content(url, content)
     if not tasks:
-        # タスクが見つからない場合はページタイトルで「確認する」タスクを登録
         title_tag = soup.find("title")
         page_title = title_tag.get_text(strip=True) if title_tag else url
         tasks = [{"title": f"{page_title}を確認する", "due": None, "priority": "medium"}]
@@ -159,10 +137,7 @@ def _process_updates(updates: list):
         text = message.get("text", "").strip()
         chat_id = str(message.get("chat", {}).get("id", ""))
 
-        if chat_id != allowed_chat_id:
-            continue
-
-        if not text:
+        if chat_id != allowed_chat_id or not text:
             continue
 
         if text.startswith("/"):
@@ -192,7 +167,6 @@ def _process_updates(updates: list):
 
 def run_listener():
     """ロングポーリングでメッセージを常時待機し、届いた瞬間に処理する。"""
-    import threading
     token = _get_token()
     if not token:
         logger.error("TELEGRAM_BOT_TOKEN が未設定です。")
@@ -208,11 +182,7 @@ def run_listener():
         nonlocal offset
         while not stop_event.is_set():
             try:
-                resp = requests.get(
-                    url,
-                    params={"offset": offset, "timeout": 30},
-                    timeout=35,
-                )
+                resp = requests.get(url, params={"offset": offset, "timeout": 30}, timeout=35)
                 resp.raise_for_status()
                 updates = resp.json().get("result", [])
                 if updates:
@@ -221,10 +191,10 @@ def run_listener():
                     offset = updates[-1]["update_id"] + 1
                     _save_offset(offset)
             except requests.exceptions.Timeout:
-                pass  # タイムアウトは正常（メッセージなし）
+                pass
             except Exception as e:
                 logger.error("Telegram listener error: %s", e)
-                stop_event.wait(5)  # エラー時は5秒待ってリトライ
+                stop_event.wait(5)
 
     t = threading.Thread(target=loop, daemon=True, name="telegram-listener")
     t.start()

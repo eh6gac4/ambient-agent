@@ -11,9 +11,13 @@ logger = logging.getLogger(__name__)
 
 _LOG_FILE = "data/usage_log.jsonl"
 
-# claude-sonnet-4 の料金 (USD per 1M tokens)
-_PRICE_INPUT_PER_M = 3.0
-_PRICE_OUTPUT_PER_M = 15.0
+# claude-haiku-4 の料金 (USD per 1M tokens)
+_PRICE_INPUT_PER_M = 0.8
+_PRICE_OUTPUT_PER_M = 4.0
+
+
+def _calc_cost(input_tokens: int, output_tokens: int) -> float:
+    return input_tokens / 1_000_000 * _PRICE_INPUT_PER_M + output_tokens / 1_000_000 * _PRICE_OUTPUT_PER_M
 
 
 def record_usage(job: str, input_tokens: int, output_tokens: int):
@@ -64,15 +68,12 @@ def get_daily_summary(target_date: date) -> dict:
     except Exception:
         logger.exception("Failed to read usage log")
 
-    cost_usd = (total_input / 1_000_000 * _PRICE_INPUT_PER_M
-                + total_output / 1_000_000 * _PRICE_OUTPUT_PER_M)
-
     return {
         "date": target_date.isoformat(),
         "call_count": call_count,
         "total_input_tokens": total_input,
         "total_output_tokens": total_output,
-        "cost_usd": cost_usd,
+        "cost_usd": _calc_cost(total_input, total_output),
         "by_job": by_job,
     }
 
@@ -97,9 +98,7 @@ def send_cost_report():
     if summary["by_job"]:
         lines.append("\n*ジョブ別内訳*")
         for job, stats in summary["by_job"].items():
-            job_cost = (stats["input_tokens"] / 1_000_000 * _PRICE_INPUT_PER_M
-                        + stats["output_tokens"] / 1_000_000 * _PRICE_OUTPUT_PER_M)
-            lines.append(f"• `{job}`: {stats['calls']}回 / ${job_cost:.4f}")
+            lines.append(f"• `{job}`: {stats['calls']}回 / ${_calc_cost(stats['input_tokens'], stats['output_tokens']):.4f}")
 
     send_message("\n".join(lines))
     logger.info("Cost report sent for %s", yesterday)
