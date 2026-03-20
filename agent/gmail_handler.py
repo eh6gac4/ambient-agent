@@ -12,9 +12,20 @@ from agent.notion_handler import add_task
 
 logger = logging.getLogger(__name__)
 
-# 処理済みメッセージID を（再起動をまたがず）メモリで管理
-# TODO: 永続化したい場合は data/processed_ids.txt などに保存する
-_processed_ids: set[str] = set()
+_PROCESSED_IDS_FILE = "data/processed_ids.txt"
+
+
+def _load_processed_ids() -> set[str]:
+    try:
+        with open(_PROCESSED_IDS_FILE) as f:
+            return set(line.strip() for line in f if line.strip())
+    except FileNotFoundError:
+        return set()
+
+
+def _save_processed_id(msg_id: str):
+    with open(_PROCESSED_IDS_FILE, "a") as f:
+        f.write(msg_id + "\n")
 
 
 def process_unread_emails():
@@ -31,9 +42,11 @@ def process_unread_emails():
         messages = results.get("messages", [])
         logger.info(f"Found {len(messages)} unread message(s).")
 
+        processed_ids = _load_processed_ids()
+
         for msg_meta in messages:
             msg_id = msg_meta["id"]
-            if msg_id in _processed_ids:
+            if msg_id in processed_ids:
                 continue
 
             msg = service.users().messages().get(
@@ -47,7 +60,7 @@ def process_unread_emails():
                 add_task(task)
                 logger.info(f"Task added: {task.get('title')}")
 
-            _processed_ids.add(msg_id)
+            _save_processed_id(msg_id)
 
     except Exception:
         logger.exception("Error in process_unread_emails")
