@@ -17,21 +17,36 @@ JST = timezone(timedelta(hours=9))
 
 
 def send_task_reminder():
-    """未完了タスクを Telegram にリマインド送信する。"""
+    """未完了タスクを優先度グループ別に Telegram にリマインド送信する。"""
+    import datetime
     logger.info("Sending task reminder...")
     try:
         tasks = get_pending_tasks()
         if not tasks:
             logger.info("No pending tasks.")
             return
+
+        def fmt_due(d):
+            try:
+                return datetime.date.fromisoformat(d[:10]).strftime("%Y年%m月%d日")
+            except (ValueError, TypeError):
+                return d
+
+        priority_order = {"high": 0, "medium": 1, "low": 2}
+        priority_labels = {"high": "🔴 High", "medium": "🟡 Medium", "low": "🟢 Low"}
+        sorted_tasks = sorted(tasks, key=lambda t: (priority_order.get(t.get("priority", "medium"), 1), t.get("due") or ""))
+
+        current_group = None
         lines = []
-        for t in tasks:
-            due = f" (期限: {t['due']})" if t.get("due") else ""
-            url = t.get("url", "")
-            link = f" [開く]({url})" if url else ""
-            lines.append(f"• [{t.get('priority', '?')}] {t['title']}{due}{link}")
-        body = "\n".join(lines)
-        send_message(f"*📋 未完了タスク ({len(tasks)}件)*\n\n{body}")
+        for t in sorted_tasks:
+            grp = t.get("priority", "medium")
+            if grp != current_group:
+                current_group = grp
+                lines.append(f"\n*{priority_labels.get(grp, grp)}*")
+            due = f"（{fmt_due(t['due'])}）" if t.get("due") else ""
+            lines.append(f"• {t['title']}{due}")
+
+        send_message(f"*📋 未完了タスク ({len(tasks)}件)*" + "\n".join(lines))
         logger.info(f"Task reminder sent ({len(tasks)} tasks).")
     except Exception:
         logger.exception("Error in send_task_reminder")
