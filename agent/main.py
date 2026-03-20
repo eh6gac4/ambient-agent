@@ -4,6 +4,7 @@ ambient-agent / main.py
 """
 import logging
 import os
+import signal
 from dotenv import load_dotenv
 from apscheduler.schedulers.blocking import BlockingScheduler
 from apscheduler.events import EVENT_JOB_ERROR
@@ -77,8 +78,18 @@ def main():
         id="cost_report",
     )
 
+    def _shutdown(signum, frame):
+        try:
+            send_message("🔴 *Ambient Agent 停止*")
+        except Exception:
+            pass
+        scheduler.shutdown(wait=False)
+
+    signal.signal(signal.SIGTERM, _shutdown)
+
     logger.info("Ambient Agent started.")
     try:
+        send_message("🟢 *Ambient Agent 起動*")
         scheduler.start()
     except (KeyboardInterrupt, SystemExit):
         logger.info("Shutting down.")
