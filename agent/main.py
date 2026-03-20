@@ -45,7 +45,7 @@ def main():
     briefing_hour = int(os.getenv("DAILY_BRIEFING_HOUR", 8))
 
     # Gmail 未読通知（稼働時間内を3時間おき、Claude 呼び出しなし）
-    notify_hours = ",".join(str(h) for h in range(OPERATING_START_HOUR + 1, OPERATING_END_HOUR, 3))
+    notify_hours = ",".join(str(h) for h in range(OPERATING_START_HOUR + 1, OPERATING_END_HOUR, 6))
     scheduler.add_job(
         notify_unread_emails,
         "cron",
