@@ -49,12 +49,13 @@ def main():
         id="gmail_check",
     )
 
-    # タスクリマインド（指定時間毎）
-    reminder_hours = int(os.getenv("TASK_REMINDER_INTERVAL_HOURS", 3))
+    # タスクリマインド（11:00 / 14:00 / 17:00）
+    reminder_hours = os.getenv("TASK_REMINDER_HOURS", "11,14,17")
     scheduler.add_job(
         send_task_reminder,
-        "interval",
-        hours=reminder_hours,
+        "cron",
+        hour=reminder_hours,
+        minute=0,
         id="task_reminder",
     )
 
