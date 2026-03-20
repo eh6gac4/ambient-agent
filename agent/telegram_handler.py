@@ -136,15 +136,19 @@ def _handle_url(url: str):
         return
 
     tasks = extract_tasks_from_url_content(url, content)
-    if tasks:
-        for task in tasks:
-            task["source"] = "URL"
-            add_task(task)
-            logger.info(f"Task added from URL: {task.get('title')}")
-        titles = "\n".join(f"• {t['title']}" for t in tasks)
-        send_message(f"✅ タスクを登録しました\n\n{titles}")
-    else:
-        send_message("ℹ️ タスクは見つかりませんでした")
+    if not tasks:
+        # タスクが見つからない場合はページタイトルで「確認する」タスクを登録
+        title_tag = soup.find("title")
+        page_title = title_tag.get_text(strip=True) if title_tag else url
+        tasks = [{"title": f"{page_title}を確認する", "due": None, "priority": "medium"}]
+        logger.info(f"No tasks extracted from URL, falling back to page title: {page_title}")
+
+    for task in tasks:
+        task["source"] = "URL"
+        add_task(task)
+        logger.info(f"Task added from URL: {task.get('title')}")
+    titles = "\n".join(f"• {t['title']}" for t in tasks)
+    send_message(f"✅ タスクを登録しました\n\n{titles}")
 
 
 def _process_updates(updates: list):
