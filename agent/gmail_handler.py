@@ -107,15 +107,24 @@ def process_unread_emails():
 
             gmail_url = f"https://mail.google.com/mail/u/0/#all/{msg_id}"
             if tasks:
-                for task in tasks:
-                    task["source_url"] = gmail_url
-                    add_task(task)
-                    logger.info(f"Task added: {task.get('title')}")
-                task_lines.append(f"• *{subject}*\n  {summary}\n  → タスク: " + "、".join(t["title"] for t in tasks))
+                _priority_order = {"high": 0, "medium": 1, "low": 2}
+                best = min(tasks, key=lambda t: _priority_order.get(t.get("priority", "medium"), 1))
+                dues = sorted(t["due"] for t in tasks if t.get("due"))
+                page_task = {
+                    "title": subject,
+                    "due": dues[0] if dues else None,
+                    "priority": best.get("priority", "medium"),
+                    "source": "Gmail",
+                    "source_url": gmail_url,
+                }
+                add_task(page_task, checklist=[t["title"] for t in tasks])
+                logger.info(f"Task added: {subject} ({len(tasks)} items)")
+                task_lines.append(f"• *{subject}*\n  {summary}\n  → " + "、".join(t["title"] for t in tasks))
             else:
-                _archive_message(service, msg_id)
                 archived_lines.append(f"• *{subject}*\n  {summary}")
-                logger.info(f"Archived (no tasks): {subject}")
+                logger.info(f"No tasks: {subject}")
+
+            _archive_message(service, msg_id)
 
             _save_processed_id(msg_id)
 

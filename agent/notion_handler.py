@@ -66,9 +66,10 @@ def _parse_task_page(page: dict) -> dict:
     }
 
 
-def add_task(task: dict):
+def add_task(task: dict, checklist: list[str] | None = None):
     """
     task = {"title": str, "due": "YYYY-MM-DD" or None, "priority": "high"|"medium"|"low", "source": str}
+    checklist: ページ本文に to_do ブロックとして追加するアイテムのリスト（省略可）
     """
     if not DB_ID:
         logger.warning("NOTION_TASKS_DB_ID is not set. Skipping.")
@@ -93,10 +94,24 @@ def add_task(task: dict):
     if priority in ("high", "medium", "low"):
         properties["Priority"] = {"select": {"name": priority}}
 
-    _notion.pages.create(
-        parent={"database_id": DB_ID},
-        properties=properties,
-    )
+    kwargs: dict = {
+        "parent": {"database_id": DB_ID},
+        "properties": properties,
+    }
+    if checklist:
+        kwargs["children"] = [
+            {
+                "object": "block",
+                "type": "to_do",
+                "to_do": {
+                    "rich_text": [{"type": "text", "text": {"content": item}}],
+                    "checked": False,
+                },
+            }
+            for item in checklist
+        ]
+
+    _notion.pages.create(**kwargs)
 
 
 def get_overdue_tasks() -> list[dict]:
