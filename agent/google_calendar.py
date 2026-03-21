@@ -9,6 +9,7 @@ from googleapiclient.discovery import build
 
 from agent.config import JST
 from agent.google_auth import get_credentials
+from agent.notion_handler import get_pending_tasks
 
 logger = logging.getLogger(__name__)
 _SYNC_STORE = "data/calendar_sync.json"
@@ -33,7 +34,6 @@ def sync_tasks_to_calendar():
     - 期限切れ: 古いイベントを削除して当日付けで再登録
     - 未来/当日: 未同期のもののみ登録
     """
-    from agent.notion_handler import get_pending_tasks
     try:
         tasks = get_pending_tasks()
         store = _load_store()

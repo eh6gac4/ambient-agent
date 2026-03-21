@@ -20,7 +20,7 @@ def fmt_due(d: str | None) -> str:
 def sort_tasks(tasks: list[dict]) -> list[dict]:
     return sorted(
         tasks,
-        key=lambda t: (PRIORITY_ORDER.get(t.get("priority", "medium"), 1), t.get("due") or ""),
+        key=lambda t: (PRIORITY_ORDER.get(t.get("priority", "medium"), 1), t.get("due") or "9999"),
     )
 
 
