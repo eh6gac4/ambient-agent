@@ -18,6 +18,9 @@ _notion = Client(auth=os.getenv("NOTION_TOKEN"))
 DB_ID = os.getenv("NOTION_TASKS_DB_ID", "")
 _data_source_id: str | None = None
 
+_STATUS_PENDING = "未着手"
+_STATUS_DONE = "完了"
+
 
 def _get_data_source_id() -> str | None:
     """DB_ID に対応する data_source_id をキャッシュして返す。"""
@@ -73,7 +76,7 @@ def add_task(task: dict):
 
     properties: dict = {
         "タイトル": {"title": [{"text": {"content": task.get("title", "")}}]},
-        "Status": {"status": {"name": "未着手"}},
+        "Status": {"status": {"name": _STATUS_PENDING}},
         "Source": {"rich_text": [{"text": {"content": task.get("source", "Gmail")}}]},
     }
 
@@ -103,7 +106,7 @@ def get_overdue_tasks() -> list[dict]:
     today = datetime.date.today().isoformat()
     results = _query_db({
         "and": [
-            {"property": "Status", "status": {"equals": "未着手"}},
+            {"property": "Status", "status": {"equals": _STATUS_PENDING}},
             {"property": "Due", "date": {"before": today}},
         ]
     })
@@ -114,7 +117,7 @@ def get_pending_tasks() -> list[dict]:
     """Status = 未着手 のタスク一覧を返す。"""
     if not DB_ID:
         return []
-    results = _query_db({"property": "Status", "status": {"equals": "未着手"}})
+    results = _query_db({"property": "Status", "status": {"equals": _STATUS_PENDING}})
     return [_parse_task_page(p) for p in results.get("results", [])]
 
 
@@ -129,7 +132,7 @@ def escalate_priority_tasks() -> list[dict]:
 
     results = _query_db({
         "and": [
-            {"property": "Status", "status": {"equals": "未着手"}},
+            {"property": "Status", "status": {"equals": _STATUS_PENDING}},
             {"property": "Priority", "select": {"equals": "medium"}},
             {"property": "Due", "date": {"on_or_before": deadline}},
             {"property": "Due", "date": {"on_or_after": today_str}},
@@ -151,5 +154,5 @@ def complete_task(page_id: str):
     """指定ページのステータスを完了に更新する。"""
     _notion.pages.update(
         page_id=page_id,
-        properties={"Status": {"status": {"name": "完了"}}},
+        properties={"Status": {"status": {"name": _STATUS_DONE}}},
     )

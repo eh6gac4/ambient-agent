@@ -4,14 +4,13 @@ Google Calendar への書き込み操作。
 """
 import json
 import logging
-from datetime import date, datetime, timezone, timedelta
+from datetime import date, datetime, timedelta
 from googleapiclient.discovery import build
 
+from agent.config import JST
 from agent.google_auth import get_credentials
 
 logger = logging.getLogger(__name__)
-
-JST = timezone(timedelta(hours=9))
 _SYNC_STORE = "data/calendar_sync.json"
 
 

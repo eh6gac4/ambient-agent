@@ -14,6 +14,11 @@ from agent.telegram_notifier import send_message
 logger = logging.getLogger(__name__)
 
 _PROCESSED_IDS_FILE = "data/processed_ids.txt"
+_GMAIL_QUERY = "is:unread in:inbox -category:promotions -category:social"
+
+
+def _parse_headers(payload: dict) -> dict[str, str]:
+    return {h["name"]: h["value"] for h in payload.get("headers", [])}
 
 
 def _load_processed_ids() -> set[str]:
@@ -35,9 +40,7 @@ def notify_unread_emails():
     try:
         service = build("gmail", "v1", credentials=get_credentials())
         results = service.users().messages().list(
-            userId="me",
-            q="is:unread in:inbox -category:promotions -category:social",
-            maxResults=20,
+            userId="me", q=_GMAIL_QUERY, maxResults=20,
         ).execute()
 
         messages = results.get("messages", [])
@@ -51,10 +54,9 @@ def notify_unread_emails():
                 userId="me", id=msg_meta["id"], format="metadata",
                 metadataHeaders=["Subject", "From"],
             ).execute()
-            headers = {h["name"]: h["value"] for h in msg["payload"].get("headers", [])}
+            headers = _parse_headers(msg["payload"])
             subject = headers.get("Subject", "(件名なし)")
             sender = headers.get("From", "")
-            # "名前 <email>" → "名前" だけ取り出す
             sender_name = sender.split("<")[0].strip().strip('"') or sender
             lines.append(f"• {subject}（{sender_name}）")
 
@@ -72,9 +74,7 @@ def process_unread_emails():
     try:
         service = build("gmail", "v1", credentials=get_credentials())
         results = service.users().messages().list(
-            userId="me",
-            q="is:unread in:inbox -category:promotions -category:social",
-            maxResults=20,
+            userId="me", q=_GMAIL_QUERY, maxResults=20,
         ).execute()
 
         messages = results.get("messages", [])
@@ -109,7 +109,7 @@ def process_unread_emails():
 
 def _parse_message(msg: dict) -> tuple[str, str]:
     """Gmail API レスポンスから件名と本文テキストを取り出す。"""
-    headers = {h["name"]: h["value"] for h in msg["payload"].get("headers", [])}
+    headers = _parse_headers(msg["payload"])
     subject = headers.get("Subject", "(no subject)")
     body = _extract_body(msg["payload"])
     return subject, body

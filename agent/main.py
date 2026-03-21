@@ -42,10 +42,10 @@ def main():
     # Telegram ロングポーリング（メッセージ着信時即時処理）
     run_listener()
 
-    # 日次ブリーフィング（毎朝指定時刻）
     briefing_hour = int(os.getenv("DAILY_BRIEFING_HOUR", 8))
+    pre_briefing_hour = briefing_hour - 1
 
-    # Gmail 未読通知（稼働時間内を3時間おき、Claude 呼び出しなし）
+    # Gmail 未読通知（稼働時間内を6時間おき、Claude 呼び出しなし）
     notify_hours = ",".join(str(h) for h in range(OPERATING_START_HOUR + 1, OPERATING_END_HOUR, 6))
     scheduler.add_job(
         notify_unread_emails,
@@ -59,7 +59,7 @@ def main():
     scheduler.add_job(
         process_unread_emails,
         "cron",
-        hour=briefing_hour - 1,
+        hour=pre_briefing_hour,
         minute=55,
         id="gmail_check",
     )
@@ -78,7 +78,7 @@ def main():
     scheduler.add_job(
         sync_tasks_to_calendar,
         "cron",
-        hour=briefing_hour - 1,
+        hour=pre_briefing_hour,
         minute=57,
         id="calendar_sync",
     )
@@ -87,7 +87,7 @@ def main():
     scheduler.add_job(
         send_escalation_notice,
         "cron",
-        hour=briefing_hour - 1,
+        hour=pre_briefing_hour,
         minute=58,
         id="priority_escalation",
     )

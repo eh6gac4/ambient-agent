@@ -3,10 +3,12 @@ agent/calendar_handler.py
 当日のカレンダーイベントを取得し、日次ブリーフィングを Telegram に送信する。
 """
 import logging
-from datetime import datetime, timezone, timedelta
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 
 from googleapiclient.discovery import build
 
+from agent.config import JST
 from agent.google_auth import get_credentials
 from agent.notion_handler import get_pending_tasks, get_overdue_tasks, escalate_priority_tasks
 from agent.claude_agent import summarize_day
@@ -14,7 +16,6 @@ from agent.telegram_notifier import send_message
 from agent.task_formatter import format_task_list, fmt_due
 
 logger = logging.getLogger(__name__)
-JST = timezone(timedelta(hours=9))
 
 
 def send_task_reminder():
@@ -51,9 +52,11 @@ def send_daily_briefing():
     """当日の予定 + Notion タスク（期限切れ含む）を要約して Telegram に送信する。"""
     logger.info("Generating daily briefing...")
     try:
-        events = _get_todays_events()
-        tasks = get_pending_tasks()
-        overdue = get_overdue_tasks()
+        with ThreadPoolExecutor(max_workers=3) as ex:
+            f_events = ex.submit(_get_todays_events)
+            f_tasks = ex.submit(get_pending_tasks)
+            f_overdue = ex.submit(get_overdue_tasks)
+        events, tasks, overdue = f_events.result(), f_tasks.result(), f_overdue.result()
         summary = summarize_day(events, tasks, overdue)
         date_str = datetime.now(JST).strftime('%Y-%m-%d')
         send_message(f"*📅 日次ブリーフィング {date_str}*\n\n{summary}")

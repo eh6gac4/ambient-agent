@@ -32,28 +32,23 @@ def _extract_json_list(text: str) -> list[dict]:
         return []
 
 
-def extract_tasks_from_email(subject: str, body: str) -> list[dict]:
-    """メールからタスクを抽出し、リストで返す。"""
+def _extract_tasks(label: str, user_content: str) -> list[dict]:
     response = _client.messages.create(
         model=MODEL,
         max_tokens=1024,
         system=_load_extract_tasks_prompt(),
-        messages=[{"role": "user", "content": f"件名: {subject}\n\n本文:\n{body}"}],
+        messages=[{"role": "user", "content": user_content}],
     )
-    record_usage("extract_tasks", response.usage.input_tokens, response.usage.output_tokens)
+    record_usage(label, response.usage.input_tokens, response.usage.output_tokens)
     return _extract_json_list(response.content[0].text)
+
+
+def extract_tasks_from_email(subject: str, body: str) -> list[dict]:
+    return _extract_tasks("extract_tasks", f"件名: {subject}\n\n本文:\n{body}")
 
 
 def extract_tasks_from_url_content(url: str, content: str) -> list[dict]:
-    """URL のページ内容からタスクを抽出し、リストで返す。"""
-    response = _client.messages.create(
-        model=MODEL,
-        max_tokens=1024,
-        system=_load_extract_tasks_prompt(),
-        messages=[{"role": "user", "content": f"件名: {url}\n\n本文:\n{content[:3000]}"}],
-    )
-    record_usage("extract_tasks_url", response.usage.input_tokens, response.usage.output_tokens)
-    return _extract_json_list(response.content[0].text)
+    return _extract_tasks("extract_tasks_url", f"件名: {url}\n\n本文:\n{content[:3000]}")
 
 
 def summarize_day(calendar_events: list[dict], notion_tasks: list[dict], overdue_tasks: list[dict] | None = None) -> str:
