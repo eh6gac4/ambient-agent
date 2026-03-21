@@ -11,6 +11,7 @@ from agent.usage_tracker import record_usage
 _client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 MODEL = "claude-haiku-4-5-20251001"
 _EXTRACT_TASKS_PROMPT: str | None = None
+_ANALYZE_EMAIL_PROMPT: str | None = None
 
 
 def _load_extract_tasks_prompt() -> str:
@@ -19,6 +20,14 @@ def _load_extract_tasks_prompt() -> str:
         with open("prompts/extract_tasks.md", encoding="utf-8") as f:
             _EXTRACT_TASKS_PROMPT = f.read()
     return _EXTRACT_TASKS_PROMPT
+
+
+def _load_analyze_email_prompt() -> str:
+    global _ANALYZE_EMAIL_PROMPT
+    if _ANALYZE_EMAIL_PROMPT is None:
+        with open("prompts/analyze_email.md", encoding="utf-8") as f:
+            _ANALYZE_EMAIL_PROMPT = f.read()
+    return _ANALYZE_EMAIL_PROMPT
 
 
 def _extract_json_list(text: str) -> list[dict]:
@@ -45,6 +54,28 @@ def _extract_tasks(label: str, user_content: str) -> list[dict]:
 
 def extract_tasks_from_email(subject: str, body: str) -> list[dict]:
     return _extract_tasks("extract_tasks", f"件名: {subject}\n\n本文:\n{body}")
+
+
+def analyze_email(subject: str, body: str) -> dict:
+    """メールを要約してタスクを抽出する。{"summary": str, "tasks": list} を返す。"""
+    response = _client.messages.create(
+        model=MODEL,
+        max_tokens=1024,
+        system=_load_analyze_email_prompt(),
+        messages=[{"role": "user", "content": f"件名: {subject}\n\n本文:\n{body[:3000]}"}],
+    )
+    record_usage("analyze_email", response.usage.input_tokens, response.usage.output_tokens)
+    text = response.content[0].text
+    match = re.search(r"\{.*\}", text, re.DOTALL)
+    if not match:
+        return {"summary": text.strip(), "tasks": []}
+    try:
+        result = json.loads(match.group())
+        result.setdefault("tasks", [])
+        result.setdefault("summary", "")
+        return result
+    except json.JSONDecodeError:
+        return {"summary": text.strip(), "tasks": []}
 
 
 def extract_tasks_from_url_content(url: str, content: str) -> list[dict]:

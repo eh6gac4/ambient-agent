@@ -7,7 +7,7 @@ import logging
 from googleapiclient.discovery import build
 
 from agent.google_auth import get_credentials
-from agent.claude_agent import extract_tasks_from_email
+from agent.claude_agent import analyze_email
 from agent.notion_handler import add_task
 from agent.telegram_notifier import send_message
 
@@ -68,8 +68,15 @@ def notify_unread_emails():
         logger.exception("Error in notify_unread_emails")
 
 
+def _archive_message(service, msg_id: str):
+    """メールを受信トレイから削除（アーカイブ）する。"""
+    service.users().messages().modify(
+        userId="me", id=msg_id, body={"removeLabelIds": ["INBOX"]}
+    ).execute()
+
+
 def process_unread_emails():
-    """未読メールをスキャンしてタスクを抽出・Notion 登録する。"""
+    """未読メールを要約・タスク抽出し、タスクがなければアーカイブする。結果を Telegram に通知する。"""
     logger.info("Checking unread emails...")
     try:
         service = build("gmail", "v1", credentials=get_credentials())
@@ -81,6 +88,8 @@ def process_unread_emails():
         logger.info(f"Found {len(messages)} unread message(s).")
 
         processed_ids = _load_processed_ids()
+        task_lines = []
+        archived_lines = []
 
         for msg_meta in messages:
             msg_id = msg_meta["id"]
@@ -92,16 +101,33 @@ def process_unread_emails():
             ).execute()
 
             subject, body = _parse_message(msg)
-            body = body[:3000]
-            tasks = extract_tasks_from_email(subject, body)
+            analysis = analyze_email(subject, body)
+            summary = analysis.get("summary", "")
+            tasks = analysis.get("tasks", [])
 
             gmail_url = f"https://mail.google.com/mail/u/0/#all/{msg_id}"
-            for task in tasks:
-                task["source_url"] = gmail_url
-                add_task(task)
-                logger.info(f"Task added: {task.get('title')}")
+            if tasks:
+                for task in tasks:
+                    task["source_url"] = gmail_url
+                    add_task(task)
+                    logger.info(f"Task added: {task.get('title')}")
+                task_lines.append(f"• *{subject}*\n  {summary}\n  → タスク: " + "、".join(t["title"] for t in tasks))
+            else:
+                _archive_message(service, msg_id)
+                archived_lines.append(f"• *{subject}*\n  {summary}")
+                logger.info(f"Archived (no tasks): {subject}")
 
             _save_processed_id(msg_id)
+
+        if not task_lines and not archived_lines:
+            return
+
+        sections = []
+        if task_lines:
+            sections.append("✅ *タスク登録*\n" + "\n".join(task_lines))
+        if archived_lines:
+            sections.append("📦 *アーカイブ済み*\n" + "\n".join(archived_lines))
+        send_message("*📧 メール処理完了*\n\n" + "\n\n".join(sections))
 
     except Exception:
         logger.exception("Error in process_unread_emails")
