@@ -68,6 +68,7 @@ docker compose logs -f
 | 時刻 / 間隔 | ジョブ | 詳細 |
 |---|---|---|
 | 07:55 | Gmail タスク抽出 | 朝時点でまだ未読のメールに Claude を実行 → Notion に登録（ブリーフィング前） |
+| 07:57 | カレンダー同期 | Notion 未着手タスク（due あり・未同期）を Google Calendar に登録 |
 | 07:58 | 優先度昇格 | 期限3日以内の medium タスクを high に昇格し Telegram に通知 |
 | 08:00 | 日次ブリーフィング | 当日の Google Calendar イベント・Notion 未着手タスク・期限切れタスクを Claude で要約し Telegram に送信 |
 | 08:05 | API コストレポート | 前日分の Claude API 利用コストを Telegram に送信 |
