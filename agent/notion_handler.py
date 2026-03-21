@@ -84,7 +84,8 @@ def add_task(task: dict):
 
     due = task.get("due")
     if due:
-        properties["Due"] = {"date": {"start": due}}
+        notion_due = due if "T" not in due else due + "+09:00"
+        properties["Due"] = {"date": {"start": notion_due}}
         add_calendar_event(task.get("title", ""), due)
 
     priority = task.get("priority", "medium")

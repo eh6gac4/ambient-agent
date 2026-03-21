@@ -9,7 +9,7 @@
 [
   {
     "title": "タスクのタイトル（簡潔に）",
-    "due": "YYYY-MM-DD または null",
+    "due": "YYYY-MM-DD または YYYY-MM-DDTHH:MM または null（時刻が明示されていれば時刻付きで返す）",
     "priority": "high | medium | low",
     "source": "Gmail"
   }
