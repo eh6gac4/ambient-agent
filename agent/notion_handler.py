@@ -12,6 +12,7 @@ import datetime
 import logging
 import os
 from notion_client import Client
+from agent.google_calendar import add_calendar_event
 
 logger = logging.getLogger(__name__)
 _notion = Client(auth=os.getenv("NOTION_TOKEN"))
@@ -84,6 +85,7 @@ def add_task(task: dict):
     due = task.get("due")
     if due:
         properties["Due"] = {"date": {"start": due}}
+        add_calendar_event(task.get("title", ""), due)
 
     priority = task.get("priority", "medium")
     if priority in ("high", "medium", "low"):
