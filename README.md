@@ -42,7 +42,9 @@ cp .env.example .env
 pip install -r requirements.txt
 mkdir -p data
 python -c "from agent.google_auth import get_credentials; get_credentials()"
-# ブラウザが開くので認証 → data/token.json が生成される
+# ポート 9999 で HTTP サーバーが起動する
+# スマホブラウザで http://<このPCのIP>:9999 を開いて Google 認証
+# 表示されたコードをターミナルに入力 → data/token.json が生成される
 ```
 
 ### 5. Docker で起動
@@ -60,19 +62,20 @@ docker compose logs -f
 |---|---|
 | reboot 時 | `docker compose up -d` で自動起動 |
 | 5分毎 | watchdog でコンテナ死活監視（停止時に Telegram 通知） |
+| 毎週月曜 10:00 | `/simplify` でリファクタリングを実行し結果を Telegram に送信 |
 
-サービスは **24時間365日稼働**。コストのかかる Claude API 呼び出しのみ 08:00〜20:00 JST に制限。
+サービスは **24時間365日稼働**。コストのかかる Claude API 呼び出しのみ 08:00〜21:00 JST に制限。
 
 ### 定期ジョブ（APScheduler）
 
 | 時刻 / 間隔 | ジョブ | 詳細 |
 |---|---|---|
-| 07:55 | Gmail タスク抽出 | 朝時点でまだ未読のメールに Claude を実行 → Notion に登録（ブリーフィング前） |
+| 07:55 | Gmail メール処理 | 未読メールを要約・タスク抽出。タスクあり → Notion に登録（件名をタイトル・アクションをチェックリスト）。タスクなし → アーカイブ。結果を Telegram に通知 |
 | 07:57 | カレンダー同期 | Notion 未着手タスク（due あり・未同期）を Google Calendar に登録 |
 | 07:58 | 優先度昇格 | 期限3日以内の medium タスクを high に昇格し Telegram に通知 |
 | 08:00 | 日次ブリーフィング | 当日の Google Calendar イベント・Notion 未着手タスク・期限切れタスクを Claude で要約し Telegram に送信 |
 | 08:05 | API コストレポート | 前日分の Claude API 利用コストを Telegram に送信 |
-| 09:00 / 15:00 | Gmail 未読通知 | 未読メールの件名・送信者を Telegram に通知（Claude 呼び出しなし） |
+| 09:00 / 15:00 | Gmail 未読通知 | 未読メールの件名・送信者を Telegram に通知（Claude 呼び出しなし・アーカイブなし） |
 | 11:00 / 14:00 / 17:00 | タスクリマインド | Notion の未着手タスク一覧を Telegram に送信 |
 
 ## Telegram コマンド
@@ -96,14 +99,22 @@ ambient-agent/
 ├── data/                    # token.json, credentials.json（Git 管理外）
 ├── agent/
 │   ├── main.py              # スケジューラ・ジョブ登録
+│   ├── config.py            # 定数・環境変数（JST・稼働時間など）
 │   ├── claude_agent.py      # Claude API ラッパー
 │   ├── google_auth.py       # OAuth 共通
-│   ├── gmail_handler.py     # Gmail → タスク抽出
+│   ├── gmail_handler.py     # Gmail 未読処理（要約・タスク抽出・アーカイブ）
+│   ├── google_calendar.py   # Google Calendar 書き込み・タスク同期
 │   ├── calendar_handler.py  # ブリーフィング・リマインド
 │   ├── notion_handler.py    # Notion 読み書き
+│   ├── task_formatter.py    # タスク一覧フォーマット共通ユーティリティ
 │   ├── telegram_handler.py  # Telegram コマンド・ロングポーリング
 │   ├── telegram_notifier.py # Telegram 送信
 │   └── usage_tracker.py     # API コスト記録・レポート
-└── prompts/
-    └── extract_tasks.md     # タスク抽出プロンプト
+├── prompts/
+│   ├── extract_tasks.md     # タスク抽出プロンプト（URL・Telegram用）
+│   └── analyze_email.md     # メール要約＋タスク抽出プロンプト
+├── scripts/
+│   ├── watchdog.py          # コンテナ死活監視
+│   └── run_simplify.py      # 週次リファクタリング実行・Telegram 通知
+└── tests/                   # pytest ユニットテスト
 ```
