@@ -76,7 +76,7 @@ docker compose logs -f
 | 08:00 | 日次ブリーフィング | 当日の Google Calendar イベント・Notion 未着手タスク・期限切れタスクを Claude で要約し Telegram に送信 |
 | 08:05 | API コストレポート | 前日分の Claude API 利用コストを Telegram に送信 |
 | 09:00 / 15:00 | Gmail 未読通知 | 未読メールの件名・送信者を Telegram に通知（Claude 呼び出しなし・アーカイブなし） |
-| 11:00 / 14:00 / 17:00 | タスクリマインド | Notion の未着手タスク一覧を Telegram に送信 |
+| 13:00 | タスクリマインド | Notion の未着手タスク一覧を Telegram に送信 |
 
 ## Telegram コマンド
 
