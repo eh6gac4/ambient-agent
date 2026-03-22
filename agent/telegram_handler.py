@@ -100,6 +100,17 @@ def _handle_command(text: str):
         send_message(f"✅ タスクを追加しました\n\n*{arg}*")
         logger.info(f"Task added via /add: {arg}")
 
+    elif command == "/help":
+        send_message(
+            "*使えるコマンド*\n\n"
+            "`/tasks` — 未着手タスク一覧\n"
+            "`/done <番号>` — タスクを完了にする\n"
+            "`/add <タスク名>` — タスクを追加\n"
+            "`/due <番号> <日付>` — 期限を変更（例: `/due 3 2026-03-25`）\n"
+            "`/briefing` — 今すぐブリーフィングを実行\n\n"
+            "URL・テキスト・転送メッセージを送るとタスクを自動抽出します"
+        )
+
     elif command == "/briefing":
         send_message("⏳ ブリーフィングを生成中...")
         send_daily_briefing()
