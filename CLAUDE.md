@@ -32,4 +32,5 @@ docker compose logs -f
 
 - APScheduler（BlockingScheduler）でジョブ管理
 - Telegram はロングポーリング（daemon スレッド）でリアルタイム受信
-- 稼働時間: 07:55 起動 / 20:00 停止（cron 管理）
+- サービスは **24時間365日稼働**。Claude API 呼び出しのみ `OPERATING_START_HOUR`〜`OPERATING_END_HOUR`（デフォルト 08:00〜21:00 JST）に制限
+- reboot 時に `docker compose up -d` で自動起動（cron）
