@@ -171,3 +171,11 @@ def complete_task(page_id: str):
         page_id=page_id,
         properties={"Status": {"status": {"name": _STATUS_DONE}}},
     )
+
+
+def update_task_due(page_id: str, due: str):
+    """指定ページの期限を更新する。due は 'YYYY-MM-DD' 形式。"""
+    _notion.pages.update(
+        page_id=page_id,
+        properties={"Due": {"date": {"start": due}}},
+    )

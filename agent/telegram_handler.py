@@ -14,9 +14,10 @@ import threading
 import requests
 from bs4 import BeautifulSoup
 
+from agent.calendar_handler import send_daily_briefing
 from agent.claude_agent import extract_tasks_from_email, extract_tasks_from_url_content
 from agent.config import JST, OPERATING_START_HOUR, OPERATING_END_HOUR
-from agent.notion_handler import add_task, get_pending_tasks, complete_task
+from agent.notion_handler import add_task, get_pending_tasks, complete_task, update_task_due
 from agent.task_formatter import format_task_list, sort_tasks
 from agent.telegram_notifier import send_message
 
@@ -99,8 +100,36 @@ def _handle_command(text: str):
         send_message(f"✅ タスクを追加しました\n\n*{arg}*")
         logger.info(f"Task added via /add: {arg}")
 
+    elif command == "/briefing":
+        send_message("⏳ ブリーフィングを生成中...")
+        send_daily_briefing()
+
+    elif command == "/due":
+        parts2 = arg.split(None, 1)
+        if len(parts2) != 2 or not parts2[0].isdigit():
+            send_message("使い方: `/due 2 2026-03-25`（番号は `/tasks` で確認）")
+            return
+        index = int(parts2[0]) - 1
+        due_str = parts2[1].strip()
+        try:
+            datetime.date.fromisoformat(due_str)
+        except ValueError:
+            send_message("日付は `YYYY-MM-DD` 形式で指定してください")
+            return
+        tasks = _load_task_cache()
+        if not tasks:
+            send_message("先に `/tasks` でタスク一覧を取得してください")
+            return
+        if index < 0 or index >= len(tasks):
+            send_message(f"番号が範囲外です（1〜{len(tasks)}）")
+            return
+        task = tasks[index]
+        update_task_due(task["page_id"], due_str)
+        send_message(f"📅 期限を更新しました\n\n*{task['title']}*\n→ {due_str}")
+        logger.info(f"Task due updated: {task['title']} -> {due_str}")
+
     else:
-        send_message("使えるコマンド:\n`/tasks` — タスク一覧\n`/done <番号>` — 完了にする\n`/add <タスク名>` — タスクを追加")
+        send_message("使えるコマンド:\n`/tasks` — タスク一覧\n`/done <番号>` — 完了にする\n`/add <タスク名>` — タスクを追加\n`/due <番号> <日付>` — 期限を変更\n`/briefing` — 今すぐブリーフィング")
 
 
 def _handle_url(url: str):
