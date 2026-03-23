@@ -66,14 +66,15 @@ def _parse_task_page(page: dict) -> dict:
     }
 
 
-def add_task(task: dict, checklist: list[str] | None = None):
+def add_task(task: dict, checklist: list[str] | None = None) -> str | None:
     """
     task = {"title": str, "due": "YYYY-MM-DD" or None, "priority": "high"|"medium"|"low", "source": str}
     checklist: ページ本文に to_do ブロックとして追加するアイテムのリスト（省略可）
+    作成したページの ID を返す。
     """
     if not DB_ID:
         logger.warning("NOTION_TASKS_DB_ID is not set. Skipping.")
-        return
+        return None
 
     properties: dict = {
         "タイトル": {"title": [{"text": {"content": task.get("title", "")}}]},
@@ -111,7 +112,8 @@ def add_task(task: dict, checklist: list[str] | None = None):
             for item in checklist
         ]
 
-    _notion.pages.create(**kwargs)
+    page = _notion.pages.create(**kwargs)
+    return page.get("id")
 
 
 
@@ -166,5 +168,49 @@ def update_task_due(page_id: str, due: str):
         page_id=page_id,
         properties={"Due": {"date": {"start": due}}},
     )
+
+
+def update_task_from_reply(page_id: str, checklist: list[str], priority: str, due: str | None):
+    """返信メールによるタスク更新。チェックリスト追記・優先度昇格・期限前倒しを行う。"""
+    _priority_order = {"high": 0, "medium": 1, "low": 2}
+
+    # 現在のタスク情報を取得
+    page = _notion.pages.retrieve(page_id=page_id)
+    props = page["properties"]
+    current_priority = (props.get("Priority", {}).get("select") or {}).get("name", "medium")
+    current_due_obj = props.get("Due", {}).get("date")
+    current_due = current_due_obj["start"][:10] if current_due_obj else None
+
+    updates: dict = {}
+
+    # 優先度は高い方を採用
+    if _priority_order.get(priority, 1) < _priority_order.get(current_priority, 1):
+        updates["Priority"] = {"select": {"name": priority}}
+
+    # 期限は早い方を採用
+    if due:
+        due_date = due[:10]
+        if current_due is None or due_date < current_due:
+            updates["Due"] = {"date": {"start": due_date}}
+
+    if updates:
+        _notion.pages.update(page_id=page_id, properties=updates)
+
+    # チェックリスト追記
+    if checklist:
+        _notion.blocks.children.append(
+            block_id=page_id,
+            children=[
+                {
+                    "object": "block",
+                    "type": "to_do",
+                    "to_do": {
+                        "rich_text": [{"type": "text", "text": {"content": item}}],
+                        "checked": False,
+                    },
+                }
+                for item in checklist
+            ],
+        )
 
 

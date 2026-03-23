@@ -1,13 +1,14 @@
 """
 tests/test_gmail_handler.py
-_load_processed_ids / _save_processed_id のユニットテスト
+_load_processed_ids / _save_processed_id / スレッドマップのユニットテスト
 """
 import datetime
-from unittest.mock import patch
+import json
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 
-from agent.gmail_handler import _load_processed_ids, _save_processed_id
+from agent.gmail_handler import _load_processed_ids, _save_processed_id, _load_thread_map, _save_thread_map
 
 
 def _days_ago(n: int) -> str:
@@ -91,3 +92,104 @@ class TestSaveProcessedId:
         _save_processed_id("msg-2")
         lines = [l for l in f.read_text().splitlines() if l]
         assert len(lines) == 2
+
+
+class TestThreadMap:
+    def test_load_returns_empty_when_missing(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("agent.gmail_handler._THREAD_MAP_FILE", str(tmp_path / "missing.json"))
+        assert _load_thread_map() == {}
+
+    def test_load_and_save_roundtrip(self, tmp_path, monkeypatch):
+        f = tmp_path / "thread_map.json"
+        monkeypatch.setattr("agent.gmail_handler._THREAD_MAP_FILE", str(f))
+        data = {"thread-1": "page-abc", "thread-2": "page-xyz"}
+        _save_thread_map(data)
+        assert _load_thread_map() == data
+
+
+class TestProcessUnreadEmailsThreading:
+    """返信メール検出（threadId）のテスト"""
+
+    def _make_msg(self, msg_id, thread_id, subject, body=""):
+        return {
+            "id": msg_id,
+            "threadId": thread_id,
+            "payload": {
+                "headers": [
+                    {"name": "Subject", "value": subject},
+                    {"name": "From", "value": "sender@example.com"},
+                ],
+                "mimeType": "text/plain",
+                "body": {"data": ""},
+                "parts": [],
+            },
+        }
+
+    def test_reply_updates_existing_task(self, tmp_path, monkeypatch):
+        """同じ threadId のメールは既存タスクを更新する"""
+        ids_file = tmp_path / "processed_ids.txt"
+        ids_file.write_text("")
+        thread_file = tmp_path / "thread_map.json"
+        thread_file.write_text(json.dumps({"thread-1": "existing-page-id"}))
+
+        monkeypatch.setattr("agent.gmail_handler._PROCESSED_IDS_FILE", str(ids_file))
+        monkeypatch.setattr("agent.gmail_handler._THREAD_MAP_FILE", str(thread_file))
+
+        mock_service = MagicMock()
+        mock_service.users.return_value.messages.return_value.list.return_value.execute.return_value = {
+            "messages": [{"id": "msg-reply", "threadId": "thread-1"}]
+        }
+        mock_service.users.return_value.messages.return_value.get.return_value.execute.return_value = \
+            self._make_msg("msg-reply", "thread-1", "Re: 元のタスク")
+
+        analysis = {"summary": "返信の要約", "tasks": [{"title": "追加アクション", "priority": "medium", "due": None}]}
+
+        with patch("agent.gmail_handler.build", return_value=mock_service), \
+             patch("agent.gmail_handler.get_credentials"), \
+             patch("agent.gmail_handler.analyze_email", return_value=analysis), \
+             patch("agent.gmail_handler.update_task_from_reply") as mock_update, \
+             patch("agent.gmail_handler.add_task") as mock_add, \
+             patch("agent.gmail_handler.send_message"):
+            from agent.gmail_handler import process_unread_emails
+            process_unread_emails()
+
+        mock_update.assert_called_once_with(
+            "existing-page-id",
+            checklist=["追加アクション"],
+            priority="medium",
+            due=None,
+        )
+        mock_add.assert_not_called()
+
+    def test_new_thread_creates_task_and_saves_map(self, tmp_path, monkeypatch):
+        """新規 threadId はタスク作成してマップに登録する"""
+        ids_file = tmp_path / "processed_ids.txt"
+        ids_file.write_text("")
+        thread_file = tmp_path / "thread_map.json"
+        thread_file.write_text("{}")
+
+        monkeypatch.setattr("agent.gmail_handler._PROCESSED_IDS_FILE", str(ids_file))
+        monkeypatch.setattr("agent.gmail_handler._THREAD_MAP_FILE", str(thread_file))
+
+        mock_service = MagicMock()
+        mock_service.users.return_value.messages.return_value.list.return_value.execute.return_value = {
+            "messages": [{"id": "msg-new", "threadId": "thread-new"}]
+        }
+        mock_service.users.return_value.messages.return_value.get.return_value.execute.return_value = \
+            self._make_msg("msg-new", "thread-new", "新規タスク")
+
+        analysis = {"summary": "新規の要約", "tasks": [{"title": "やること", "priority": "high", "due": None}]}
+
+        with patch("agent.gmail_handler.build", return_value=mock_service), \
+             patch("agent.gmail_handler.get_credentials"), \
+             patch("agent.gmail_handler.analyze_email", return_value=analysis), \
+             patch("agent.gmail_handler.add_task", return_value="new-page-id") as mock_add, \
+             patch("agent.gmail_handler.update_task_from_reply") as mock_update, \
+             patch("agent.gmail_handler.send_message"):
+            from agent.gmail_handler import process_unread_emails
+            process_unread_emails()
+
+        mock_add.assert_called_once()
+        mock_update.assert_not_called()
+        saved = json.loads(thread_file.read_text())
+        assert saved.get("thread-new") == "new-page-id"
