@@ -3,6 +3,7 @@ ambient-agent / main.py
 スケジューラを起動し、各ジョブを登録する。
 """
 import logging
+import logging.handlers
 import os
 import signal
 from dotenv import load_dotenv
@@ -18,10 +19,22 @@ from agent.telegram_notifier import send_message
 from agent.usage_tracker import send_cost_report
 
 load_dotenv()
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+
+_LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+_LOG_DIR = "data/logs"
+os.makedirs(_LOG_DIR, exist_ok=True)
+
+logging.basicConfig(level=logging.INFO, format=_LOG_FORMAT)
+
+_file_handler = logging.handlers.TimedRotatingFileHandler(
+    filename=os.path.join(_LOG_DIR, "agent.log"),
+    when="midnight",
+    backupCount=7,
+    encoding="utf-8",
 )
+_file_handler.setFormatter(logging.Formatter(_LOG_FORMAT))
+logging.getLogger().addHandler(_file_handler)
+
 logger = logging.getLogger(__name__)
 
 
