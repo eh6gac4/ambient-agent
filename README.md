@@ -75,7 +75,6 @@ docker compose logs -f
 | 07:58 | 優先度昇格 | 期限3日以内の medium タスクを high に昇格し Telegram に通知 |
 | 08:00 | 日次ブリーフィング | 当日の Google Calendar イベント・Notion 未着手タスク・期限切れタスクを Claude で要約し Telegram に送信 |
 | 08:05 | API コストレポート | 前日分の Claude API 利用コストを Telegram に送信 |
-| 09:00 / 15:00 | Gmail 未読通知 | 未読メールの件名・送信者を Telegram に通知（Claude 呼び出しなし・アーカイブなし） |
 | 13:00 | タスクリマインド | Notion の未着手タスク一覧を Telegram に送信 |
 
 ## Telegram コマンド
