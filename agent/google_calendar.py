@@ -9,7 +9,7 @@ from googleapiclient.discovery import build
 
 from agent.config import JST
 from agent.google_auth import get_credentials
-from agent.notion_handler import get_pending_tasks
+from agent.notion_handler import get_pending_tasks, is_task_completed
 
 logger = logging.getLogger(__name__)
 _SYNC_STORE = "data/calendar_sync.json"
@@ -98,6 +98,40 @@ def delete_calendar_event_for_task(page_id: str) -> bool:
     store.pop(page_id)
     _save_store(store)
     return True
+
+
+def cleanup_completed_task_events():
+    """store に残っている完了済みタスクのカレンダーイベントを削除する。"""
+    store = _load_store()
+    if not store:
+        return
+    try:
+        service = build("calendar", "v3", credentials=get_credentials())
+    except Exception:
+        logger.exception("Failed to build calendar service in cleanup")
+        return
+
+    removed = 0
+    for page_id in list(store.keys()):
+        try:
+            if not is_task_completed(page_id):
+                continue
+        except Exception:
+            logger.warning("Could not check completion status for %s", page_id)
+            continue
+
+        event_id = store[page_id].get("event_id")
+        if event_id:
+            try:
+                service.events().delete(calendarId="primary", eventId=event_id).execute()
+                logger.info("Cleanup: deleted calendar event %s for completed task %s", event_id, page_id)
+            except Exception:
+                logger.warning("Cleanup: could not delete event %s", event_id)
+        store.pop(page_id)
+        removed += 1
+
+    _save_store(store)
+    logger.info("Calendar cleanup done: %d event(s) removed.", removed)
 
 
 def add_calendar_event(title: str, due: str) -> None:

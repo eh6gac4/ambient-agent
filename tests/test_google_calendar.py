@@ -2,7 +2,7 @@ import json
 import pytest
 from datetime import date
 from unittest.mock import MagicMock, patch, mock_open
-from agent.google_calendar import _load_store, _save_store, sync_tasks_to_calendar, delete_calendar_event_for_task
+from agent.google_calendar import _load_store, _save_store, sync_tasks_to_calendar, delete_calendar_event_for_task, cleanup_completed_task_events
 
 
 class TestLoadStore:
@@ -126,3 +126,54 @@ class TestDeleteCalendarEventForTask:
         assert result is True
         store = json.loads(store_file.read_text())
         assert "page-2" not in store
+
+
+class TestCleanupCompletedTaskEvents:
+    def test_deletes_completed_task_events(self, tmp_path, monkeypatch):
+        store_data = {
+            "page-done": {"event_id": "ev-done", "calendar_date": "2026-03-25"},
+            "page-pending": {"event_id": "ev-pending", "calendar_date": "2026-03-26"},
+        }
+        store_file = tmp_path / "store.json"
+        store_file.write_text(json.dumps(store_data))
+        monkeypatch.setattr("agent.google_calendar._SYNC_STORE", str(store_file))
+
+        mock_service = MagicMock()
+
+        def fake_is_completed(page_id):
+            return page_id == "page-done"
+
+        with patch("agent.google_calendar.build", return_value=mock_service), \
+             patch("agent.google_calendar.get_credentials"), \
+             patch("agent.google_calendar.is_task_completed", side_effect=fake_is_completed):
+            cleanup_completed_task_events()
+
+        mock_service.events().delete.assert_called_once_with(calendarId="primary", eventId="ev-done")
+        store = json.loads(store_file.read_text())
+        assert "page-done" not in store
+        assert "page-pending" in store
+
+    def test_empty_store_does_nothing(self, tmp_path, monkeypatch):
+        store_file = tmp_path / "store.json"
+        store_file.write_text("{}")
+        monkeypatch.setattr("agent.google_calendar._SYNC_STORE", str(store_file))
+
+        with patch("agent.google_calendar.build") as mock_build:
+            cleanup_completed_task_events()
+        mock_build.assert_not_called()
+
+    def test_notion_error_skips_task(self, tmp_path, monkeypatch):
+        store_data = {"page-err": {"event_id": "ev-err", "calendar_date": "2026-03-25"}}
+        store_file = tmp_path / "store.json"
+        store_file.write_text(json.dumps(store_data))
+        monkeypatch.setattr("agent.google_calendar._SYNC_STORE", str(store_file))
+
+        mock_service = MagicMock()
+        with patch("agent.google_calendar.build", return_value=mock_service), \
+             patch("agent.google_calendar.get_credentials"), \
+             patch("agent.google_calendar.is_task_completed", side_effect=Exception("Notion error")):
+            cleanup_completed_task_events()
+
+        # エラー時はstoreに残る
+        store = json.loads(store_file.read_text())
+        assert "page-err" in store

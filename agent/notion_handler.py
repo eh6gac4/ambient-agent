@@ -179,3 +179,10 @@ def update_task_due(page_id: str, due: str):
         page_id=page_id,
         properties={"Due": {"date": {"start": due}}},
     )
+
+
+def is_task_completed(page_id: str) -> bool:
+    """指定ページのステータスが完了かどうかを返す。"""
+    page = _notion.pages.retrieve(page_id=page_id)
+    status = page["properties"].get("Status", {}).get("status", {})
+    return status.get("name") == _STATUS_DONE
