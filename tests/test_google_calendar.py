@@ -2,7 +2,7 @@ import json
 import pytest
 from datetime import date
 from unittest.mock import MagicMock, patch, mock_open
-from agent.google_calendar import _load_store, _save_store, sync_tasks_to_calendar
+from agent.google_calendar import _load_store, _save_store, sync_tasks_to_calendar, delete_calendar_event_for_task
 
 
 class TestLoadStore:
@@ -83,3 +83,46 @@ class TestOverdueDetermination:
             sync_tasks_to_calendar()
 
         mock_service.events().insert.assert_not_called()
+
+
+class TestDeleteCalendarEventForTask:
+    def test_deletes_event_and_removes_from_store(self, tmp_path, monkeypatch):
+        store_data = {"page-1": {"event_id": "ev-abc", "calendar_date": "2026-03-25"}}
+        store_file = tmp_path / "store.json"
+        store_file.write_text(json.dumps(store_data))
+        monkeypatch.setattr("agent.google_calendar._SYNC_STORE", str(store_file))
+
+        mock_service = MagicMock()
+        with patch("agent.google_calendar.build", return_value=mock_service), \
+             patch("agent.google_calendar.get_credentials"):
+            result = delete_calendar_event_for_task("page-1")
+
+        assert result is True
+        mock_service.events().delete.assert_called_once_with(calendarId="primary", eventId="ev-abc")
+        store = json.loads(store_file.read_text())
+        assert "page-1" not in store
+
+    def test_returns_false_when_no_record(self, tmp_path, monkeypatch):
+        store_file = tmp_path / "store.json"
+        store_file.write_text("{}")
+        monkeypatch.setattr("agent.google_calendar._SYNC_STORE", str(store_file))
+
+        result = delete_calendar_event_for_task("page-999")
+
+        assert result is False
+
+    def test_removes_from_store_even_if_api_fails(self, tmp_path, monkeypatch):
+        store_data = {"page-2": {"event_id": "ev-xyz", "calendar_date": "2026-03-25"}}
+        store_file = tmp_path / "store.json"
+        store_file.write_text(json.dumps(store_data))
+        monkeypatch.setattr("agent.google_calendar._SYNC_STORE", str(store_file))
+
+        mock_service = MagicMock()
+        mock_service.events().delete().execute.side_effect = Exception("API error")
+        with patch("agent.google_calendar.build", return_value=mock_service), \
+             patch("agent.google_calendar.get_credentials"):
+            result = delete_calendar_event_for_task("page-2")
+
+        assert result is True
+        store = json.loads(store_file.read_text())
+        assert "page-2" not in store

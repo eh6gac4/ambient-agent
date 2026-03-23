@@ -81,6 +81,25 @@ def sync_tasks_to_calendar():
         logger.exception("Error in sync_tasks_to_calendar")
 
 
+def delete_calendar_event_for_task(page_id: str) -> bool:
+    """タスク完了時に対応するカレンダーイベントを削除し、store から除去する。
+    削除できた場合は True、対応イベントがない場合は False を返す。
+    """
+    store = _load_store()
+    record = store.get(page_id)
+    if not record or not record.get("event_id"):
+        return False
+    try:
+        service = build("calendar", "v3", credentials=get_credentials())
+        service.events().delete(calendarId="primary", eventId=record["event_id"]).execute()
+        logger.info("Deleted calendar event for task %s: %s", page_id, record["event_id"])
+    except Exception:
+        logger.warning("Could not delete calendar event %s", record.get("event_id"))
+    store.pop(page_id)
+    _save_store(store)
+    return True
+
+
 def add_calendar_event(title: str, due: str) -> None:
     """単発でカレンダーにイベントを登録する（同期管理なし）。"""
     try:

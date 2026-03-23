@@ -85,23 +85,24 @@ class TestDueCommand:
 # ── 既存コマンドの基本動作確認 ────────────────────────────────────────────────
 
 class TestDoneCommand:
-    def test_success(self, mock_send, mock_complete_task, mock_load_cache):
+    def test_success(self, mock_send, mock_complete_task, mock_delete_event, mock_load_cache):
         mock_load_cache.return_value = MOCK_TASKS
         _handle_command("/done 2")
         mock_complete_task.assert_called_once_with("page-2")
+        mock_delete_event.assert_called_once_with("page-2")
         assert "タスクB" in mock_send.call_args[0][0]
 
-    def test_non_digit_arg(self, mock_send, mock_complete_task, mock_load_cache):
+    def test_non_digit_arg(self, mock_send, mock_complete_task, mock_delete_event, mock_load_cache):
         _handle_command("/done abc")
         mock_complete_task.assert_not_called()
         assert "使い方" in mock_send.call_args[0][0]
 
-    def test_empty_cache(self, mock_send, mock_complete_task, mock_load_cache):
+    def test_empty_cache(self, mock_send, mock_complete_task, mock_delete_event, mock_load_cache):
         mock_load_cache.return_value = []
         _handle_command("/done 1")
         mock_complete_task.assert_not_called()
 
-    def test_out_of_range(self, mock_send, mock_complete_task, mock_load_cache):
+    def test_out_of_range(self, mock_send, mock_complete_task, mock_delete_event, mock_load_cache):
         mock_load_cache.return_value = MOCK_TASKS
         _handle_command("/done 99")
         mock_complete_task.assert_not_called()
@@ -150,6 +151,11 @@ def mock_load_cache():
 @pytest.fixture
 def mock_complete_task():
     with patch("agent.telegram_handler.complete_task") as m:
+        yield m
+
+@pytest.fixture
+def mock_delete_event():
+    with patch("agent.telegram_handler.delete_calendar_event_for_task") as m:
         yield m
 
 @pytest.fixture
