@@ -12,7 +12,7 @@ from apscheduler.events import EVENT_JOB_ERROR
 from agent.config import OPERATING_START_HOUR, OPERATING_END_HOUR
 from agent.gmail_handler import process_unread_emails, notify_unread_emails
 from agent.calendar_handler import send_daily_briefing, send_task_reminder, send_escalation_notice
-from agent.google_calendar import sync_tasks_to_calendar, cleanup_completed_task_events
+from agent.google_calendar import sync_calendar
 from agent.telegram_handler import run_listener
 from agent.telegram_notifier import send_message
 from agent.usage_tracker import send_cost_report
@@ -55,15 +55,6 @@ def main():
         id="gmail_notify",
     )
 
-    # Notion 完了済みタスクのカレンダーイベント削除（ブリーフィング6分前）
-    scheduler.add_job(
-        cleanup_completed_task_events,
-        "cron",
-        hour=pre_briefing_hour,
-        minute=54,
-        id="calendar_cleanup",
-    )
-
     # Gmail → Notion タスク抽出（ブリーフィング5分前、まだ未読のメールに Claude を実行）
     scheduler.add_job(
         process_unread_emails,
@@ -83,9 +74,9 @@ def main():
         id="task_reminder",
     )
 
-    # Notion タスク → カレンダー同期（毎朝ブリーフィング前）
+    # カレンダー同期（完了済み削除 + 未着手タスク登録、ブリーフィング3分前）
     scheduler.add_job(
-        sync_tasks_to_calendar,
+        sync_calendar,
         "cron",
         hour=pre_briefing_hour,
         minute=57,

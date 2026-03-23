@@ -29,56 +29,67 @@ def _save_store(store: dict):
         json.dump(store, f, ensure_ascii=False, indent=2)
 
 
-def sync_tasks_to_calendar():
-    """Notion 未着手タスク（due あり）をカレンダーに同期する。
-    - 期限切れ: 古いイベントを削除して当日付けで再登録
-    - 未来/当日: 未同期のもののみ登録
+def sync_calendar():
+    """完了済みタスクのイベントを削除し、未着手タスクをカレンダーに同期する。
+    カレンダーサービスと store のロードを1回に集約。
     """
     try:
-        tasks = get_pending_tasks()
-        store = _load_store()
-        today = date.today().isoformat()
         service = build("calendar", "v3", credentials=get_credentials())
-        added = deleted = 0
-
-        for task in tasks:
-            due = task.get("due")
-            if not due:
-                continue
-
-            page_id = task.get("page_id", "")
-            due_date = due[:10]  # YYYY-MM-DD 部分
-            is_overdue = due_date < today
-            target_date = today if is_overdue else due_date
-
-            record = store.get(page_id)
-
-            # 既に今日付けで登録済みならスキップ
-            if record and record.get("calendar_date") == target_date:
-                continue
-
-            # 古いイベントを削除
-            if record and record.get("event_id"):
-                try:
-                    service.events().delete(
-                        calendarId="primary", eventId=record["event_id"]
-                    ).execute()
-                    deleted += 1
-                    logger.info("Deleted old calendar event: %s", record["event_id"])
-                except Exception:
-                    logger.warning("Could not delete event %s", record["event_id"])
-
-            # 新しいイベントを作成（期限切れなら当日付け、時刻指定があれば無視して終日に）
-            event_due = target_date if is_overdue else due
-            event_id = _insert_event(service, task["title"], event_due)
-            if page_id and event_id:
-                store[page_id] = {"event_id": event_id, "calendar_date": target_date}
-            added += 1
-
-        _save_store(store)
-        logger.info("Calendar sync done: %d added, %d deleted.", added, deleted)
     except Exception:
-        logger.exception("Error in sync_tasks_to_calendar")
+        logger.exception("Failed to build calendar service")
+        return
+
+    store = _load_store()
+    today = date.today().isoformat()
+
+    # Step 1: 完了済みタスクのイベントを削除
+    removed = 0
+    for page_id in list(store.keys()):
+        try:
+            if not is_task_completed(page_id):
+                continue
+        except Exception:
+            logger.warning("Could not check completion status for %s", page_id)
+            continue
+        event_id = store[page_id].get("event_id")
+        if event_id:
+            try:
+                service.events().delete(calendarId="primary", eventId=event_id).execute()
+                logger.info("Deleted calendar event %s for completed task %s", event_id, page_id)
+            except Exception:
+                logger.warning("Could not delete event %s", event_id)
+        store.pop(page_id)
+        removed += 1
+
+    # Step 2: 未着手タスクを同期
+    tasks = get_pending_tasks()
+    added = deleted = 0
+    for task in tasks:
+        due = task.get("due")
+        if not due:
+            continue
+        page_id = task.get("page_id", "")
+        due_date = due[:10]
+        is_overdue = due_date < today
+        target_date = today if is_overdue else due_date
+        record = store.get(page_id)
+        if record and record.get("calendar_date") == target_date:
+            continue
+        if record and record.get("event_id"):
+            try:
+                service.events().delete(calendarId="primary", eventId=record["event_id"]).execute()
+                deleted += 1
+                logger.info("Deleted old calendar event: %s", record["event_id"])
+            except Exception:
+                logger.warning("Could not delete event %s", record["event_id"])
+        event_due = target_date if is_overdue else due
+        event_id = _insert_event(service, task["title"], event_due)
+        if page_id and event_id:
+            store[page_id] = {"event_id": event_id, "calendar_date": target_date}
+        added += 1
+
+    _save_store(store)
+    logger.info("Calendar sync done: %d removed, %d added, %d rescheduled.", removed, added, deleted)
 
 
 def delete_calendar_event_for_task(page_id: str) -> bool:
@@ -99,39 +110,6 @@ def delete_calendar_event_for_task(page_id: str) -> bool:
     _save_store(store)
     return True
 
-
-def cleanup_completed_task_events():
-    """store に残っている完了済みタスクのカレンダーイベントを削除する。"""
-    store = _load_store()
-    if not store:
-        return
-    try:
-        service = build("calendar", "v3", credentials=get_credentials())
-    except Exception:
-        logger.exception("Failed to build calendar service in cleanup")
-        return
-
-    removed = 0
-    for page_id in list(store.keys()):
-        try:
-            if not is_task_completed(page_id):
-                continue
-        except Exception:
-            logger.warning("Could not check completion status for %s", page_id)
-            continue
-
-        event_id = store[page_id].get("event_id")
-        if event_id:
-            try:
-                service.events().delete(calendarId="primary", eventId=event_id).execute()
-                logger.info("Cleanup: deleted calendar event %s for completed task %s", event_id, page_id)
-            except Exception:
-                logger.warning("Cleanup: could not delete event %s", event_id)
-        store.pop(page_id)
-        removed += 1
-
-    _save_store(store)
-    logger.info("Calendar cleanup done: %d event(s) removed.", removed)
 
 
 def add_calendar_event(title: str, due: str) -> None:
