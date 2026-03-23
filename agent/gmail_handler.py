@@ -3,6 +3,7 @@ agent/gmail_handler.py
 未読メールを取得し、Claude でタスクを抽出して Notion に登録する。
 """
 import base64
+import datetime
 import logging
 from googleapiclient.discovery import build
 
@@ -21,17 +22,44 @@ def _parse_headers(payload: dict) -> dict[str, str]:
     return {h["name"]: h["value"] for h in payload.get("headers", [])}
 
 
+_PROCESSED_IDS_RETENTION_DAYS = 30
+
+
 def _load_processed_ids() -> set[str]:
+    """処理済み ID を返す。30日以上古いエントリは除去してファイルを更新する。
+    フォーマット: 'YYYY-MM-DD msg_id'（旧形式の行は無視）
+    """
+    cutoff = (datetime.date.today() - datetime.timedelta(days=_PROCESSED_IDS_RETENTION_DAYS)).isoformat()
+    valid_lines: list[str] = []
+    ids: set[str] = set()
+    total = 0
     try:
         with open(_PROCESSED_IDS_FILE) as f:
-            return set(line.strip() for line in f if line.strip())
+            for line in f:
+                parts = line.strip().split(" ", 1)
+                if len(parts) != 2:
+                    continue  # 旧形式はスキップ
+                total += 1
+                date_str, msg_id = parts
+                if date_str >= cutoff:
+                    valid_lines.append(line.rstrip())
+                    ids.add(msg_id)
     except FileNotFoundError:
         return set()
 
+    # 古いエントリがあればファイルを書き直す
+    if len(valid_lines) < total:
+        with open(_PROCESSED_IDS_FILE, "w") as f:
+            f.write("\n".join(valid_lines) + ("\n" if valid_lines else ""))
+        logger.info("processed_ids trimmed: %d → %d entries", total, len(valid_lines))
+
+    return ids
+
 
 def _save_processed_id(msg_id: str):
+    today = datetime.date.today().isoformat()
     with open(_PROCESSED_IDS_FILE, "a") as f:
-        f.write(msg_id + "\n")
+        f.write(f"{today} {msg_id}\n")
 
 
 def notify_unread_emails():
