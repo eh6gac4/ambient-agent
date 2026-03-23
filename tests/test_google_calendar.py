@@ -39,7 +39,6 @@ class TestSyncCalendar:
         tasks = [{"title": "Old task", "page_id": "p1", "due": "2026-01-01"}]
 
         with patch("agent.google_calendar.get_pending_tasks", return_value=tasks), \
-             patch("agent.google_calendar.is_task_completed", return_value=False), \
              patch("agent.google_calendar.build", return_value=mock_service), \
              patch("agent.google_calendar.get_credentials"):
             sync_calendar()
@@ -53,7 +52,6 @@ class TestSyncCalendar:
         tasks = [{"title": "Future task", "page_id": "p2", "due": future_due}]
 
         with patch("agent.google_calendar.get_pending_tasks", return_value=tasks), \
-             patch("agent.google_calendar.is_task_completed", return_value=False), \
              patch("agent.google_calendar.build", return_value=mock_service), \
              patch("agent.google_calendar.get_credentials"):
             sync_calendar()
@@ -68,14 +66,14 @@ class TestSyncCalendar:
         tasks = [{"title": "Task", "page_id": "p3", "due": today}]
 
         with patch("agent.google_calendar.get_pending_tasks", return_value=tasks), \
-             patch("agent.google_calendar.is_task_completed", return_value=False), \
              patch("agent.google_calendar.build", return_value=mock_service), \
              patch("agent.google_calendar.get_credentials"):
             sync_calendar()
 
-        mock_service.events().insert.assert_not_called()
+        mock_service.events.return_value.insert.assert_not_called()
 
-    def test_deletes_completed_task_events(self, tmp_path, monkeypatch):
+    def test_deletes_event_for_task_not_in_pending(self, tmp_path, monkeypatch):
+        """store にあるが get_pending_tasks に含まれない → 完了/削除済みとして削除"""
         store_data = {
             "page-done": {"event_id": "ev-done", "calendar_date": "2026-03-25"},
             "page-pending": {"event_id": "ev-pending", "calendar_date": "2099-12-31"},
@@ -83,11 +81,7 @@ class TestSyncCalendar:
         store_file, mock_service = self._setup(tmp_path, monkeypatch, store_data)
         tasks = [{"title": "Pending task", "page_id": "page-pending", "due": "2099-12-31"}]
 
-        def fake_is_completed(page_id):
-            return page_id == "page-done"
-
         with patch("agent.google_calendar.get_pending_tasks", return_value=tasks), \
-             patch("agent.google_calendar.is_task_completed", side_effect=fake_is_completed), \
              patch("agent.google_calendar.build", return_value=mock_service), \
              patch("agent.google_calendar.get_credentials"):
             sync_calendar()
@@ -96,34 +90,28 @@ class TestSyncCalendar:
         assert "page-done" not in store
         assert "page-pending" in store
 
-    def test_notion_error_skips_task(self, tmp_path, monkeypatch):
-        store_data = {"page-err": {"event_id": "ev-err", "calendar_date": "2026-03-25"}}
-        store_file, mock_service = self._setup(tmp_path, monkeypatch, store_data)
-
-        with patch("agent.google_calendar.get_pending_tasks", return_value=[]), \
-             patch("agent.google_calendar.is_task_completed", side_effect=Exception("Notion error")), \
-             patch("agent.google_calendar.build", return_value=mock_service), \
-             patch("agent.google_calendar.get_credentials"):
-            sync_calendar()
-
-        store = json.loads(store_file.read_text())
-        assert "page-err" in store
-
     def test_uses_single_service_build(self, tmp_path, monkeypatch):
-        store_data = {
-            "page-done": {"event_id": "ev-done", "calendar_date": "2026-03-25"},
-        }
+        store_data = {"page-done": {"event_id": "ev-done", "calendar_date": "2026-03-25"}}
         store_file, mock_service = self._setup(tmp_path, monkeypatch, store_data)
         tasks = [{"title": "New task", "page_id": "page-new", "due": "2099-12-31"}]
 
         with patch("agent.google_calendar.get_pending_tasks", return_value=tasks), \
-             patch("agent.google_calendar.is_task_completed", return_value=True), \
              patch("agent.google_calendar.build", return_value=mock_service) as mock_build, \
              patch("agent.google_calendar.get_credentials"):
             sync_calendar()
 
-        # カレンダーサービスのビルドは1回だけ
         mock_build.assert_called_once()
+
+    def test_uses_single_get_pending_tasks_call(self, tmp_path, monkeypatch):
+        """get_pending_tasks は1回だけ呼ばれる（N+1 解消の確認）"""
+        store_file, mock_service = self._setup(tmp_path, monkeypatch)
+
+        with patch("agent.google_calendar.get_pending_tasks", return_value=[]) as mock_get, \
+             patch("agent.google_calendar.build", return_value=mock_service), \
+             patch("agent.google_calendar.get_credentials"):
+            sync_calendar()
+
+        mock_get.assert_called_once()
 
 
 class TestDeleteCalendarEventForTask:

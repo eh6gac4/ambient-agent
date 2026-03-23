@@ -114,19 +114,6 @@ def add_task(task: dict, checklist: list[str] | None = None):
     _notion.pages.create(**kwargs)
 
 
-def get_overdue_tasks() -> list[dict]:
-    """期限切れ（Due < 今日）かつ未着手のタスク一覧を返す。"""
-    if not DB_ID:
-        return []
-    today = datetime.date.today().isoformat()
-    results = _query_db({
-        "and": [
-            {"property": "Status", "status": {"equals": _STATUS_PENDING}},
-            {"property": "Due", "date": {"before": today}},
-        ]
-    })
-    return [_parse_task_page(p) for p in results.get("results", [])]
-
 
 def get_pending_tasks() -> list[dict]:
     """Status = 未着手 のタスク一覧を返す。"""
@@ -181,8 +168,3 @@ def update_task_due(page_id: str, due: str):
     )
 
 
-def is_task_completed(page_id: str) -> bool:
-    """指定ページのステータスが完了かどうかを返す。"""
-    page = _notion.pages.retrieve(page_id=page_id)
-    status = page["properties"].get("Status", {}).get("status", {})
-    return status.get("name") == _STATUS_DONE
