@@ -16,7 +16,7 @@ from agent.telegram_notifier import send_message
 logger = logging.getLogger(__name__)
 
 _PROCESSED_IDS_FILE = "data/processed_ids.txt"
-_GMAIL_QUERY = "is:unread in:inbox -category:promotions -category:social"
+_GMAIL_QUERY = "is:unread in:inbox -category:promotions"
 
 
 def _parse_headers(payload: dict) -> dict[str, str]:

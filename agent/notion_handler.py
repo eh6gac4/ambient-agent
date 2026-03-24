@@ -19,6 +19,7 @@ DB_ID = os.getenv("NOTION_TASKS_DB_ID", "")
 _data_source_id: str | None = None
 
 _STATUS_PENDING = "未着手"
+_STATUS_IN_PROGRESS_GROUP = ["進行中", "確認中", "一時中断"]
 _STATUS_DONE = "完了"
 
 
@@ -118,10 +119,12 @@ def add_task(task: dict, checklist: list[str] | None = None) -> str | None:
 
 
 def get_pending_tasks() -> list[dict]:
-    """Status = 未着手 のタスク一覧を返す。"""
+    """Status = 未着手 または 進行中グループ のタスク一覧を返す。"""
     if not DB_ID:
         return []
-    results = _query_db({"property": "Status", "status": {"equals": _STATUS_PENDING}})
+    status_filters = [{"property": "Status", "status": {"equals": s}}
+                      for s in [_STATUS_PENDING] + _STATUS_IN_PROGRESS_GROUP]
+    results = _query_db({"or": status_filters})
     return [_parse_task_page(p) for p in results.get("results", [])]
 
 
@@ -134,9 +137,11 @@ def escalate_priority_tasks() -> list[dict]:
     deadline = (today + datetime.timedelta(days=3)).isoformat()
     today_str = today.isoformat()
 
+    status_filters = [{"property": "Status", "status": {"equals": s}}
+                      for s in [_STATUS_PENDING] + _STATUS_IN_PROGRESS_GROUP]
     results = _query_db({
         "and": [
-            {"property": "Status", "status": {"equals": _STATUS_PENDING}},
+            {"or": status_filters},
             {"property": "Priority", "select": {"equals": "medium"}},
             {"property": "Due", "date": {"on_or_before": deadline}},
             {"property": "Due", "date": {"on_or_after": today_str}},
