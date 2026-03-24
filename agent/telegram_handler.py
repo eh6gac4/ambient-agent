@@ -18,7 +18,7 @@ from agent.calendar_handler import send_daily_briefing
 from agent.claude_agent import extract_tasks_from_email, extract_tasks_from_url_content
 from agent.config import JST, OPERATING_START_HOUR, OPERATING_END_HOUR
 from agent.google_calendar import delete_calendar_event_for_task
-from agent.notion_handler import add_task, get_pending_tasks, complete_task, update_task_due
+from agent.notion_handler import add_task, get_open_tasks, complete_task, update_task_due
 from agent.task_formatter import format_task_list, sort_tasks
 from agent.telegram_notifier import send_message
 
@@ -67,7 +67,7 @@ def _handle_command(text: str):
     arg = parts[1].strip() if len(parts) > 1 else ""
 
     if command == "/tasks":
-        tasks = get_pending_tasks()
+        tasks = get_open_tasks()
         if not tasks:
             send_message("✅ 未着手のタスクはありません")
             return

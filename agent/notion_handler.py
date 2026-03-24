@@ -118,7 +118,7 @@ def add_task(task: dict, checklist: list[str] | None = None) -> str | None:
 
 
 
-def get_pending_tasks() -> list[dict]:
+def get_open_tasks() -> list[dict]:
     """Status = 未着手 または 進行中グループ のタスク一覧を返す。"""
     if not DB_ID:
         return []

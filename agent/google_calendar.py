@@ -9,7 +9,7 @@ from googleapiclient.discovery import build
 
 from agent.config import JST
 from agent.google_auth import get_credentials
-from agent.notion_handler import get_pending_tasks
+from agent.notion_handler import get_open_tasks
 
 logger = logging.getLogger(__name__)
 _SYNC_STORE = "data/calendar_sync.json"
@@ -41,7 +41,7 @@ def sync_calendar():
 
     store = _load_store()
     today = date.today().isoformat()
-    tasks = get_pending_tasks()
+    tasks = get_open_tasks()
     pending_ids = {task["page_id"] for task in tasks}
 
     # Step 1: store にあるが未着手でない（完了/削除済み）→ カレンダーイベントを削除

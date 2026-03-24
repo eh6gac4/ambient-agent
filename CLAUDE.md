@@ -10,6 +10,10 @@ docker compose build && docker compose up -d
 docker compose logs -f
 ```
 
+## Git ルール
+
+- コード変更後は必ずコミットして `git push` する。
+
 ## 重要な注意事項
 
 - **`start.sh` は使わない。** Docker がメインの実行環境。ホスト上での手動デバッグ時のみ使用。

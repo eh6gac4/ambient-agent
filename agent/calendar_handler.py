@@ -10,7 +10,7 @@ from googleapiclient.discovery import build
 
 from agent.config import JST
 from agent.google_auth import get_credentials
-from agent.notion_handler import get_pending_tasks, escalate_priority_tasks
+from agent.notion_handler import get_open_tasks, escalate_priority_tasks
 from agent.claude_agent import summarize_day
 from agent.telegram_notifier import send_message
 from agent.task_formatter import format_task_list, fmt_due
@@ -22,7 +22,7 @@ def send_task_reminder():
     """未完了タスクを優先度グループ別に Telegram にリマインド送信する。"""
     logger.info("Sending task reminder...")
     try:
-        tasks = get_pending_tasks()
+        tasks = get_open_tasks()
         if not tasks:
             logger.info("No pending tasks.")
             return
@@ -54,7 +54,7 @@ def send_daily_briefing():
     try:
         with ThreadPoolExecutor(max_workers=2) as ex:
             f_events = ex.submit(_get_todays_events)
-            f_tasks = ex.submit(get_pending_tasks)
+            f_tasks = ex.submit(get_open_tasks)
         events, tasks = f_events.result(), f_tasks.result()
         today = datetime.now(JST).date().isoformat()
         overdue = [t for t in tasks if t.get("due") and t["due"][:10] < today]
