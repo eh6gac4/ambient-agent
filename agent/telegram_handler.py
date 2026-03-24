@@ -18,7 +18,8 @@ from agent.calendar_handler import send_daily_briefing
 from agent.claude_agent import extract_tasks_from_email, extract_tasks_from_url_content
 from agent.config import JST, OPERATING_START_HOUR, OPERATING_END_HOUR
 from agent.google_calendar import delete_calendar_event_for_task
-from agent.notion_handler import add_task, get_open_tasks, complete_task, update_task_due
+from agent.gmail_handler import get_sender_for_task, add_no_task_sender
+from agent.notion_handler import add_task, get_open_tasks, complete_task, cancel_task, update_task_due
 from agent.task_formatter import format_task_list, sort_tasks
 from agent.telegram_notifier import send_message
 
@@ -105,8 +106,9 @@ def _handle_command(text: str):
     elif command == "/help":
         send_message(
             "*使えるコマンド*\n\n"
-            "`/tasks` — 未着手タスク一覧\n"
+            "`/tasks` — タスク一覧\n"
             "`/done <番号>` — タスクを完了にする\n"
+            "`/skip <番号>` — タスクを中止にし、送信者をブロック\n"
             "`/add <タスク名>` — タスクを追加\n"
             "`/due <番号> <日付>` — 期限を変更（例: `/due 3 2026-03-25`）\n"
             "`/briefing` — 今すぐブリーフィングを実行\n\n"
@@ -116,6 +118,29 @@ def _handle_command(text: str):
     elif command == "/briefing":
         send_message("⏳ ブリーフィングを生成中...")
         send_daily_briefing()
+
+    elif command == "/skip":
+        if not arg.isdigit():
+            send_message("使い方: `/skip 2`（番号は `/tasks` で確認）")
+            return
+        index = int(arg) - 1
+        tasks = _load_task_cache()
+        if not tasks:
+            send_message("先に `/tasks` でタスク一覧を取得してください")
+            return
+        if index < 0 or index >= len(tasks):
+            send_message(f"番号が範囲外です（1〜{len(tasks)}）")
+            return
+        task = tasks[index]
+        cancel_task(task["page_id"])
+        delete_calendar_event_for_task(task["page_id"])
+        sender = get_sender_for_task(task["page_id"])
+        if sender:
+            add_no_task_sender(sender)
+            send_message(f"🚫 タスクを中止にしました\n\n*{task['title']}*\n\n`{sender}` からのメールは今後タスク登録しません")
+        else:
+            send_message(f"🚫 タスクを中止にしました\n\n*{task['title']}*")
+        logger.info(f"Task cancelled: {task['title']} (sender: {sender})")
 
     elif command == "/due":
         parts2 = arg.split(None, 1)

@@ -21,6 +21,7 @@ _data_source_id: str | None = None
 _STATUS_PENDING = "未着手"
 _STATUS_IN_PROGRESS_GROUP = ["進行中", "確認中", "一時中断"]
 _STATUS_DONE = "完了"
+_STATUS_CANCELLED = "中止"
 
 
 def _get_data_source_id() -> str | None:
@@ -167,6 +168,14 @@ def complete_task(page_id: str):
     _notion.pages.update(
         page_id=page_id,
         properties={"Status": {"status": {"name": _STATUS_DONE}}},
+    )
+
+
+def cancel_task(page_id: str):
+    """指定ページのステータスを中止に更新する。"""
+    _notion.pages.update(
+        page_id=page_id,
+        properties={"Status": {"status": {"name": _STATUS_CANCELLED}}},
     )
 
 

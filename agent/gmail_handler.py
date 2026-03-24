@@ -25,6 +25,8 @@ def _parse_headers(payload: dict) -> dict[str, str]:
 
 _PROCESSED_IDS_RETENTION_DAYS = 30
 _THREAD_MAP_FILE = "data/gmail_thread_map.json"
+_SENDER_MAP_FILE = "data/task_sender_map.json"
+_NO_TASK_SENDERS_FILE = "data/no_task_senders.txt"
 
 
 def _load_thread_map() -> dict:
@@ -39,6 +41,47 @@ def _load_thread_map() -> dict:
 def _save_thread_map(thread_map: dict):
     with open(_THREAD_MAP_FILE, "w") as f:
         json.dump(thread_map, f, ensure_ascii=False, indent=2)
+
+
+def _load_sender_map() -> dict:
+    """page_id → sender のマッピングを返す。"""
+    try:
+        with open(_SENDER_MAP_FILE) as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def _save_sender_map(sender_map: dict):
+    with open(_SENDER_MAP_FILE, "w") as f:
+        json.dump(sender_map, f, ensure_ascii=False, indent=2)
+
+
+def get_sender_for_task(page_id: str) -> str | None:
+    """page_id に対応する送信者メールアドレスを返す。"""
+    return _load_sender_map().get(page_id)
+
+
+def load_no_task_senders() -> set[str]:
+    """タスク不要な送信者のメールアドレス一覧を返す。"""
+    try:
+        with open(_NO_TASK_SENDERS_FILE) as f:
+            return {line.strip() for line in f if line.strip()}
+    except FileNotFoundError:
+        return set()
+
+
+def add_no_task_sender(sender_email: str):
+    """タスク不要な送信者を追加する。"""
+    with open(_NO_TASK_SENDERS_FILE, "a") as f:
+        f.write(f"{sender_email}\n")
+
+
+def _extract_email(sender: str) -> str:
+    """'Name <email>' 形式から email アドレスを抽出する。"""
+    if "<" in sender and ">" in sender:
+        return sender.split("<")[1].rstrip(">").strip().lower()
+    return sender.strip().lower()
 
 
 def _load_processed_ids() -> set[str]:
@@ -133,6 +176,8 @@ def process_unread_emails():
 
         processed_ids = _load_processed_ids()
         thread_map = _load_thread_map()
+        sender_map = _load_sender_map()
+        no_task_senders = load_no_task_senders()
         task_lines = []
         archived_lines = []
 
@@ -146,10 +191,20 @@ def process_unread_emails():
             ).execute()
 
             subject, body = _parse_message(msg)
+            headers = _parse_headers(msg["payload"])
+            sender_email = _extract_email(headers.get("From", ""))
+            thread_id = msg.get("threadId", "")
+
+            # ブロック済み送信者はタスク抽出せずアーカイブ
+            if sender_email in no_task_senders:
+                logger.info(f"Skipped (blocked sender): {subject}")
+                _archive_message(service, msg_id)
+                _save_processed_id(msg_id)
+                continue
+
             analysis = analyze_email(subject, body)
             summary = analysis.get("summary", "")
             tasks = analysis.get("tasks", [])
-            thread_id = msg.get("threadId", "")
 
             gmail_url = f"https://mail.google.com/mail/u/0/#all/{msg_id}"
             if tasks:
@@ -179,8 +234,10 @@ def process_unread_emails():
                         "source_url": gmail_url,
                     }
                     page_id = add_task(page_task, checklist=checklist)
-                    if page_id and thread_id:
-                        thread_map[thread_id] = page_id
+                    if page_id:
+                        if thread_id:
+                            thread_map[thread_id] = page_id
+                        sender_map[page_id] = sender_email
                     logger.info(f"Task added: {subject} ({len(tasks)} items)")
                     task_lines.append(f"• *{subject}*\n  {summary}\n  → " + "、".join(checklist))
             else:
@@ -191,6 +248,7 @@ def process_unread_emails():
             _save_processed_id(msg_id)
 
         _save_thread_map(thread_map)
+        _save_sender_map(sender_map)
 
         if not task_lines and not archived_lines:
             return
