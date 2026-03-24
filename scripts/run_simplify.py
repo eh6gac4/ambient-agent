@@ -51,7 +51,7 @@ def main():
     files_list = "\n".join(f"- `{f}`" for f in changed_files)
     output = result.stdout.strip()
     body_summary = output[:1500] + ("\n…（省略）" if len(output) > 1500 else "")
-    pr_body = f"## 変更ファイル\n{files_list}\n\n## 内容\n{body_summary}"
+    pr_body = f"## サマリー\n{body_summary}\n\n## 変更ファイル\n{files_list}"
 
     pr_result = _run([
         "gh", "pr", "create",
