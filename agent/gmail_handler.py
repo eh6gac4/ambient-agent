@@ -202,8 +202,12 @@ def process_unread_emails():
             sections.append("📦 *アーカイブ済み*\n" + "\n".join(archived_lines))
         send_message("*📧 メール処理完了*\n\n" + "\n\n".join(sections))
 
-    except Exception:
+    except Exception as e:
         logger.exception("Error in process_unread_emails")
+        try:
+            send_message(f"⚠️ Gmail処理エラー\n\n```\n{type(e).__name__}: {e}\n```")
+        except Exception:
+            pass
 
 
 def _parse_message(msg: dict) -> tuple[str, str]:
