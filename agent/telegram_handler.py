@@ -74,7 +74,7 @@ def _handle_command(text: str):
         sorted_tasks = sort_tasks(tasks)
         _save_task_cache(sorted_tasks)
         body = format_task_list(tasks, numbered=True)
-        send_message(f"*📋 未着手タスク ({len(sorted_tasks)}件)*{body}\n\n`/done <番号>` で完了にできます")
+        send_message(f"*📋 タスク一覧 ({len(sorted_tasks)}件)*{body}\n\n`/done <番号>` で完了にできます")
 
     elif command == "/done":
         if not arg.isdigit():

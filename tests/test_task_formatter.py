@@ -58,25 +58,25 @@ class TestFormatTaskList:
     def test_empty(self):
         assert format_task_list([]) == ""
 
-    def test_groups_by_priority(self):
+    def test_groups_by_status(self):
         tasks = [
-            {"title": "H", "priority": "high"},
-            {"title": "L", "priority": "low"},
+            {"title": "H", "priority": "high", "status": "未着手"},
+            {"title": "L", "priority": "low", "status": "進行中"},
         ]
         result = format_task_list(tasks)
-        assert "🔴 High" in result
-        assert "🟢 Low" in result
-        assert result.index("🔴") < result.index("🟢")
+        assert "📋 未着手" in result
+        assert "▶️ 進行中" in result
+        assert result.index("未着手") < result.index("進行中")
 
     def test_bullet_prefix(self):
-        tasks = [{"title": "T", "priority": "medium"}]
+        tasks = [{"title": "T", "priority": "medium", "status": "未着手"}]
         result = format_task_list(tasks)
-        assert "• T" in result
+        assert "• 🟡 T" in result
 
     def test_numbered_prefix(self):
-        tasks = [{"title": "T", "priority": "medium"}]
+        tasks = [{"title": "T", "priority": "medium", "status": "未着手"}]
         result = format_task_list(tasks, numbered=True)
-        assert "1. T" in result
+        assert "1. 🟡 T" in result
 
     def test_due_included(self):
         tasks = [{"title": "T", "priority": "medium", "due": "2026-03-21"}]

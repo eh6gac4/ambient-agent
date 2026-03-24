@@ -58,10 +58,13 @@ def _parse_task_page(page: dict) -> dict:
     due = due_obj["start"] if due_obj else None
     priority_obj = props.get("Priority", {}).get("select")
     priority = priority_obj["name"] if priority_obj else "medium"
+    status_obj = props.get("Status", {}).get("status")
+    status = status_obj["name"] if status_obj else _STATUS_PENDING
     return {
         "title": title_text,
         "due": due,
         "priority": priority,
+        "status": status,
         "url": page.get("url", ""),
         "page_id": page["id"],
     }
