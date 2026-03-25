@@ -12,7 +12,7 @@ from apscheduler.events import EVENT_JOB_ERROR
 
 from agent.config import OPERATING_START_HOUR, OPERATING_END_HOUR
 from agent.gmail_handler import process_unread_emails, learn_from_cancelled_tasks
-from agent.calendar_handler import send_daily_briefing, send_task_reminder, send_escalation_notice
+from agent.calendar_handler import send_daily_briefing, send_task_reminder, send_escalation_notice, send_due_soon_notice, send_stale_tasks_notice
 from agent.google_calendar import sync_calendar
 from agent.telegram_handler import run_listener
 from agent.telegram_notifier import send_message
@@ -100,6 +100,25 @@ def main():
         hour=briefing_hour,
         minute=0,
         id="daily_briefing",
+    )
+
+    # 当日・翌日期限タスク通知（ブリーフィング10分後）
+    scheduler.add_job(
+        send_due_soon_notice,
+        "cron",
+        hour=briefing_hour,
+        minute=10,
+        id="due_soon_notice",
+    )
+
+    # 長期未更新タスク通知（毎週月曜 09:00）
+    scheduler.add_job(
+        send_stale_tasks_notice,
+        "cron",
+        day_of_week="mon",
+        hour=9,
+        minute=0,
+        id="stale_tasks_notice",
     )
 
     # 中止タスクから送信者ブロックを学習（1時間ごと）

@@ -61,11 +61,13 @@ def _parse_task_page(page: dict) -> dict:
     priority = priority_obj["name"] if priority_obj else "medium"
     status_obj = props.get("Status", {}).get("status")
     status = status_obj["name"] if status_obj else _STATUS_PENDING
+    last_edited = page.get("last_edited_time", "")[:10] if page.get("last_edited_time") else None
     return {
         "title": title_text,
         "due": due,
         "priority": priority,
         "status": status,
+        "last_edited": last_edited,
         "url": page.get("url", ""),
         "page_id": page["id"],
     }
