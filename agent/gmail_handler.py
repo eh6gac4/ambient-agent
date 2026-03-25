@@ -10,7 +10,7 @@ from googleapiclient.discovery import build
 
 from agent.google_auth import get_credentials
 from agent.claude_agent import analyze_email
-from agent.notion_handler import add_task, update_task_from_reply
+from agent.notion_handler import add_task, update_task_from_reply, get_task_status
 from agent.telegram_notifier import send_message
 
 logger = logging.getLogger(__name__)
@@ -75,6 +75,36 @@ def add_no_task_sender(sender_email: str):
     """タスク不要な送信者を追加する。"""
     with open(_NO_TASK_SENDERS_FILE, "a") as f:
         f.write(f"{sender_email}\n")
+
+
+def learn_from_cancelled_tasks():
+    """sender_map の page_id を Notion で確認し、中止になっていたら送信者をブロックリストに追加する。"""
+    sender_map = _load_sender_map()
+    if not sender_map:
+        return
+
+    no_task_senders = load_no_task_senders()
+    learned = []
+    remaining = {}
+
+    for page_id, sender_email in sender_map.items():
+        status = get_task_status(page_id)
+        if status == "中止":
+            if sender_email not in no_task_senders:
+                add_no_task_sender(sender_email)
+                no_task_senders.add(sender_email)
+                learned.append(sender_email)
+                logger.info(f"Learned no-task sender from Notion: {sender_email}")
+            # 学習済みは sender_map から削除
+        else:
+            remaining[page_id] = sender_email
+
+    if len(remaining) < len(sender_map):
+        _save_sender_map(remaining)
+
+    if learned:
+        from agent.telegram_notifier import send_message as _send
+        _send("📚 *送信者ブロックを学習しました*\n\n" + "\n".join(f"• `{s}`" for s in learned))
 
 
 def _extract_email(sender: str) -> str:

@@ -179,6 +179,16 @@ def cancel_task(page_id: str):
     )
 
 
+def get_task_status(page_id: str) -> str | None:
+    """指定ページのステータス名を返す。取得失敗時は None。"""
+    try:
+        page = _notion.pages.retrieve(page_id=page_id)
+        status_obj = page["properties"].get("Status", {}).get("status")
+        return status_obj["name"] if status_obj else None
+    except Exception:
+        return None
+
+
 def update_task_due(page_id: str, due: str):
     """指定ページの期限を更新する。due は 'YYYY-MM-DD' 形式。"""
     _notion.pages.update(
