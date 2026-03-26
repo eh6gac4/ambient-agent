@@ -236,7 +236,7 @@ def process_unread_emails():
             summary = analysis.get("summary", "")
             tasks = analysis.get("tasks", [])
 
-            gmail_url = f"https://mail.google.com/mail/u/0/#all/{msg_id}"
+            gmail_url = f"https://mail.google.com/mail/u/0/#all/{thread_id}"
             if tasks:
                 _priority_order = {"high": 0, "medium": 1, "low": 2}
                 best = min(tasks, key=lambda t: _priority_order.get(t.get("priority", "medium"), 1))
