@@ -39,7 +39,7 @@ def fmt_due(d: str | None) -> str:
     else:
         return abs_str
 
-    return f"{abs_str}・{rel}"
+    return rel
 
 
 def sort_tasks(tasks: list[dict]) -> list[dict]:

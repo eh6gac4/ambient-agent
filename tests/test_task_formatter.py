@@ -24,17 +24,17 @@ class TestFmtDue:
         assert fmt_due("not-a-date") == "not-a-date"
 
     def test_today(self):
-        assert _fmt("2026-03-27") == "2026年03月27日・今日"
+        assert _fmt("2026-03-27") == "今日"
 
     def test_tomorrow(self):
-        assert _fmt("2026-03-28") == "2026年03月28日・明日"
+        assert _fmt("2026-03-28") == "明日"
 
     def test_day_after_tomorrow(self):
-        assert _fmt("2026-03-29") == "2026年03月29日・明後日"
+        assert _fmt("2026-03-29") == "明後日"
 
     def test_this_week(self):
         result = _fmt("2026-03-28")
-        assert "今週土曜" in result or "明日" in result
+        assert result in ("今週土曜", "明日")
 
     def test_next_week(self):
         result = _fmt("2026-03-30")
