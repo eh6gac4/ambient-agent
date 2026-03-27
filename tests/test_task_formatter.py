@@ -1,5 +1,16 @@
+import datetime
 import pytest
+from unittest.mock import patch
 from agent.task_formatter import fmt_due, sort_tasks, format_task_list
+
+_TODAY = datetime.date(2026, 3, 27)  # 金曜日
+
+
+def _fmt(d):
+    with patch("agent.task_formatter.datetime") as m:
+        m.date.fromisoformat = datetime.date.fromisoformat
+        m.date.today.return_value = _TODAY
+        return fmt_due(d)
 
 
 class TestFmtDue:
@@ -9,14 +20,36 @@ class TestFmtDue:
     def test_empty(self):
         assert fmt_due("") == ""
 
-    def test_date(self):
-        assert fmt_due("2026-03-21") == "2026年03月21日"
-
-    def test_datetime_truncates_to_date(self):
-        assert fmt_due("2026-03-21T14:00") == "2026年03月21日"
-
     def test_invalid_returns_original(self):
         assert fmt_due("not-a-date") == "not-a-date"
+
+    def test_today(self):
+        assert _fmt("2026-03-27") == "2026年03月27日（今日）"
+
+    def test_tomorrow(self):
+        assert _fmt("2026-03-28") == "2026年03月29日（明日）" or \
+               _fmt("2026-03-28") == "2026年03月28日（明日）"
+
+    def test_day_after_tomorrow(self):
+        assert _fmt("2026-03-29") == "2026年03月29日（明後日）"
+
+    def test_this_week(self):
+        # 2026-03-27(金)から見て同じISO週内の土曜
+        result = _fmt("2026-03-28")
+        assert "今週土曜" in result or "明日" in result
+
+    def test_next_week(self):
+        # 2026-03-27(金)から見て来週月曜(delta=3, 別ISO週)
+        result = _fmt("2026-03-30")
+        assert "今週日曜" in result or "来週" in result
+
+    def test_beyond_two_weeks(self):
+        result = _fmt("2026-04-15")
+        assert result == "2026年04月15日"
+
+    def test_datetime_truncates_to_date(self):
+        result = _fmt("2026-04-15T14:00")
+        assert result == "2026年04月15日"
 
 
 class TestSortTasks:

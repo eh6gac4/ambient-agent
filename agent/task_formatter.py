@@ -11,13 +11,35 @@ STATUS_ORDER = {"未着手": 0, "進行中": 1, "確認中": 2, "一時中断": 
 STATUS_LABELS = {"未着手": "📋 未着手", "進行中": "▶️ 進行中", "確認中": "🔍 確認中", "一時中断": "⏸ 一時中断"}
 
 
+_WEEKDAYS_JP = ["月", "火", "水", "木", "金", "土", "日"]
+
+
 def fmt_due(d: str | None) -> str:
     if not d:
         return ""
     try:
-        return datetime.date.fromisoformat(d[:10]).strftime("%Y年%m月%d日")
+        due = datetime.date.fromisoformat(d[:10])
     except (ValueError, TypeError):
         return d
+
+    abs_str = due.strftime("%Y年%m月%d日")
+    today = datetime.date.today()
+    delta = (due - today).days
+
+    if delta == 0:
+        rel = "今日"
+    elif delta == 1:
+        rel = "明日"
+    elif delta == 2:
+        rel = "明後日"
+    elif 3 <= delta < 14:
+        weekday = _WEEKDAYS_JP[due.weekday()]
+        prefix = "今週" if due.isocalendar()[1] == today.isocalendar()[1] else "来週"
+        rel = f"{prefix}{weekday}曜"
+    else:
+        return abs_str
+
+    return f"{abs_str}（{rel}）"
 
 
 def sort_tasks(tasks: list[dict]) -> list[dict]:
