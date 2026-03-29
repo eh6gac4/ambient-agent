@@ -77,6 +77,17 @@ def add_no_task_sender(sender_email: str):
         f.write(f"{sender_email}\n")
 
 
+def remove_no_task_sender(sender_email: str) -> bool:
+    """ブロック済み送信者を解除する。解除できた場合 True を返す。"""
+    senders = load_no_task_senders()
+    if sender_email not in senders:
+        return False
+    senders.discard(sender_email)
+    with open(_NO_TASK_SENDERS_FILE, "w") as f:
+        f.writelines(f"{s}\n" for s in sorted(senders))
+    return True
+
+
 def learn_from_cancelled_tasks():
     """sender_map の page_id を Notion で確認し、中止になっていたら送信者をブロックリストに追加する。"""
     sender_map = _load_sender_map()

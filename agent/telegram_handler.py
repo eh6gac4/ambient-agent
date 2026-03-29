@@ -18,7 +18,7 @@ from agent.calendar_handler import send_daily_briefing
 from agent.claude_agent import extract_tasks_from_email, extract_tasks_from_url_content
 from agent.config import JST, OPERATING_START_HOUR, OPERATING_END_HOUR
 from agent.google_calendar import delete_calendar_event_for_task
-from agent.gmail_handler import get_sender_for_task, add_no_task_sender
+from agent.gmail_handler import get_sender_for_task, add_no_task_sender, remove_no_task_sender, load_no_task_senders
 from agent.notion_handler import add_task, get_open_tasks, complete_task, cancel_task, update_task_due
 from agent.task_formatter import format_task_list, sort_tasks
 from agent.telegram_notifier import send_message
@@ -109,6 +109,8 @@ def _handle_command(text: str):
             "`/tasks` — タスク一覧\n"
             "`/done <番号>` — タスクを完了にする\n"
             "`/skip <番号>` — タスクを中止にし、送信者をブロック\n"
+            "`/blocklist` — ブロック中の送信者一覧\n"
+            "`/unblock <メール>` — 送信者のブロックを解除\n"
             "`/add <タスク名>` — タスクを追加\n"
             "`/due <番号> <日付>` — 期限を変更（例: `/due 3 2026-03-25`）\n"
             "`/briefing` — 今すぐブリーフィングを実行\n\n"
@@ -141,6 +143,23 @@ def _handle_command(text: str):
         else:
             send_message(f"🚫 タスクを中止にしました\n\n*{task['title']}*")
         logger.info(f"Task cancelled: {task['title']} (sender: {sender})")
+
+    elif command == "/blocklist":
+        senders = load_no_task_senders()
+        if not senders:
+            send_message("ブロック中の送信者はいません")
+        else:
+            lines = "\n".join(f"• `{s}`" for s in sorted(senders))
+            send_message(f"*🚫 ブロック中の送信者 ({len(senders)}件)*\n\n{lines}\n\n解除: `/unblock メールアドレス`")
+
+    elif command == "/unblock":
+        if not arg:
+            send_message("使い方: `/unblock email@example.com`")
+            return
+        if remove_no_task_sender(arg):
+            send_message(f"✅ `{arg}` のブロックを解除しました")
+        else:
+            send_message(f"`{arg}` はブロックリストにありません\n\n`/blocklist` で確認できます")
 
     elif command == "/due":
         parts2 = arg.split(None, 1)
