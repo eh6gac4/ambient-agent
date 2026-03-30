@@ -13,6 +13,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+# cron 実行時の PATH に claude のディレクトリを追加
+os.environ["PATH"] = "/home/ctoshiki/.local/bin:" + os.environ.get("PATH", "")
+
 from dotenv import load_dotenv
 load_dotenv(ROOT / ".env")
 
