@@ -27,7 +27,7 @@ def _run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
 
 def main():
     # /simplify 実行
-    result = _run(["claude", "-p", "/simplify\n\nすべての出力・コメント・説明は日本語で記述してください。", "--output-format", "text"])
+    result = _run(["/home/ctoshiki/.local/bin/claude", "-p", "/simplify\n\nすべての出力・コメント・説明は日本語で記述してください。", "--output-format", "text"])
     if result.returncode != 0:
         stderr = result.stderr.strip()
         send_message(f"⚠️ /simplify 実行エラー (exit {result.returncode})\n\n```\n{stderr[:MAX_CHARS]}\n```")
