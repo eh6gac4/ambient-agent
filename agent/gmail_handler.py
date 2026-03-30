@@ -13,6 +13,13 @@ from agent.claude_agent import analyze_email
 from agent.notion_handler import add_task, update_task_from_reply, get_task_status
 from agent.telegram_notifier import send_message
 
+
+def _escape_md(text: str) -> str:
+    """Telegram Markdown の特殊文字（* _ ` [）をエスケープする。"""
+    for ch in ("\\", "*", "_", "`", "["):
+        text = text.replace(ch, "\\" + ch)
+    return text
+
 logger = logging.getLogger(__name__)
 
 _PROCESSED_IDS_FILE = "data/processed_ids.txt"
@@ -186,7 +193,7 @@ def notify_unread_emails():
             subject = headers.get("Subject", "(件名なし)")
             sender = headers.get("From", "")
             sender_name = sender.split("<")[0].strip().strip('"') or sender
-            lines.append(f"• {subject}（{sender_name}）")
+            lines.append(f"• {_escape_md(subject)}（{_escape_md(sender_name)}）")
 
         body = "\n".join(lines)
         send_message(f"*📧 未読メール {len(messages)}件*\n\n{body}")
@@ -264,7 +271,7 @@ def process_unread_emails():
                         due=dues[0] if dues else None,
                     )
                     logger.info(f"Task updated (reply): {subject} ({len(tasks)} items)")
-                    task_lines.append(f"• *{subject}*（更新）\n  {summary}\n  → " + "、".join(checklist))
+                    task_lines.append(f"• *{_escape_md(subject)}*（更新）\n  {_escape_md(summary)}\n  → " + "、".join(_escape_md(t) for t in checklist))
                 else:
                     # 新規メール → タスク作成
                     page_task = {
@@ -280,9 +287,9 @@ def process_unread_emails():
                             thread_map[thread_id] = page_id
                         sender_map[page_id] = sender_email
                     logger.info(f"Task added: {subject} ({len(tasks)} items)")
-                    task_lines.append(f"• *{subject}*\n  {summary}\n  → " + "、".join(checklist))
+                    task_lines.append(f"• *{_escape_md(subject)}*\n  {_escape_md(summary)}\n  → " + "、".join(_escape_md(t) for t in checklist))
             else:
-                archived_lines.append(f"• *{subject}*\n  {summary}")
+                archived_lines.append(f"• *{_escape_md(subject)}*\n  {_escape_md(summary)}")
                 logger.info(f"No tasks: {subject}")
 
             _archive_message(service, msg_id)
