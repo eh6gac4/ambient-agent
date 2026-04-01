@@ -6,6 +6,7 @@ import base64
 import datetime
 import json
 import logging
+import os
 from googleapiclient.discovery import build
 
 from agent.google_auth import get_credentials
@@ -210,6 +211,41 @@ def _archive_message(service, msg_id: str):
     ).execute()
 
 
+_label_id_cache: dict[str, str] = {}
+
+
+def _get_label_id(service, label_name: str) -> str | None:
+    """ラベル名からラベルIDを返す。存在しない場合は作成して返す。"""
+    if label_name in _label_id_cache:
+        return _label_id_cache[label_name]
+    try:
+        labels = service.users().labels().list(userId="me").execute().get("labels", [])
+        for label in labels:
+            if label["name"] == label_name:
+                _label_id_cache[label_name] = label["id"]
+                return label["id"]
+        # 存在しなければ作成
+        new_label = service.users().labels().create(
+            userId="me", body={"name": label_name}
+        ).execute()
+        _label_id_cache[label_name] = new_label["id"]
+        logger.info(f"Created Gmail label: {label_name}")
+        return new_label["id"]
+    except Exception:
+        logger.exception(f"Failed to get/create Gmail label: {label_name}")
+        return None
+
+
+def _add_label(service, msg_id: str, label_id: str):
+    """メールにラベルを付与する。"""
+    try:
+        service.users().messages().modify(
+            userId="me", id=msg_id, body={"addLabelIds": [label_id]}
+        ).execute()
+    except Exception:
+        logger.exception(f"Failed to add label to message {msg_id}")
+
+
 def process_unread_emails():
     """未読メールを要約・タスク抽出し、タスクがなければアーカイブする。結果を Telegram に通知する。"""
     logger.info("Checking unread emails...")
@@ -228,6 +264,9 @@ def process_unread_emails():
         no_task_senders = load_no_task_senders()
         task_lines = []
         archived_lines = []
+
+        task_label_name = os.getenv("GMAIL_TASK_LABEL", "タスク登録済み")
+        task_label_id = _get_label_id(service, task_label_name)
 
         for msg_meta in messages:
             msg_id = msg_meta["id"]
@@ -270,6 +309,8 @@ def process_unread_emails():
                         priority=best.get("priority", "medium"),
                         due=dues[0] if dues else None,
                     )
+                    if task_label_id:
+                        _add_label(service, msg_id, task_label_id)
                     logger.info(f"Task updated (reply): {subject} ({len(tasks)} items)")
                     task_lines.append(f"• *{_escape_md(subject)}*（更新）\n  {_escape_md(summary)}\n  → " + "、".join(_escape_md(t) for t in checklist))
                 else:
@@ -286,6 +327,8 @@ def process_unread_emails():
                         if thread_id:
                             thread_map[thread_id] = page_id
                         sender_map[page_id] = sender_email
+                        if task_label_id:
+                            _add_label(service, msg_id, task_label_id)
                     logger.info(f"Task added: {subject} ({len(tasks)} items)")
                     task_lines.append(f"• *{_escape_md(subject)}*\n  {_escape_md(summary)}\n  → " + "、".join(_escape_md(t) for t in checklist))
             else:
