@@ -121,11 +121,12 @@ def main():
         id="stale_tasks_notice",
     )
 
-    # 中止タスクから送信者ブロックを学習（1時間ごと）
+    # 中止タスクから送信者ブロックを学習（毎朝Gmail処理の直前）
     scheduler.add_job(
         learn_from_cancelled_tasks,
         "cron",
-        minute=30,
+        hour=pre_briefing_hour,
+        minute=50,
         id="learn_cancelled",
     )
 
