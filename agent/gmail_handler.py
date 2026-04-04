@@ -294,6 +294,13 @@ def process_unread_emails():
                 _save_processed_id(msg_id)
                 continue
 
+            # カレンダー招待はタスク抽出せずアーカイブ
+            if _is_calendar_invite(msg["payload"]):
+                logger.info(f"Skipped (calendar invite): {subject}")
+                _archive_message(service, msg_id)
+                _save_processed_id(msg_id)
+                continue
+
             analysis = analyze_email(subject, body)
             summary = analysis.get("summary", "")
             tasks = analysis.get("tasks", [])
@@ -370,6 +377,13 @@ def _parse_message(msg: dict) -> tuple[str, str]:
     subject = headers.get("Subject", "(no subject)")
     body = _extract_body(msg["payload"])
     return subject, body
+
+
+def _is_calendar_invite(payload: dict) -> bool:
+    """MIME ツリーに text/calendar が含まれる場合 True を返す。"""
+    if payload.get("mimeType", "").startswith("text/calendar"):
+        return True
+    return any(_is_calendar_invite(part) for part in payload.get("parts", []))
 
 
 def _extract_body(payload: dict) -> str:
