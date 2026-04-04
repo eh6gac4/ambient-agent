@@ -97,7 +97,8 @@ def remove_no_task_sender(sender_email: str) -> bool:
 
 
 def learn_from_cancelled_tasks():
-    """sender_map の page_id を Notion で確認し、中止になっていたら送信者をブロックリストに追加する。"""
+    """sender_map の page_id を Notion で確認し、中止になっていたら送信者をブロックリストに追加する。
+    完了・中止・ページ無効（削除済み）のエントリは map から除去してサイズを抑える。"""
     sender_map = _load_sender_map()
     if not sender_map:
         return
@@ -115,7 +116,11 @@ def learn_from_cancelled_tasks():
                 learned.append(sender_email)
                 logger.info(f"Learned no-task sender from Notion: {sender_email}")
             # 学習済みは sender_map から削除
+        elif status in (None, "完了"):
+            # ページ削除済み or 完了タスク → スパムではないので学習不要、mapからは除去
+            logger.info(f"Removing resolved entry from sender_map: {page_id} ({sender_email}, status={status})")
         else:
+            # 未着手など進行中のタスクは残す
             remaining[page_id] = sender_email
 
     if len(remaining) < len(sender_map):
