@@ -282,6 +282,14 @@ def process_unread_emails():
                 userId="me", id=msg_id, format="full"
             ).execute()
 
+            # カレンダー招待はタスクでないため本文のparseをスキップ
+            if _is_calendar_invite(msg["payload"]):
+                _subj = _parse_headers(msg["payload"]).get("Subject", msg_id)
+                logger.info(f"Skipped (calendar invite): {_subj}")
+                _archive_message(service, msg_id)
+                _save_processed_id(msg_id)
+                continue
+
             subject, body = _parse_message(msg)
             headers = _parse_headers(msg["payload"])
             sender_email = _extract_email(headers.get("From", ""))
@@ -290,13 +298,6 @@ def process_unread_emails():
             # ブロック済み送信者はタスク抽出せずアーカイブ
             if sender_email in no_task_senders:
                 logger.info(f"Skipped (blocked sender): {subject}")
-                _archive_message(service, msg_id)
-                _save_processed_id(msg_id)
-                continue
-
-            # カレンダー招待はタスク抽出せずアーカイブ
-            if _is_calendar_invite(msg["payload"]):
-                logger.info(f"Skipped (calendar invite): {subject}")
                 _archive_message(service, msg_id)
                 _save_processed_id(msg_id)
                 continue
@@ -381,9 +382,9 @@ def _parse_message(msg: dict) -> tuple[str, str]:
 
 def _is_calendar_invite(payload: dict) -> bool:
     """MIME ツリーに text/calendar が含まれる場合 True を返す。"""
-    if payload.get("mimeType", "").startswith("text/calendar"):
-        return True
-    return any(_is_calendar_invite(part) for part in payload.get("parts", []))
+    return payload.get("mimeType", "").startswith("text/calendar") or any(
+        _is_calendar_invite(part) for part in payload.get("parts", [])
+    )
 
 
 def _extract_body(payload: dict) -> str:
