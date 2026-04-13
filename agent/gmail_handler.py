@@ -216,6 +216,12 @@ def _archive_message(service, msg_id: str):
     ).execute()
 
 
+def _finalize_message(service, msg_id: str):
+    """メールをアーカイブして処理済みとして記録する。"""
+    _archive_message(service, msg_id)
+    _save_processed_id(msg_id)
+
+
 _label_id_cache: dict[str, str] = {}
 
 
@@ -282,12 +288,10 @@ def process_unread_emails():
                 userId="me", id=msg_id, format="full"
             ).execute()
 
-            # カレンダー招待はタスクでないため本文のparseをスキップ
             if _is_calendar_invite(msg["payload"]):
-                _subj = _parse_headers(msg["payload"]).get("Subject", msg_id)
-                logger.info(f"Skipped (calendar invite): {_subj}")
-                _archive_message(service, msg_id)
-                _save_processed_id(msg_id)
+                subject = _parse_headers(msg["payload"]).get("Subject", msg_id)
+                logger.info(f"Skipped (calendar invite): {subject}")
+                _finalize_message(service, msg_id)
                 continue
 
             subject, body = _parse_message(msg)
@@ -295,11 +299,9 @@ def process_unread_emails():
             sender_email = _extract_email(headers.get("From", ""))
             thread_id = msg.get("threadId", "")
 
-            # ブロック済み送信者はタスク抽出せずアーカイブ
             if sender_email in no_task_senders:
                 logger.info(f"Skipped (blocked sender): {subject}")
-                _archive_message(service, msg_id)
-                _save_processed_id(msg_id)
+                _finalize_message(service, msg_id)
                 continue
 
             analysis = analyze_email(subject, body)
@@ -348,8 +350,7 @@ def process_unread_emails():
                 archived_lines.append(f"• *{_escape_md(subject)}*\n  {_escape_md(summary)}")
                 logger.info(f"No tasks: {subject}")
 
-            _archive_message(service, msg_id)
-            _save_processed_id(msg_id)
+            _finalize_message(service, msg_id)
 
         _save_thread_map(thread_map)
         _save_sender_map(sender_map)
