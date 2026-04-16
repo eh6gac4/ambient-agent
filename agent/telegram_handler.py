@@ -15,7 +15,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from agent.calendar_handler import send_daily_briefing
-from agent.claude_agent import extract_tasks_from_email, extract_tasks_from_url_content
+from agent.claude_agent import extract_tasks_from_email, extract_tasks_from_url_content, extract_tasks_from_image
 from agent.config import JST, OPERATING_START_HOUR, OPERATING_END_HOUR
 from agent.google_calendar import delete_calendar_event_for_task
 from agent.gmail_handler import get_sender_for_task, add_no_task_sender, remove_no_task_sender, load_no_task_senders
@@ -114,7 +114,7 @@ def _handle_command(text: str):
             "`/add <タスク名>` — タスクを追加\n"
             "`/due <番号> <日付>` — 期限を変更（例: `/due 3 2026-03-25`）\n"
             "`/briefing` — 今すぐブリーフィングを実行\n\n"
-            "URL・テキスト・転送メッセージを送るとタスクを自動抽出します"
+            "URL・テキスト・転送メッセージ・画像を送るとタスクを自動抽出します"
         )
 
     elif command == "/briefing":
@@ -189,6 +189,51 @@ def _handle_command(text: str):
         send_message("使えるコマンド:\n`/tasks` — タスク一覧\n`/done <番号>` — 完了にする\n`/add <タスク名>` — タスクを追加\n`/due <番号> <日付>` — 期限を変更\n`/briefing` — 今すぐブリーフィング")
 
 
+def _handle_photo(message: dict):
+    """Telegram の photo を受け取り、タスクを抽出して Notion に登録する。"""
+    token = _get_token()
+    photo = message["photo"][-1]  # 最大サイズを選択
+    file_id = photo["file_id"]
+
+    try:
+        resp = requests.get(
+            f"{TELEGRAM_API_BASE.format(token=token)}/getFile",
+            params={"file_id": file_id},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        file_path = resp.json()["result"]["file_path"]
+
+        img_resp = requests.get(
+            f"https://api.telegram.org/file/bot{token}/{file_path}",
+            timeout=30,
+        )
+        img_resp.raise_for_status()
+    except Exception as e:
+        send_message(f"⚠️ 画像の取得に失敗しました\n`{e}`")
+        logger.error("Failed to fetch photo: %s", e)
+        return
+
+    ext = file_path.rsplit(".", 1)[-1].lower()
+    media_type = {
+        "jpg": "image/jpeg", "jpeg": "image/jpeg",
+        "png": "image/png", "gif": "image/gif", "webp": "image/webp",
+    }.get(ext, "image/jpeg")
+
+    send_message("⏳ 画像からタスクを抽出中...")
+    tasks = extract_tasks_from_image(img_resp.content, media_type)
+    if tasks:
+        for task in tasks:
+            task["source"] = "Telegram"
+            add_task(task)
+            logger.info(f"Task added from image: {task.get('title')}")
+        titles = "\n".join(f"• {t['title']}" for t in tasks)
+        send_message(f"✅ タスクを登録しました\n\n{titles}")
+    else:
+        send_message("ℹ️ タスクは見つかりませんでした")
+        logger.info("Photo: no tasks extracted.")
+
+
 def _handle_url(url: str):
     """URL のページ内容を取得し、タスクを抽出して Notion に登録する。"""
     try:
@@ -227,16 +272,22 @@ def _process_updates(updates: list):
         text = message.get("text", "").strip()
         chat_id = str(message.get("chat", {}).get("id", ""))
 
-        if chat_id != allowed_chat_id or not text:
+        has_photo = bool(message.get("photo"))
+
+        if chat_id != allowed_chat_id or (not text and not has_photo):
             continue
 
-        if text.startswith("/"):
+        if text and text.startswith("/"):
             _handle_command(text)
             continue
 
         hour = dt.now(JST).hour
         if not (OPERATING_START_HOUR <= hour < OPERATING_END_HOUR):
             send_message(f"🌙 夜間はタスク抽出を停止中です（{OPERATING_START_HOUR}:00-{OPERATING_END_HOUR}:00 に受け付けます）")
+            continue
+
+        if has_photo:
+            _handle_photo(message)
             continue
 
         url_match = _URL_PATTERN.match(text)

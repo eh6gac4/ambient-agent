@@ -2,6 +2,7 @@
 agent/claude_agent.py
 Claude API を呼び出す薄いラッパー。
 """
+import base64
 import json
 import os
 import re
@@ -80,6 +81,31 @@ def analyze_email(subject: str, body: str) -> dict:
 
 def extract_tasks_from_url_content(url: str, content: str) -> list[dict]:
     return _extract_tasks("extract_tasks_url", f"件名: {url}\n\n本文:\n{content[:3000]}")
+
+
+def extract_tasks_from_image(image_data: bytes, media_type: str = "image/jpeg") -> list[dict]:
+    """画像からタスクを抽出する。"""
+    b64 = base64.standard_b64encode(image_data).decode()
+    response = _client.messages.create(
+        model=MODEL,
+        max_tokens=1024,
+        system=_load_extract_tasks_prompt(),
+        messages=[{
+            "role": "user",
+            "content": [
+                {
+                    "type": "image",
+                    "source": {"type": "base64", "media_type": media_type, "data": b64},
+                },
+                {
+                    "type": "text",
+                    "text": "この画像からアクションが必要なタスクを抽出してください。",
+                },
+            ],
+        }],
+    )
+    record_usage("extract_tasks_image", response.usage.input_tokens, response.usage.output_tokens)
+    return _extract_json_list(response.content[0].text)
 
 
 def summarize_day(calendar_events: list[dict], notion_tasks: list[dict], overdue_tasks: list[dict] | None = None) -> str:
