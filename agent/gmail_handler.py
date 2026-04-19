@@ -180,11 +180,7 @@ def notify_unread_emails():
     logger.info("Notifying unread emails...")
     try:
         service = build("gmail", "v1", credentials=get_credentials())
-        results = service.users().messages().list(
-            userId="me", q=_GMAIL_QUERY, maxResults=20,
-        ).execute()
-
-        messages = results.get("messages", [])
+        messages = _list_all_messages(service, _GMAIL_QUERY, _MAX_MESSAGES_PER_RUN)
         if not messages:
             logger.info("No unread messages.")
             return
@@ -257,16 +253,32 @@ def _add_label(service, msg_id: str, label_id: str):
         logger.exception(f"Failed to add label to message {msg_id}")
 
 
+_MAX_MESSAGES_PER_RUN = 200
+
+
+def _list_all_messages(service, query: str, max_results: int) -> list[dict]:
+    """ページネーションで全未読メッセージを取得する（上限 max_results 件）。"""
+    messages = []
+    page_token = None
+    while len(messages) < max_results:
+        batch = min(100, max_results - len(messages))
+        kwargs = {"userId": "me", "q": query, "maxResults": batch}
+        if page_token:
+            kwargs["pageToken"] = page_token
+        results = service.users().messages().list(**kwargs).execute()
+        messages.extend(results.get("messages", []))
+        page_token = results.get("nextPageToken")
+        if not page_token:
+            break
+    return messages
+
+
 def process_unread_emails():
     """未読メールを要約・タスク抽出し、タスクがなければアーカイブする。結果を Telegram に通知する。"""
     logger.info("Checking unread emails...")
     try:
         service = build("gmail", "v1", credentials=get_credentials())
-        results = service.users().messages().list(
-            userId="me", q=_GMAIL_QUERY, maxResults=20,
-        ).execute()
-
-        messages = results.get("messages", [])
+        messages = _list_all_messages(service, _GMAIL_QUERY, _MAX_MESSAGES_PER_RUN)
         logger.info(f"Found {len(messages)} unread message(s).")
 
         processed_ids = _load_processed_ids()
