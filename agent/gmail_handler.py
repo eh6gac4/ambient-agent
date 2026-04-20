@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 _PROCESSED_IDS_FILE = "data/processed_ids.txt"
 _GMAIL_QUERY = "is:unread in:inbox -category:promotions"
+_MAX_MESSAGES_PER_RUN = 200
 
 
 def _parse_headers(payload: dict) -> dict[str, str]:
@@ -206,7 +207,7 @@ def notify_unread_emails():
 
 
 def _archive_message(service, msg_id: str):
-    """メールを受信トレイから削除（アーカイブ）する。"""
+    """メールを受信トレイからアーカイブする。"""
     service.users().messages().modify(
         userId="me", id=msg_id, body={"removeLabelIds": ["INBOX"]}
     ).execute()
@@ -253,11 +254,8 @@ def _add_label(service, msg_id: str, label_id: str):
         logger.exception(f"Failed to add label to message {msg_id}")
 
 
-_MAX_MESSAGES_PER_RUN = 200
-
-
 def _list_all_messages(service, query: str, max_results: int) -> list[dict]:
-    """ページネーションで全未読メッセージを取得する（上限 max_results 件）。"""
+    """ページネーションで Gmail メッセージを一括取得する。"""
     messages = []
     page_token = None
     while len(messages) < max_results:
