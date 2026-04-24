@@ -7,6 +7,7 @@ import datetime
 import json
 import logging
 import os
+import urllib.parse
 from googleapiclient.discovery import build
 
 from agent.google_auth import get_credentials
@@ -308,6 +309,11 @@ def process_unread_emails():
             headers = _parse_headers(msg["payload"])
             sender_email = _extract_email(headers.get("From", ""))
             thread_id = msg.get("threadId", "")
+            message_id_header = headers.get("Message-ID", "")
+            if message_id_header:
+                gmail_url = "https://mail.google.com/mail/u/0/#search/rfc822msgid:" + urllib.parse.quote(message_id_header, safe="")
+            else:
+                gmail_url = f"https://mail.google.com/mail/u/0/#all/{thread_id}"
 
             if sender_email in no_task_senders:
                 logger.info(f"Skipped (blocked sender): {subject}")
@@ -317,8 +323,6 @@ def process_unread_emails():
             analysis = analyze_email(subject, body)
             summary = analysis.get("summary", "")
             tasks = analysis.get("tasks", [])
-
-            gmail_url = f"https://mail.google.com/mail/u/0/#all/{thread_id}"
             if tasks:
                 _priority_order = {"high": 0, "medium": 1, "low": 2}
                 best = min(tasks, key=lambda t: _priority_order.get(t.get("priority", "medium"), 1))
@@ -337,7 +341,7 @@ def process_unread_emails():
                     if task_label_id:
                         _add_label(service, msg_id, task_label_id)
                     logger.info(f"Task updated (reply): {subject} ({len(tasks)} items)")
-                    task_lines.append(f"• *{_escape_md(subject)}*（更新）\n  {_escape_md(summary)}\n  → " + "、".join(_escape_md(t) for t in checklist))
+                    task_lines.append(f"• *{_escape_md(subject)}*（更新）\n  {_escape_md(summary)}\n  → " + "、".join(_escape_md(t) for t in checklist) + f"\n  [📧 Gmail で開く]({gmail_url})")
                 else:
                     # 新規メール → タスク作成
                     page_task = {
@@ -355,7 +359,7 @@ def process_unread_emails():
                         if task_label_id:
                             _add_label(service, msg_id, task_label_id)
                     logger.info(f"Task added: {subject} ({len(tasks)} items)")
-                    task_lines.append(f"• *{_escape_md(subject)}*\n  {_escape_md(summary)}\n  → " + "、".join(_escape_md(t) for t in checklist))
+                    task_lines.append(f"• *{_escape_md(subject)}*\n  {_escape_md(summary)}\n  → " + "、".join(_escape_md(t) for t in checklist) + f"\n  [📧 Gmail で開く]({gmail_url})")
             else:
                 archived_lines.append(f"• *{_escape_md(subject)}*\n  {_escape_md(summary)}")
                 logger.info(f"No tasks: {subject}")
