@@ -40,7 +40,7 @@ export async function checkGmail(env: Env): Promise<void> {
       continue;
     }
 
-    const { subject, body, senderEmail, threadId, gmailUrl } = parseMessage(msg);
+    const { subject, body, senderEmail, threadId, gmailUrl } = parseMessage(msg, env);
 
     if (noTaskSenders.has(senderEmail)) {
       await archiveMessage(env, meta.id);

@@ -29,3 +29,6 @@ database_id = "ba5c15ff-8e0e-4b86-b020-f1c4cb5975a3"
 # GOOGLE_CLIENT_ID
 # GOOGLE_CLIENT_SECRET
 # GOOGLE_REFRESH_TOKEN
+
+# optional vars (set via wrangler.toml [vars] or secret)
+# GMAIL_ACCOUNT_INDEX=0  # Gmail の u/N のN（複数アカウント時に変更）
