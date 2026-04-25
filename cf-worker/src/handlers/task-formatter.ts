@@ -32,9 +32,8 @@ export function fmtDue(d: string | null): string {
     return `${prefix}${weekday}曜`;
   }
 
-  const y = due.getFullYear();
-  const m = String(due.getMonth() + 1).padStart(2, "0");
-  const day = String(due.getDate()).padStart(2, "0");
+  // 文字列から直接パースしてタイムゾーンズレを防ぐ
+  const [y, m, day] = d.slice(0, 10).split("-").map(Number);
   return `${y}年${m}月${day}日`;
 }
 
