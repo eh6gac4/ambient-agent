@@ -1,0 +1,38 @@
+name = "ambient-agent"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+[triggers]
+crons = [
+  "50 22 * * *",
+  "55 22 * * *",
+  "57 22 * * *",
+  "58 22 * * *",
+  "0 23 * * *",
+  "5 23 * * *",
+  "10 23 * * *",
+  "0 4 * * *",
+  "0 0 * * 1",
+]
+
+# wrangler kv:namespace create AGENT_KV → replace id below
+[[kv_namespaces]]
+binding = "AGENT_KV"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+# wrangler d1 create ambient-agent-db → replace database_id below
+[[d1_databases]]
+binding = "AGENT_DB"
+database_name = "ambient-agent-db"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+# secrets (set via: wrangler secret put SECRET_NAME)
+# ANTHROPIC_API_KEY
+# NOTION_TOKEN
+# NOTION_TASKS_DB_ID
+# TELEGRAM_BOT_TOKEN
+# TELEGRAM_CHAT_ID
+# GOOGLE_CLIENT_ID
+# GOOGLE_CLIENT_SECRET
+# GOOGLE_REFRESH_TOKEN
