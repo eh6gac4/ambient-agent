@@ -80,4 +80,27 @@ describe("formatTaskList", () => {
     expect(result).toContain("• ");
     expect(result).not.toContain("1. ");
   });
+
+  it("wraps title in Markdown link when url is present", () => {
+    const tasks = sampleTasks().slice(0, 1);
+    const result = formatTaskList(tasks);
+    expect(result).toContain("[プロジェクト資料を確認する](https://notion.so/page-001)");
+  });
+
+  it("falls back to plain title when url is empty", () => {
+    const tasks: Task[] = [
+      { title: "リンクなし", due: null, priority: "medium", status: "未着手", lastEdited: null, url: "", pageId: "x" },
+    ];
+    const result = formatTaskList(tasks);
+    expect(result).toContain("リンクなし");
+    expect(result).not.toContain("](");
+  });
+
+  it("escapes ] in title within link text", () => {
+    const tasks: Task[] = [
+      { title: "タスク[1]", due: null, priority: "medium", status: "未着手", lastEdited: null, url: "https://notion.so/p", pageId: "y" },
+    ];
+    const result = formatTaskList(tasks);
+    expect(result).toContain("[タスク[1\\]](https://notion.so/p)");
+  });
 });
