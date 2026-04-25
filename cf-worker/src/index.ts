@@ -6,17 +6,25 @@ import { sendEscalationNotice, sendStaleTasksNotice } from "./handlers/escalatio
 import { handleTelegramWebhook } from "./handlers/telegram.js";
 import { sendMessage } from "./clients/telegram.js";
 
-// Cron → job mapping (UTC cron expressions from wrangler.toml)
+// 無料プランの Cron 上限（5個）に合わせて4つに統合
+async function morningPrep(env: Env): Promise<void> {
+  await learnFromCancelled(env);
+  await checkGmail(env);
+  await syncCalendar(env);
+  await sendEscalationNotice(env);
+}
+
+async function morningBriefing(env: Env): Promise<void> {
+  await sendDailyBriefing(env);
+  await sendCostReport(env);
+  await sendDueSoonNotice(env);
+}
+
 const CRON_JOBS: Record<string, (env: Env) => Promise<void>> = {
-  "50 22 * * *": learnFromCancelled,   // 07:50 JST
-  "55 22 * * *": checkGmail,           // 07:55 JST
-  "57 22 * * *": syncCalendar,         // 07:57 JST
-  "58 22 * * *": sendEscalationNotice, // 07:58 JST
-  "0 23 * * *": sendDailyBriefing,     // 08:00 JST
-  "5 23 * * *": sendCostReport,        // 08:05 JST
-  "10 23 * * *": sendDueSoonNotice,    // 08:10 JST
+  "50 22 * * *": morningPrep,          // 07:50 JST: learn→gmail→calendar→escalation
+  "0 23 * * *": morningBriefing,       // 08:00 JST: briefing→cost→due_soon
   "0 4 * * *": sendTaskReminder,       // 13:00 JST
-  "0 0 * * 1": sendStaleTasksNotice,   // Mon 09:00 JST
+  "0 0 * * 1": sendStaleTasksNotice,   // 月 09:00 JST
 };
 
 export default {

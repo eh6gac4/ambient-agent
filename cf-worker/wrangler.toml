@@ -5,15 +5,10 @@ compatibility_flags = ["nodejs_compat"]
 
 [triggers]
 crons = [
-  "50 22 * * *",
-  "55 22 * * *",
-  "57 22 * * *",
-  "58 22 * * *",
-  "0 23 * * *",
-  "5 23 * * *",
-  "10 23 * * *",
-  "0 4 * * *",
-  "0 0 * * 1",
+  "50 22 * * *",  # 07:50 JST: morning_prep (learn→gmail→calendar→escalation)
+  "0 23 * * *",   # 08:00 JST: morning_briefing (briefing→cost→due_soon)
+  "0 4 * * *",    # 13:00 JST: task_reminder
+  "0 0 * * 1",    # 月 09:00 JST: stale_tasks_notice
 ]
 
 [[kv_namespaces]]
