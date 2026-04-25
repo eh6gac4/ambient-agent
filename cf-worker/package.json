@@ -1,0 +1,26 @@
+{
+  "name": "ambient-agent-cf",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "dotenv -e .env.local -- wrangler dev",
+    "deploy": "dotenv -e .env.local -- wrangler deploy",
+    "d1": "dotenv -e .env.local -- wrangler d1",
+    "kv": "dotenv -e .env.local -- wrangler kv",
+    "secret": "dotenv -e .env.local -- wrangler secret",
+    "whoami": "dotenv -e .env.local -- wrangler whoami",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "secrets:push": "dotenv -e .env.local -- node scripts/push-secrets.mjs",
+    "cf-typegen": "dotenv -e .env.local -- wrangler types"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "^0.8.5",
+    "@cloudflare/workers-types": "^4.20250422.0",
+    "dotenv-cli": "^8.0.0",
+    "typescript": "^5.8.3",
+    "vitest": "^3.1.2",
+    "wrangler": "^4.0.0"
+  }
+}

@@ -1,0 +1,31 @@
+name = "ambient-agent"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+[triggers]
+crons = [
+  "50 22 * * *",  # 07:50 JST: morning_prep (learn→gmail→calendar→escalation)
+  "0 23 * * *",   # 08:00 JST: morning_briefing (briefing→cost→due_soon)
+  "0 4 * * *",    # 13:00 JST: task_reminder
+  "0 0 * * 1",    # 月 09:00 JST: stale_tasks_notice
+]
+
+[[kv_namespaces]]
+binding = "AGENT_KV"
+id = "c00f19dce0fb4fc495e9425608e53283"
+
+[[d1_databases]]
+binding = "AGENT_DB"
+database_name = "ambient-agent-db"
+database_id = "ba5c15ff-8e0e-4b86-b020-f1c4cb5975a3"
+
+# secrets (set via: wrangler secret put SECRET_NAME)
+# ANTHROPIC_API_KEY
+# NOTION_TOKEN
+# NOTION_TASKS_DB_ID
+# TELEGRAM_BOT_TOKEN
+# TELEGRAM_CHAT_ID
+# GOOGLE_CLIENT_ID
+# GOOGLE_CLIENT_SECRET
+# GOOGLE_REFRESH_TOKEN

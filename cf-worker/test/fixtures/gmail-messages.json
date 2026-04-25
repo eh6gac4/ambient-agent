@@ -1,0 +1,56 @@
+{
+  "listResponse": {
+    "messages": [
+      { "id": "msg-001", "threadId": "thread-001" },
+      { "id": "msg-002", "threadId": "thread-002" }
+    ]
+  },
+  "newEmail": {
+    "id": "msg-001",
+    "threadId": "thread-001",
+    "payload": {
+      "headers": [
+        { "name": "Subject", "value": "プロジェクトの進捗確認をお願いします" },
+        { "name": "From", "value": "tanaka@example.com" },
+        { "name": "Message-ID", "value": "<msg-001@example.com>" }
+      ],
+      "mimeType": "text/plain",
+      "body": {
+        "data": "44OX44Ot44K444Kn44Kv44OI44Gu6YCA5pS244Gn44GZ44CC5p2h6YCa5pmC44Gm44GE44Gg44GN44G+44GZ44CC"
+      },
+      "parts": []
+    }
+  },
+  "replyEmail": {
+    "id": "msg-003",
+    "threadId": "thread-001",
+    "payload": {
+      "headers": [
+        { "name": "Subject", "value": "Re: プロジェクトの進捗確認をお願いします" },
+        { "name": "From", "value": "tanaka@example.com" },
+        { "name": "Message-ID", "value": "<msg-003@example.com>" }
+      ],
+      "mimeType": "text/plain",
+      "body": {
+        "data": "6L+U5Zue44CC6YCA5pS244Gn44GZ44CC"
+      },
+      "parts": []
+    }
+  },
+  "calendarInvite": {
+    "id": "msg-cal-001",
+    "threadId": "thread-cal-001",
+    "payload": {
+      "headers": [
+        { "name": "Subject", "value": "会議の招待" },
+        { "name": "From", "value": "calendar-notification@google.com" }
+      ],
+      "mimeType": "multipart/mixed",
+      "body": {},
+      "parts": [
+        { "mimeType": "text/plain", "body": { "data": "" }, "headers": [] },
+        { "mimeType": "text/calendar", "body": { "data": "" }, "headers": [] }
+      ]
+    }
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "tasksCommand": {
+    "update_id": 1001,
+    "message": {
+      "message_id": 1,
+      "chat": { "id": 123456789 },
+      "text": "/tasks"
+    }
+  },
+  "doneCommand": {
+    "update_id": 1002,
+    "message": {
+      "message_id": 2,
+      "chat": { "id": 123456789 },
+      "text": "/done 1"
+    }
+  },
+  "addCommand": {
+    "update_id": 1003,
+    "message": {
+      "message_id": 3,
+      "chat": { "id": 123456789 },
+      "text": "/add 資料を確認する"
+    }
+  },
+  "dueCommand": {
+    "update_id": 1004,
+    "message": {
+      "message_id": 4,
+      "chat": { "id": 123456789 },
+      "text": "/due 1 2026-05-01"
+    }
+  },
+  "urlMessage": {
+    "update_id": 1005,
+    "message": {
+      "message_id": 5,
+      "chat": { "id": 123456789 },
+      "text": "https://example.com/article"
+    }
+  },
+  "textMessage": {
+    "update_id": 1006,
+    "message": {
+      "message_id": 6,
+      "chat": { "id": 123456789 },
+      "text": "明日までに資料を提出してください"
+    }
+  },
+  "wrongChatMessage": {
+    "update_id": 1007,
+    "message": {
+      "message_id": 7,
+      "chat": { "id": 999999999 },
+      "text": "/tasks"
+    }
+  }
+}

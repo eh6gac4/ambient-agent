@@ -1,0 +1,38 @@
+{
+  "extractTasksResponse": {
+    "content": [
+      {
+        "type": "text",
+        "text": "[{\"title\": \"プロジェクト資料を確認する\", \"due\": \"2026-04-30\", \"priority\": \"high\", \"source\": \"Gmail\"}]"
+      }
+    ],
+    "usage": { "input_tokens": 150, "output_tokens": 50 }
+  },
+  "analyzeEmailResponse": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"summary\": \"田中さんからプロジェクトの進捗確認依頼。期限は4月30日。\", \"tasks\": [{\"title\": \"プロジェクト進捗を報告する\", \"due\": \"2026-04-30\", \"priority\": \"high\", \"source\": \"Gmail\"}]}"
+      }
+    ],
+    "usage": { "input_tokens": 200, "output_tokens": 80 }
+  },
+  "analyzeEmailNoTasksResponse": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"summary\": \"ニュースレターの配信通知。アクション不要。\", \"tasks\": []}"
+      }
+    ],
+    "usage": { "input_tokens": 100, "output_tokens": 30 }
+  },
+  "summarizeDayResponse": {
+    "content": [
+      {
+        "type": "text",
+        "text": "今日は3件のタスクがあります。期限切れタスクが1件あるため早急に対応が必要です。午後の会議に向けて資料準備を優先してください。"
+      }
+    ],
+    "usage": { "input_tokens": 300, "output_tokens": 60 }
+  }
+}
