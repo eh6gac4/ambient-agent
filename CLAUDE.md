@@ -3,11 +3,11 @@
 ## 基本コマンド
 
 ```bash
-# コード変更後は必ずリビルド
-docker compose build && docker compose up -d
+# cf-worker のデプロイ
+cd cf-worker && npx wrangler deploy
 
-# ログ確認
-docker compose logs -f
+# cf-worker のログ確認
+cd cf-worker && npx wrangler tail
 ```
 
 ## Git ルール
@@ -16,10 +16,10 @@ docker compose logs -f
 
 ## 重要な注意事項
 
-- **`start.sh` は使わない。** Docker がメインの実行環境。ホスト上での手動デバッグ時のみ使用。
+- **メインの実行環境は Cloudflare Workers（`cf-worker/`）。** Docker は使用しない。
 - **`data/` を削除しない。** `token.json`・`credentials.json` は Git 管理外で、消えると再認証が必要になる。
 - **Notion API は `data_sources.query` を使う。** `notion_handler.py` の `_query_db()` 参照。
-- **409 Conflict が出たら**、同一 Bot Token で複数プロセスが動いている。`docker compose ps` と `ps aux` で確認して重複プロセスを停止する。
+- **重複通知が届いたら**、Docker コンテナが誤って起動していないか確認する。`docker compose ps` と `ps aux` で確認して重複プロセスを停止する。
 
 ## ドキュメント更新ルール
 
@@ -34,7 +34,6 @@ docker compose logs -f
 
 ## アーキテクチャ
 
-- APScheduler（BlockingScheduler）でジョブ管理
-- Telegram はロングポーリング（daemon スレッド）でリアルタイム受信
+- Cloudflare Workers でジョブ管理（`cf-worker/src/index.ts`）
+- Telegram は Webhook でリアルタイム受信
 - サービスは **24時間365日稼働**。Claude API 呼び出しのみ `OPERATING_START_HOUR`〜`OPERATING_END_HOUR`（デフォルト 08:00〜21:00 JST）に制限
-- reboot 時に `docker compose up -d` で自動起動（cron）
