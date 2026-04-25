@@ -12,7 +12,9 @@ cd cf-worker && npx wrangler tail
 
 ## Git ルール
 
-- コード変更後は必ずコミットして `git push` する。
+- コード変更後はブランチを切り、PR を作成して master にマージする。
+- ブランチ名の例: `feat/xxx`、`fix/xxx`、`docs/xxx`
+- master への直接 push はしない。
 
 ## 重要な注意事項
 
