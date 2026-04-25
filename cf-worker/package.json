@@ -6,7 +6,7 @@
     "dev": "dotenv -e .env.local -- wrangler dev",
     "deploy": "dotenv -e .env.local -- wrangler deploy",
     "d1": "dotenv -e .env.local -- wrangler d1",
-    "kv": "dotenv -e .env.local -- wrangler kv:namespace",
+    "kv": "dotenv -e .env.local -- wrangler kv",
     "secret": "dotenv -e .env.local -- wrangler secret",
     "whoami": "dotenv -e .env.local -- wrangler whoami",
     "test": "vitest run",

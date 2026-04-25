@@ -16,16 +16,14 @@ crons = [
   "0 0 * * 1",
 ]
 
-# wrangler kv:namespace create AGENT_KV → replace id below
 [[kv_namespaces]]
 binding = "AGENT_KV"
-id = "REPLACE_WITH_KV_NAMESPACE_ID"
+id = "c00f19dce0fb4fc495e9425608e53283"
 
-# wrangler d1 create ambient-agent-db → replace database_id below
 [[d1_databases]]
 binding = "AGENT_DB"
 database_name = "ambient-agent-db"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "ba5c15ff-8e0e-4b86-b020-f1c4cb5975a3"
 
 # secrets (set via: wrangler secret put SECRET_NAME)
 # ANTHROPIC_API_KEY
