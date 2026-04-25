@@ -81,15 +81,15 @@ describe("formatTaskList", () => {
     expect(result).not.toContain("1. ");
   });
 
-  it("wraps title in Markdown link when url is present", () => {
+  it("wraps title in notion-tasks app link using pageId", () => {
     const tasks = sampleTasks().slice(0, 1);
     const result = formatTaskList(tasks);
-    expect(result).toContain("[プロジェクト資料を確認する](https://notion.so/page-001)");
+    expect(result).toContain("[プロジェクト資料を確認する](https://todo.eh6gac4.work/?task=page-001)");
   });
 
-  it("falls back to plain title when url is empty", () => {
+  it("falls back to plain title when pageId is empty", () => {
     const tasks: Task[] = [
-      { title: "リンクなし", due: null, priority: "medium", status: "未着手", lastEdited: null, url: "", pageId: "x" },
+      { title: "リンクなし", due: null, priority: "medium", status: "未着手", lastEdited: null, url: "", pageId: "" },
     ];
     const result = formatTaskList(tasks);
     expect(result).toContain("リンクなし");
@@ -98,9 +98,9 @@ describe("formatTaskList", () => {
 
   it("escapes ] in title within link text", () => {
     const tasks: Task[] = [
-      { title: "タスク[1]", due: null, priority: "medium", status: "未着手", lastEdited: null, url: "https://notion.so/p", pageId: "y" },
+      { title: "タスク[1]", due: null, priority: "medium", status: "未着手", lastEdited: null, url: "https://notion.so/p", pageId: "abc123" },
     ];
     const result = formatTaskList(tasks);
-    expect(result).toContain("[タスク[1\\]](https://notion.so/p)");
+    expect(result).toContain("[タスク[1\\]](https://todo.eh6gac4.work/?task=abc123)");
   });
 });
