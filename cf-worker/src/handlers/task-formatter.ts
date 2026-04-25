@@ -66,7 +66,10 @@ export function formatTaskList(tasks: Task[], numbered = false): string {
     const due = t.due ? `（${fmtDue(t.due)}）` : "";
     const icon = PRIORITY_LABELS[t.priority] ?? "";
     const prefix = numbered ? `${i + 1}. ` : "• ";
-    lines.push(`${prefix}${icon} ${t.title}${due}`);
+    const titleText = t.title.replaceAll("]", "\\]");
+    const appUrl = t.pageId ? `https://todo.eh6gac4.work/?task=${t.pageId}` : "";
+    const titleLink = appUrl ? `[${titleText}](${appUrl})` : t.title;
+    lines.push(`${prefix}${icon} ${titleLink}${due}`);
   }
   return lines.join("\n");
 }
