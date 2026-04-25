@@ -15,6 +15,7 @@ export interface Env {
   TASK_REMINDER_HOURS?: string;
   COST_REPORT_HOUR?: string;
   GMAIL_TASK_LABEL?: string;
+  GMAIL_ACCOUNT_INDEX?: string;
 }
 
 export interface Task {

@@ -88,17 +88,18 @@ export async function getMessage(env: Env, msgId: string): Promise<GmailMessage>
   return resp.json<GmailMessage>();
 }
 
-export function parseMessage(msg: GmailMessage): { subject: string; body: string; senderEmail: string; threadId: string; gmailUrl: string } {
+export function parseMessage(msg: GmailMessage, env?: Env): { subject: string; body: string; senderEmail: string; threadId: string; gmailUrl: string } {
   const headers = parseHeaders(msg.payload);
   const subject = headers["Subject"] ?? "(件名なし)";
   const body = extractBody(msg.payload);
   const senderEmail = extractEmail(headers["From"] ?? "");
   const threadId = msg.threadId ?? "";
 
+  const accountIndex = env?.GMAIL_ACCOUNT_INDEX ?? "0";
   const messageIdHeader = headers["Message-ID"] ?? "";
   const gmailUrl = messageIdHeader
-    ? `https://mail.google.com/mail/u/0/#search/rfc822msgid:${encodeURIComponent(messageIdHeader)}`
-    : `https://mail.google.com/mail/u/0/#all/${threadId}`;
+    ? `https://mail.google.com/mail/u/${accountIndex}/#search/rfc822msgid:${encodeURIComponent(messageIdHeader)}`
+    : `https://mail.google.com/mail/u/${accountIndex}/#all/${threadId}`;
 
   return { subject, body, senderEmail, threadId, gmailUrl };
 }
