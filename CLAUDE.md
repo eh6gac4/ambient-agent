@@ -15,6 +15,7 @@ cd cf-worker && npx wrangler tail
 - コード変更後はブランチを切り、PR を作成して master にマージする。
 - ブランチ名の例: `feat/xxx`、`fix/xxx`、`docs/xxx`
 - master への直接 push はしない。
+- コミット前に全テストをパスさせる: `pytest` または `docker compose run --rm agent pytest`
 
 ## 重要な注意事項
 
