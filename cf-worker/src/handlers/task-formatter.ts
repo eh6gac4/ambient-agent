@@ -1,5 +1,7 @@
 import type { Task } from "../types.js";
 
+const TASK_APP_URL = "https://todo.eh6gac4.work";
+
 const PRIORITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
 const PRIORITY_LABELS: Record<string, string> = { high: "🔴", medium: "🟡", low: "🟢" };
 const STATUS_ORDER: Record<string, number> = { 未着手: 0, 進行中: 1, 確認中: 2, 一時中断: 3 };
@@ -66,9 +68,9 @@ export function formatTaskList(tasks: Task[], numbered = false): string {
     const due = t.due ? `（${fmtDue(t.due)}）` : "";
     const icon = PRIORITY_LABELS[t.priority] ?? "";
     const prefix = numbered ? `${i + 1}. ` : "• ";
-    const titleText = t.title.replaceAll("]", "\\]");
-    const appUrl = t.pageId ? `https://todo.eh6gac4.work/?task=${t.pageId}` : "";
-    const titleLink = appUrl ? `[${titleText}](${appUrl})` : t.title;
+    const titleLink = t.pageId
+      ? `[${t.title.replaceAll("[", "\\[").replaceAll("]", "\\]")}](${TASK_APP_URL}/?task=${t.pageId})`
+      : t.title;
     lines.push(`${prefix}${icon} ${titleLink}${due}`);
   }
   return lines.join("\n");

@@ -101,6 +101,6 @@ describe("formatTaskList", () => {
       { title: "タスク[1]", due: null, priority: "medium", status: "未着手", lastEdited: null, url: "https://notion.so/p", pageId: "abc123" },
     ];
     const result = formatTaskList(tasks);
-    expect(result).toContain("[タスク[1\\]](https://todo.eh6gac4.work/?task=abc123)");
+    expect(result).toContain("[タスク\\[1\\]](https://todo.eh6gac4.work/?task=abc123)");
   });
 });
