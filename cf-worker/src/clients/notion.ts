@@ -12,6 +12,23 @@ const STATUS_CANCELLED = "中止";
 const EMAIL_BODY_MAX_CHARS = 10000;
 const NOTION_RICH_TEXT_MAX = 2000;
 
+function buildImageBlocks(uploadId: string | undefined): Array<Record<string, unknown>> {
+  if (!uploadId) return [];
+  return [
+    { object: "block", type: "divider", divider: {} },
+    {
+      object: "block",
+      type: "heading_3",
+      heading_3: { rich_text: [{ type: "text", text: { content: "📷 元画像" } }] },
+    },
+    {
+      object: "block",
+      type: "image",
+      image: { type: "file_upload", file_upload: { id: uploadId } },
+    },
+  ];
+}
+
 function buildEmailBodyBlocks(bodyText: string, headingLabel: string): Array<Record<string, unknown>> {
   const trimmed = bodyText.trim();
   if (!trimmed) return [];
@@ -115,7 +132,51 @@ function parseTaskPage(page: Record<string, unknown>): Task {
   };
 }
 
-export async function addTask(env: Env, task: TaskInput, checklist?: string[], bodyText?: string): Promise<string | null> {
+export async function uploadImageToNotion(
+  env: Env,
+  imageData: ArrayBuffer,
+  mediaType: string,
+  filename: string,
+): Promise<string | null> {
+  const MAX_BYTES = 20 * 1024 * 1024;
+  if (imageData.byteLength > MAX_BYTES) return null;
+
+  try {
+    const createResp = await fetch(`${NOTION_API}/file_uploads`, {
+      method: "POST",
+      headers: headers(env.NOTION_TOKEN),
+      body: JSON.stringify({}),
+    });
+    if (!createResp.ok) return null;
+    const created = await createResp.json<{ id: string; upload_url: string }>();
+    if (!created.id || !created.upload_url) return null;
+
+    const form = new FormData();
+    form.append("file", new Blob([imageData], { type: mediaType }), filename);
+
+    const sendResp = await fetch(created.upload_url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.NOTION_TOKEN}`,
+        "Notion-Version": NOTION_VERSION,
+      },
+      body: form,
+    });
+    if (!sendResp.ok) return null;
+
+    return created.id;
+  } catch {
+    return null;
+  }
+}
+
+export async function addTask(
+  env: Env,
+  task: TaskInput,
+  checklist?: string[],
+  bodyText?: string,
+  imageUploadId?: string,
+): Promise<string | null> {
   const properties: Record<string, unknown> = {
     "タイトル": { title: [{ text: { content: task.title } }] },
     Status: { status: { name: STATUS_PENDING } },
@@ -150,7 +211,8 @@ export async function addTask(env: Env, task: TaskInput, checklist?: string[], b
     },
   }));
   const bodyBlocks = buildEmailBodyBlocks(bodyText ?? "", "📧 メール本文");
-  const children = [...checklistBlocks, ...bodyBlocks];
+  const imageBlocks = buildImageBlocks(imageUploadId);
+  const children = [...checklistBlocks, ...bodyBlocks, ...imageBlocks];
   if (children.length) {
     body.children = children;
   }

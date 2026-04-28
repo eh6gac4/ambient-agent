@@ -9,6 +9,7 @@ vi.mock("../../src/clients/notion.js", () => ({
   completeTask: vi.fn().mockResolvedValue(undefined),
   cancelTask: vi.fn().mockResolvedValue(undefined),
   updateTaskDue: vi.fn().mockResolvedValue(undefined),
+  uploadImageToNotion: vi.fn().mockResolvedValue("upload-id-test"),
 }));
 
 vi.mock("../../src/clients/telegram.js", () => ({
@@ -110,5 +111,46 @@ describe("Telegram webhook E2E", () => {
 
     const resp = await worker.fetch(webhookRequest(telegramFixtures.addCommand), env);
     expect(resp.status).toBe(200);
+  });
+
+  it("photo message uploads image to Notion and attaches to first task", async () => {
+    const env = createMockEnv({ OPERATING_START_HOUR: "0", OPERATING_END_HOUR: "24" });
+    const { addTask, uploadImageToNotion } = await import("../../src/clients/notion.js");
+    const { extractTasksFromImage } = await import("../../src/clients/anthropic.js");
+    const { getFileUrl } = await import("../../src/clients/telegram.js");
+
+    (addTask as ReturnType<typeof vi.fn>).mockResolvedValue("page-new");
+    (getFileUrl as ReturnType<typeof vi.fn>).mockResolvedValue("https://api.telegram.org/file/bottoken/photos/file_5.jpg");
+    (extractTasksFromImage as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { title: "領収書を経費申請", due: null, priority: "medium" },
+      { title: "金額を確認", due: null, priority: "low" },
+    ]);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(new Uint8Array([0xff, 0xd8, 0xff]).buffer, { status: 200 })));
+
+    const resp = await worker.fetch(webhookRequest(telegramFixtures.photoMessage), env);
+    expect(resp.status).toBe(200);
+
+    expect(uploadImageToNotion).toHaveBeenCalledTimes(1);
+    const uploadArgs = (uploadImageToNotion as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(uploadArgs[2]).toBe("image/jpeg");
+
+    expect(addTask).toHaveBeenCalledTimes(2);
+    const firstCall = (addTask as ReturnType<typeof vi.fn>).mock.calls[0];
+    const secondCall = (addTask as ReturnType<typeof vi.fn>).mock.calls[1];
+    expect(firstCall[4]).toBe("upload-id-test");
+    expect(secondCall[4]).toBeUndefined();
+  });
+
+  it("photo message picks the largest photo by file_size", async () => {
+    const env = createMockEnv({ OPERATING_START_HOUR: "0", OPERATING_END_HOUR: "24" });
+    const { extractTasksFromImage } = await import("../../src/clients/anthropic.js");
+    const { getFileUrl } = await import("../../src/clients/telegram.js");
+
+    (getFileUrl as ReturnType<typeof vi.fn>).mockResolvedValue("https://api.telegram.org/file/bottoken/photos/file_5.jpg");
+    (extractTasksFromImage as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(new Uint8Array([0xff]).buffer, { status: 200 })));
+
+    await worker.fetch(webhookRequest(telegramFixtures.photoMessage), env);
+    expect(getFileUrl).toHaveBeenCalledWith(env, "photo-large");
   });
 });

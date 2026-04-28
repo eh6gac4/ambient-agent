@@ -1,6 +1,6 @@
 import type { Env } from "../types.js";
 import { sendMessage, getFileUrl } from "../clients/telegram.js";
-import { addTask, getOpenTasks, completeTask, cancelTask, updateTaskDue } from "../clients/notion.js";
+import { addTask, getOpenTasks, completeTask, cancelTask, updateTaskDue, uploadImageToNotion } from "../clients/notion.js";
 import { extractTasksFromText, extractTasksFromUrlContent, extractTasksFromImage } from "../clients/anthropic.js";
 import { getSenderForTask } from "../storage/d1.js";
 import { getTaskCache, setTaskCache, getNoTaskSenders, addNoTaskSender, removeNoTaskSender } from "../storage/kv.js";
@@ -208,12 +208,17 @@ async function handlePhoto(env: Env, message: Record<string, unknown>): Promise<
 
   const ext = fileUrl.split(".").pop()?.toLowerCase() ?? "jpg";
   const mediaType = ({ jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif", webp: "image/webp" } as Record<string, string>)[ext] ?? "image/jpeg";
+  const imageData = await imgResp.arrayBuffer();
 
   await sendMessage(env, "⏳ 画像からタスクを抽出中...");
-  const tasks = await extractTasksFromImage(env, await imgResp.arrayBuffer(), mediaType);
+  const [tasks, uploadId] = await Promise.all([
+    extractTasksFromImage(env, imageData, mediaType),
+    uploadImageToNotion(env, imageData, mediaType, `telegram-${largest.file_id}.${ext}`),
+  ]);
   if (tasks.length) {
-    for (const task of tasks) {
-      await addTask(env, { ...task, source: "Telegram" });
+    for (let i = 0; i < tasks.length; i++) {
+      const attachId = i === 0 ? uploadId ?? undefined : undefined;
+      await addTask(env, { ...tasks[i], source: "Telegram" }, undefined, undefined, attachId);
     }
     await sendMessage(env, "✅ タスクを登録しました\n\n" + tasks.map((t) => `• ${t.title}`).join("\n"));
   } else {

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { addTask, getOpenTasks, completeTask, cancelTask, updateTaskDue, escalatePriorityTasks } from "../../../src/clients/notion.js";
+import { addTask, getOpenTasks, completeTask, cancelTask, updateTaskDue, escalatePriorityTasks, uploadImageToNotion } from "../../../src/clients/notion.js";
 import { createMockEnv } from "../../helpers/mocks.js";
 import notionFixtures from "../../fixtures/notion-tasks.json" assert { type: "json" };
 
@@ -99,6 +99,97 @@ describe("addTask", () => {
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(body.children).toHaveLength(1);
     expect(body.children[0].type).toBe("to_do");
+  });
+
+  it("appends image block when imageUploadId provided", async () => {
+    const env = createMockEnv();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(notionFixtures.createResponse), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await addTask(env, { title: "画像付き" }, undefined, undefined, "upload-id-123");
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.children).toHaveLength(3);
+    expect(body.children[0].type).toBe("divider");
+    expect(body.children[1].type).toBe("heading_3");
+    expect(body.children[1].heading_3.rich_text[0].text.content).toBe("📷 元画像");
+    expect(body.children[2].type).toBe("image");
+    expect(body.children[2].image.file_upload.id).toBe("upload-id-123");
+  });
+
+  it("does not append image block when imageUploadId is undefined", async () => {
+    const env = createMockEnv();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(notionFixtures.createResponse), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await addTask(env, { title: "画像なし" }, undefined, undefined, undefined);
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.children).toBeUndefined();
+  });
+});
+
+describe("uploadImageToNotion", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("creates a file_upload, sends bytes, and returns the upload id", async () => {
+    const env = createMockEnv();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: "upload-id-abc", upload_url: "https://api.notion.com/v1/file_uploads/upload-id-abc/send" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ status: "uploaded" }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const bytes = new Uint8Array([1, 2, 3, 4]).buffer;
+    const id = await uploadImageToNotion(env, bytes, "image/jpeg", "test.jpg");
+
+    expect(id).toBe("upload-id-abc");
+    expect(fetchMock.mock.calls[0][0]).toBe("https://api.notion.com/v1/file_uploads");
+    expect(fetchMock.mock.calls[1][0]).toBe("https://api.notion.com/v1/file_uploads/upload-id-abc/send");
+    const sendOpts = fetchMock.mock.calls[1][1] as { method: string; body: FormData; headers: Record<string, string> };
+    expect(sendOpts.method).toBe("POST");
+    expect(sendOpts.body).toBeInstanceOf(FormData);
+    expect(sendOpts.headers["Authorization"]).toBe("Bearer test-notion-token");
+    expect(sendOpts.headers["Notion-Version"]).toBeDefined();
+  });
+
+  it("returns null when create endpoint fails", async () => {
+    const env = createMockEnv();
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(new Response("err", { status: 500 })));
+
+    const id = await uploadImageToNotion(env, new Uint8Array([1]).buffer, "image/jpeg", "test.jpg");
+    expect(id).toBeNull();
+  });
+
+  it("returns null when send endpoint fails", async () => {
+    const env = createMockEnv();
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: "u1", upload_url: "https://x" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response("err", { status: 500 })),
+    );
+
+    const id = await uploadImageToNotion(env, new Uint8Array([1]).buffer, "image/jpeg", "test.jpg");
+    expect(id).toBeNull();
+  });
+
+  it("returns null when image exceeds 20MB", async () => {
+    const env = createMockEnv();
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const huge = new Uint8Array(21 * 1024 * 1024).buffer;
+    const id = await uploadImageToNotion(env, huge, "image/jpeg", "huge.jpg");
+    expect(id).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("returns null on network error", async () => {
+    const env = createMockEnv();
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network")));
+
+    const id = await uploadImageToNotion(env, new Uint8Array([1]).buffer, "image/jpeg", "test.jpg");
+    expect(id).toBeNull();
   });
 });
 
