@@ -41,6 +41,65 @@ describe("addTask", () => {
     expect(body.children[0].type).toBe("to_do");
     expect(body.children[0].to_do.rich_text[0].text.content).toBe("項目1");
   });
+
+  it("appends email body blocks after checklist when bodyText provided", async () => {
+    const env = createMockEnv();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(notionFixtures.createResponse), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await addTask(env, { title: "メール本文付き" }, ["項目1"], "これはメール本文です。");
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.children).toHaveLength(4);
+    expect(body.children[0].type).toBe("to_do");
+    expect(body.children[1].type).toBe("divider");
+    expect(body.children[2].type).toBe("heading_3");
+    expect(body.children[2].heading_3.rich_text[0].text.content).toBe("📧 メール本文");
+    expect(body.children[3].type).toBe("paragraph");
+    expect(body.children[3].paragraph.rich_text[0].text.content).toBe("これはメール本文です。");
+  });
+
+  it("splits long email body into multiple paragraph blocks of 2000 chars each", async () => {
+    const env = createMockEnv();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(notionFixtures.createResponse), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const longBody = "あ".repeat(4500);
+    await addTask(env, { title: "長文メール" }, [], longBody);
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const paragraphs = body.children.filter((b: { type: string }) => b.type === "paragraph");
+    expect(paragraphs).toHaveLength(3);
+    expect(paragraphs[0].paragraph.rich_text[0].text.content.length).toBe(2000);
+    expect(paragraphs[1].paragraph.rich_text[0].text.content.length).toBe(2000);
+    expect(paragraphs[2].paragraph.rich_text[0].text.content.length).toBe(500);
+  });
+
+  it("truncates email body over 10000 chars with notice", async () => {
+    const env = createMockEnv();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(notionFixtures.createResponse), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const hugeBody = "x".repeat(15000);
+    await addTask(env, { title: "超長文" }, [], hugeBody);
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const paragraphs = body.children.filter((b: { type: string }) => b.type === "paragraph");
+    const lastChunk = paragraphs[paragraphs.length - 1].paragraph.rich_text[0].text.content;
+    expect(lastChunk).toContain("…(以下省略)");
+  });
+
+  it("does not append body blocks when bodyText is empty", async () => {
+    const env = createMockEnv();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(notionFixtures.createResponse), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await addTask(env, { title: "本文なし" }, ["項目1"], "");
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.children).toHaveLength(1);
+    expect(body.children[0].type).toBe("to_do");
+  });
 });
 
 describe("getOpenTasks", () => {

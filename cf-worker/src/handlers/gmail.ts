@@ -62,7 +62,7 @@ export async function checkGmail(env: Env): Promise<void> {
       const existingPageId = await getThreadMapEntry(env, threadId);
 
       if (existingPageId) {
-        await updateTaskFromReply(env, existingPageId, checklist, best.priority, dues[0] ?? null);
+        await updateTaskFromReply(env, existingPageId, checklist, best.priority, dues[0] ?? null, body);
         if (taskLabelId) await addLabel(env, meta.id, taskLabelId);
         taskLines.push(
           `• *${escapeMd(subject)}*（更新）\n  ${escapeMd(summary)}\n  → ${checklist.map(escapeMd).join("、")}\n  [📧 Gmail で開く](${gmailUrl})`,
@@ -72,6 +72,7 @@ export async function checkGmail(env: Env): Promise<void> {
           env,
           { title: subject, due: dues[0] ?? null, priority: best.priority, source: "Gmail", sourceUrl: gmailUrl },
           checklist,
+          body,
         );
         if (pageId) {
           if (threadId) await setThreadMapEntry(env, threadId, pageId);

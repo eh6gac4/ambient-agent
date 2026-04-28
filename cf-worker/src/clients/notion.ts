@@ -9,6 +9,37 @@ const STATUS_IN_PROGRESS_GROUP = ["進行中", "確認中", "一時中断"];
 const STATUS_DONE = "完了";
 const STATUS_CANCELLED = "中止";
 
+const EMAIL_BODY_MAX_CHARS = 10000;
+const NOTION_RICH_TEXT_MAX = 2000;
+
+function buildEmailBodyBlocks(bodyText: string, headingLabel: string): Array<Record<string, unknown>> {
+  const trimmed = bodyText.trim();
+  if (!trimmed) return [];
+
+  const truncated = trimmed.length > EMAIL_BODY_MAX_CHARS
+    ? trimmed.slice(0, EMAIL_BODY_MAX_CHARS) + "\n\n…(以下省略)"
+    : trimmed;
+
+  const chunks: string[] = [];
+  for (let i = 0; i < truncated.length; i += NOTION_RICH_TEXT_MAX) {
+    chunks.push(truncated.slice(i, i + NOTION_RICH_TEXT_MAX));
+  }
+
+  return [
+    { object: "block", type: "divider", divider: {} },
+    {
+      object: "block",
+      type: "heading_3",
+      heading_3: { rich_text: [{ type: "text", text: { content: headingLabel } }] },
+    },
+    ...chunks.map((chunk) => ({
+      object: "block",
+      type: "paragraph",
+      paragraph: { rich_text: [{ type: "text", text: { content: chunk } }] },
+    })),
+  ];
+}
+
 function headers(token: string): Record<string, string> {
   return {
     Authorization: `Bearer ${token}`,
@@ -84,7 +115,7 @@ function parseTaskPage(page: Record<string, unknown>): Task {
   };
 }
 
-export async function addTask(env: Env, task: TaskInput, checklist?: string[]): Promise<string | null> {
+export async function addTask(env: Env, task: TaskInput, checklist?: string[], bodyText?: string): Promise<string | null> {
   const properties: Record<string, unknown> = {
     "タイトル": { title: [{ text: { content: task.title } }] },
     Status: { status: { name: STATUS_PENDING } },
@@ -110,15 +141,18 @@ export async function addTask(env: Env, task: TaskInput, checklist?: string[]): 
     properties,
   };
 
-  if (checklist?.length) {
-    body.children = checklist.map((item) => ({
-      object: "block",
-      type: "to_do",
-      to_do: {
-        rich_text: [{ type: "text", text: { content: item } }],
-        checked: false,
-      },
-    }));
+  const checklistBlocks = (checklist ?? []).map((item) => ({
+    object: "block",
+    type: "to_do",
+    to_do: {
+      rich_text: [{ type: "text", text: { content: item } }],
+      checked: false,
+    },
+  }));
+  const bodyBlocks = buildEmailBodyBlocks(bodyText ?? "", "📧 メール本文");
+  const children = [...checklistBlocks, ...bodyBlocks];
+  if (children.length) {
+    body.children = children;
   }
 
   const resp = await fetch(`${NOTION_API}/pages`, {
@@ -219,6 +253,7 @@ export async function updateTaskFromReply(
   checklist: string[],
   priority: string,
   due: string | null,
+  bodyText?: string,
 ): Promise<void> {
   const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
 
@@ -254,20 +289,22 @@ export async function updateTaskFromReply(
     });
   }
 
-  if (checklist.length) {
+  const checklistBlocks = checklist.map((item) => ({
+    object: "block",
+    type: "to_do",
+    to_do: {
+      rich_text: [{ type: "text", text: { content: item } }],
+      checked: false,
+    },
+  }));
+  const bodyBlocks = buildEmailBodyBlocks(bodyText ?? "", "📧 返信メール");
+  const appendChildren = [...checklistBlocks, ...bodyBlocks];
+
+  if (appendChildren.length) {
     await fetch(`${NOTION_API}/blocks/${pageId}/children`, {
       method: "PATCH",
       headers: headers(env.NOTION_TOKEN),
-      body: JSON.stringify({
-        children: checklist.map((item) => ({
-          object: "block",
-          type: "to_do",
-          to_do: {
-            rich_text: [{ type: "text", text: { content: item } }],
-            checked: false,
-          },
-        })),
-      }),
+      body: JSON.stringify({ children: appendChildren }),
     });
   }
 }
