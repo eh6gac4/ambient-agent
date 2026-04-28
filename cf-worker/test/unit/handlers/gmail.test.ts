@@ -74,6 +74,7 @@ describe("checkGmail", () => {
       env,
       expect.objectContaining({ title: "プロジェクトの進捗確認", source: "Gmail" }),
       ["進捗を報告する"],
+      "内容",
     );
   });
 
@@ -106,6 +107,7 @@ describe("checkGmail", () => {
       ["追加確認を実施する"],
       "medium",
       null,
+      "返信内容",
     );
     expect(addTask).not.toHaveBeenCalled();
   });
