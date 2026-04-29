@@ -9,6 +9,7 @@ vi.mock("../../../src/clients/notion.js", () => ({
   completeTask: vi.fn().mockResolvedValue(undefined),
   cancelTask: vi.fn().mockResolvedValue(undefined),
   updateTaskDue: vi.fn().mockResolvedValue(undefined),
+  uploadImageToNotion: vi.fn().mockResolvedValue("upload-id-001"),
 }));
 
 vi.mock("../../../src/clients/telegram.js", () => ({
@@ -33,7 +34,7 @@ vi.mock("../../../src/handlers/briefing.js", () => ({
 vi.mock("../../../src/clients/anthropic.js", () => ({
   extractTasksFromText: vi.fn().mockResolvedValue([{ title: "テストタスク", due: null, priority: "medium" }]),
   extractTasksFromUrlContent: vi.fn().mockResolvedValue([]),
-  extractTasksFromImage: vi.fn().mockResolvedValue([]),
+  analyzeImage: vi.fn().mockResolvedValue({ summary: "", tasks: [] }),
   summarizeDay: vi.fn().mockResolvedValue("今日のブリーフィング"),
 }));
 
@@ -90,6 +91,50 @@ describe("handleTelegramWebhook", () => {
 
     await handleTelegramWebhook(env, telegramFixtures.tasksCommand);
     expect(getOpenTasks).toHaveBeenCalledWith(env);
+  });
+
+  it("photo message: consolidates all extracted tasks into ONE Notion task with image attached", async () => {
+    const env = createMockEnv();
+    const { addTask, uploadImageToNotion } = await import("../../../src/clients/notion.js");
+    const { analyzeImage } = await import("../../../src/clients/anthropic.js");
+    const { getFileUrl } = await import("../../../src/clients/telegram.js");
+
+    (getFileUrl as ReturnType<typeof vi.fn>).mockResolvedValue("https://api.telegram.org/file/bot/photo.jpg");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(new ArrayBuffer(1024), { status: 200 })));
+    (analyzeImage as ReturnType<typeof vi.fn>).mockResolvedValue({
+      summary: "週末の買い物リスト",
+      tasks: [
+        { title: "牛乳を買う", priority: "medium", due: null },
+        { title: "卵を買う", priority: "high", due: "2026-05-01" },
+        { title: "パンを買う", priority: "low", due: null },
+      ],
+    });
+
+    await handleTelegramWebhook(env, telegramFixtures.photoMessage);
+
+    expect(uploadImageToNotion).toHaveBeenCalledTimes(1);
+    expect(addTask).toHaveBeenCalledTimes(1);
+    expect(addTask).toHaveBeenCalledWith(
+      env,
+      expect.objectContaining({ title: "週末の買い物リスト", priority: "high", due: "2026-05-01", source: "Telegram" }),
+      ["牛乳を買う", "卵を買う", "パンを買う"],
+      undefined,
+      "upload-id-001",
+    );
+    vi.unstubAllGlobals();
+  });
+
+  it("photo message: largest photo is selected", async () => {
+    const env = createMockEnv();
+    const { getFileUrl } = await import("../../../src/clients/telegram.js");
+
+    (getFileUrl as ReturnType<typeof vi.fn>).mockResolvedValue("https://api.telegram.org/file/bot/photo.jpg");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(new ArrayBuffer(1024), { status: 200 })));
+
+    await handleTelegramWebhook(env, telegramFixtures.photoMessage);
+
+    expect(getFileUrl).toHaveBeenCalledWith(env, "photo-large");
+    vi.unstubAllGlobals();
   });
 
   it("/done command without prior /tasks sends guidance message", async () => {

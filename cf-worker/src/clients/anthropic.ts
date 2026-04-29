@@ -126,14 +126,64 @@ export async function extractTasksFromUrlContent(env: Env, url: string, content:
   return extractJsonList(text);
 }
 
+function imageToBase64(imageData: ArrayBuffer): string {
+  let bin = "";
+  const bytes = new Uint8Array(imageData);
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin);
+}
+
 export async function extractTasksFromImage(env: Env, imageData: ArrayBuffer, mediaType: string): Promise<ExtractedTask[]> {
-  const b64 = btoa(String.fromCharCode(...new Uint8Array(imageData)));
   const userContent = [
-    { type: "image", source: { type: "base64", media_type: mediaType, data: b64 } },
+    { type: "image", source: { type: "base64", media_type: mediaType, data: imageToBase64(imageData) } },
     { type: "text", text: "この画像からアクションが必要なタスクを抽出してください。" },
   ];
   const text = await callClaude(env, "extract_tasks_image", EXTRACT_TASKS_PROMPT, userContent);
   return extractJsonList(text);
+}
+
+const ANALYZE_IMAGE_PROMPT = `あなたは画像からタスクを分析するアシスタントです。
+
+画像（レシート・ホワイトボード・メモ・スクリーンショット等）を読み、要約と実行が必要なタスクを JSON で返してください。
+
+## 出力フォーマット（JSON のみ、説明文不要）
+
+\`\`\`json
+{
+  "summary": "画像の内容を1文で要約（タスクのタイトルとして使う）",
+  "tasks": [
+    {
+      "title": "具体的にやること（簡潔に）",
+      "due": "YYYY-MM-DD または null",
+      "priority": "high | medium | low",
+      "source": "Telegram"
+    }
+  ]
+}
+\`\`\`
+
+## 判断基準
+- summary: 「何の画像か / なぜ撮ったと考えられるか」を1文に。タスク登録時のタイトルになるので具体的に
+- tasks: 関連する一連のアクションは細切れにせず、できるだけ少ない数にまとめる
+- 期日が画像内に明示されていれば due に設定する（不明なら null）
+- 緊急・至急 → high、通常 → medium`;
+
+export async function analyzeImage(env: Env, imageData: ArrayBuffer, mediaType: string): Promise<EmailAnalysis> {
+  const userContent = [
+    { type: "image", source: { type: "base64", media_type: mediaType, data: imageToBase64(imageData) } },
+    { type: "text", text: "この画像を分析してください。" },
+  ];
+  const text = await callClaude(env, "analyze_image", ANALYZE_IMAGE_PROMPT, userContent);
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) return { summary: text.trim(), tasks: [] };
+  try {
+    const result = JSON.parse(match[0]) as EmailAnalysis;
+    result.tasks ??= [];
+    result.summary ??= "";
+    return result;
+  } catch {
+    return { summary: text.trim(), tasks: [] };
+  }
 }
 
 export async function summarizeDay(

@@ -61,7 +61,7 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 | `/unblock <メール>` | 送信者のブロックを解除 |
 | URL 送信 | ページ内容を取得してタスクを抽出し Notion に登録 |
 | テキスト・転送メッセージ送信 | Claude でタスク抽出して Notion に登録 |
-| 画像送信 | Claude Vision でタスク抽出して Notion に登録 |
+| 画像送信 | Claude Vision で要約・タスク抽出 → 1タスクにまとめて Notion 登録、複数アクションはチェックリスト化、画像をページ本文に添付 |
 
 ## Notion DB 必須プロパティ
 
