@@ -1,7 +1,7 @@
 import type { Env } from "../types.js";
 import { sendMessage, getFileUrl } from "../clients/telegram.js";
-import { addTask, getOpenTasks, completeTask, cancelTask, updateTaskDue } from "../clients/notion.js";
-import { extractTasksFromText, extractTasksFromUrlContent, extractTasksFromImage } from "../clients/anthropic.js";
+import { addTask, getOpenTasks, completeTask, cancelTask, updateTaskDue, uploadImageToNotion } from "../clients/notion.js";
+import { extractTasksFromText, extractTasksFromUrlContent, analyzeImage } from "../clients/anthropic.js";
 import { getSenderForTask } from "../storage/d1.js";
 import { getTaskCache, setTaskCache, getNoTaskSenders, addNoTaskSender, removeNoTaskSender } from "../storage/kv.js";
 import { deleteCalendarEventForTask } from "./calendar.js";
@@ -208,17 +208,34 @@ async function handlePhoto(env: Env, message: Record<string, unknown>): Promise<
 
   const ext = fileUrl.split(".").pop()?.toLowerCase() ?? "jpg";
   const mediaType = ({ jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif", webp: "image/webp" } as Record<string, string>)[ext] ?? "image/jpeg";
+  const imageData = await imgResp.arrayBuffer();
 
   await sendMessage(env, "⏳ 画像からタスクを抽出中...");
-  const tasks = await extractTasksFromImage(env, await imgResp.arrayBuffer(), mediaType);
-  if (tasks.length) {
-    for (const task of tasks) {
-      await addTask(env, { ...task, source: "Telegram" });
-    }
-    await sendMessage(env, "✅ タスクを登録しました\n\n" + tasks.map((t) => `• ${t.title}`).join("\n"));
-  } else {
-    await sendMessage(env, "ℹ️ タスクは見つかりませんでした");
-  }
+  const [{ summary, tasks }, uploadId] = await Promise.all([
+    analyzeImage(env, imageData, mediaType),
+    uploadImageToNotion(env, imageData, mediaType, `telegram-${largest.file_id}.${ext}`),
+  ]);
+
+  const checklist = tasks.map((t) => t.title);
+  const dues = tasks.map((t) => t.due).filter((d): d is string => Boolean(d)).sort();
+  const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+  const best = tasks.length
+    ? tasks.reduce((a, b) => ((priorityOrder[a.priority] ?? 1) <= (priorityOrder[b.priority] ?? 1) ? a : b))
+    : { priority: "medium" as const };
+  const title = (summary || tasks[0]?.title || "📷 画像メモ").slice(0, 200);
+
+  await addTask(
+    env,
+    { title, due: dues[0] ?? null, priority: best.priority, source: "Telegram" },
+    checklist,
+    undefined,
+    uploadId ?? undefined,
+  );
+
+  const lines = [`✅ タスクを登録しました`, ``, `*${title}*`];
+  if (checklist.length) lines.push(...checklist.map((t) => `• ${t}`));
+  if (!uploadId) lines.push(``, `⚠️ 画像のアップロードに失敗したためテキストのみ登録`);
+  await sendMessage(env, lines.join("\n"));
 }
 
 async function handleUrl(env: Env, url: string): Promise<void> {

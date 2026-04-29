@@ -9,6 +9,7 @@ vi.mock("../../src/clients/notion.js", () => ({
   completeTask: vi.fn().mockResolvedValue(undefined),
   cancelTask: vi.fn().mockResolvedValue(undefined),
   updateTaskDue: vi.fn().mockResolvedValue(undefined),
+  uploadImageToNotion: vi.fn().mockResolvedValue("upload-id-001"),
 }));
 
 vi.mock("../../src/clients/telegram.js", () => ({
@@ -21,7 +22,7 @@ vi.mock("../../src/clients/anthropic.js", () => ({
   analyzeEmail: vi.fn(),
   extractTasksFromText: vi.fn().mockResolvedValue([]),
   extractTasksFromUrlContent: vi.fn().mockResolvedValue([]),
-  extractTasksFromImage: vi.fn().mockResolvedValue([]),
+  analyzeImage: vi.fn().mockResolvedValue({ summary: "", tasks: [] }),
   summarizeDay: vi.fn().mockResolvedValue("ブリーフィング"),
 }));
 
