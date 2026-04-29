@@ -3,7 +3,7 @@ import { getTodaysEvents } from "../clients/gcal-api.js";
 import { getOpenTasks } from "../clients/notion.js";
 import { summarizeDay } from "../clients/anthropic.js";
 import { sendMessage } from "../clients/telegram.js";
-import { getDailyUsage } from "../storage/kv.js";
+import { getDailyUsage, takeEmailDigest } from "../storage/kv.js";
 
 const PRICE_INPUT_PER_M = 0.8;
 const PRICE_OUTPUT_PER_M = 4.0;
@@ -74,4 +74,14 @@ export async function sendCostReport(env: Env): Promise<void> {
   ];
 
   await sendMessage(env, lines.join("\n"));
+}
+
+export async function sendEmailDigest(env: Env): Promise<void> {
+  const { taskLines, archivedLines } = await takeEmailDigest(env);
+  if (!taskLines.length && !archivedLines.length) return;
+
+  const sections: string[] = [];
+  if (taskLines.length) sections.push("✅ *タスク登録*\n" + taskLines.join("\n"));
+  if (archivedLines.length) sections.push("📦 *アーカイブ済み*\n" + archivedLines.join("\n"));
+  await sendMessage(env, "*📧 メール処理サマリ*\n\n" + sections.join("\n\n"));
 }

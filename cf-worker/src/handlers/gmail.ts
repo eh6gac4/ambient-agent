@@ -14,9 +14,18 @@ import {
   markProcessed,
   cleanOldProcessed,
 } from "../storage/d1.js";
-import { getNoTaskSenders, addNoTaskSender } from "../storage/kv.js";
+import { getNoTaskSenders, addNoTaskSender, appendEmailDigest } from "../storage/kv.js";
 
-export async function checkGmail(env: Env): Promise<void> {
+function isSubrequestLimitError(err: unknown): boolean {
+  return String(err).includes("Too many subrequests");
+}
+
+export interface CheckGmailOptions {
+  /** When true, accumulate results to KV instead of sending Telegram immediately. */
+  silent?: boolean;
+}
+
+export async function checkGmail(env: Env, options: CheckGmailOptions = {}): Promise<void> {
   await cleanOldProcessed(env);
 
   const messages = await listAllMessages(env);
@@ -30,68 +39,81 @@ export async function checkGmail(env: Env): Promise<void> {
   const archivedLines: string[] = [];
 
   for (const meta of messages) {
-    if (await isProcessed(env, meta.id)) continue;
+    try {
+      if (await isProcessed(env, meta.id)) continue;
 
-    const msg = await getMessage(env, meta.id);
+      const msg = await getMessage(env, meta.id);
 
-    if (isCalendarInvite(msg.payload)) {
-      await archiveMessage(env, meta.id);
-      await markProcessed(env, meta.id);
-      continue;
-    }
-
-    const { subject, body, senderEmail, threadId, gmailUrl } = parseMessage(msg, env);
-
-    if (noTaskSenders.has(senderEmail)) {
-      await archiveMessage(env, meta.id);
-      await markProcessed(env, meta.id);
-      continue;
-    }
-
-    const analysis = await analyzeEmail(env, subject, body);
-    const { summary, tasks } = analysis;
-
-    if (tasks.length) {
-      const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
-      const best = tasks.reduce((a, b) =>
-        (priorityOrder[a.priority] ?? 1) <= (priorityOrder[b.priority] ?? 1) ? a : b,
-      );
-      const dues = tasks.map((t) => t.due).filter((d): d is string => Boolean(d)).sort();
-      const checklist = tasks.map((t) => t.title);
-
-      const existingPageId = await getThreadMapEntry(env, threadId);
-
-      if (existingPageId) {
-        await updateTaskFromReply(env, existingPageId, checklist, best.priority, dues[0] ?? null, body);
-        if (taskLabelId) await addLabel(env, meta.id, taskLabelId);
-        taskLines.push(
-          `• *${escapeMd(subject)}*（更新）\n  ${escapeMd(summary)}\n  → ${checklist.map(escapeMd).join("、")}\n  [📧 Gmail で開く](${gmailUrl})`,
-        );
-      } else {
-        const pageId = await addTask(
-          env,
-          { title: subject, due: dues[0] ?? null, priority: best.priority, source: "Gmail", sourceUrl: gmailUrl },
-          checklist,
-          body,
-        );
-        if (pageId) {
-          if (threadId) await setThreadMapEntry(env, threadId, pageId);
-          await setSenderForTask(env, pageId, senderEmail);
-          if (taskLabelId) await addLabel(env, meta.id, taskLabelId);
-        }
-        taskLines.push(
-          `• *${escapeMd(subject)}*\n  ${escapeMd(summary)}\n  → ${checklist.map(escapeMd).join("、")}\n  [📧 Gmail で開く](${gmailUrl})`,
-        );
+      if (isCalendarInvite(msg.payload)) {
+        await archiveMessage(env, meta.id);
+        await markProcessed(env, meta.id);
+        continue;
       }
-    } else {
-      archivedLines.push(`• *${escapeMd(subject)}*\n  ${escapeMd(summary)}`);
-    }
 
-    await archiveMessage(env, meta.id);
-    await markProcessed(env, meta.id);
+      const { subject, body, senderEmail, threadId, gmailUrl } = parseMessage(msg, env);
+
+      if (noTaskSenders.has(senderEmail)) {
+        await archiveMessage(env, meta.id);
+        await markProcessed(env, meta.id);
+        continue;
+      }
+
+      const analysis = await analyzeEmail(env, subject, body);
+      const { summary, tasks } = analysis;
+
+      if (tasks.length) {
+        const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+        const best = tasks.reduce((a, b) =>
+          (priorityOrder[a.priority] ?? 1) <= (priorityOrder[b.priority] ?? 1) ? a : b,
+        );
+        const dues = tasks.map((t) => t.due).filter((d): d is string => Boolean(d)).sort();
+        const checklist = tasks.map((t) => t.title);
+
+        const existingPageId = await getThreadMapEntry(env, threadId);
+
+        if (existingPageId) {
+          await updateTaskFromReply(env, existingPageId, checklist, best.priority, dues[0] ?? null, body);
+          if (taskLabelId) await addLabel(env, meta.id, taskLabelId);
+          taskLines.push(
+            `• *${escapeMd(subject)}*（更新）\n  ${escapeMd(summary)}\n  → ${checklist.map(escapeMd).join("、")}\n  [📧 Gmail で開く](${gmailUrl})`,
+          );
+        } else {
+          const pageId = await addTask(
+            env,
+            { title: subject, due: dues[0] ?? null, priority: best.priority, source: "Gmail", sourceUrl: gmailUrl },
+            checklist,
+            body,
+          );
+          if (pageId) {
+            if (threadId) await setThreadMapEntry(env, threadId, pageId);
+            await setSenderForTask(env, pageId, senderEmail);
+            if (taskLabelId) await addLabel(env, meta.id, taskLabelId);
+          }
+          taskLines.push(
+            `• *${escapeMd(subject)}*\n  ${escapeMd(summary)}\n  → ${checklist.map(escapeMd).join("、")}\n  [📧 Gmail で開く](${gmailUrl})`,
+          );
+        }
+      } else {
+        archivedLines.push(`• *${escapeMd(subject)}*\n  ${escapeMd(summary)}`);
+      }
+
+      await archiveMessage(env, meta.id);
+      await markProcessed(env, meta.id);
+    } catch (err) {
+      if (isSubrequestLimitError(err)) {
+        console.warn("checkGmail: subrequest limit hit, deferring remaining messages");
+        break;
+      }
+      console.error(`checkGmail: failed to process message ${meta.id}:`, err);
+    }
   }
 
   if (!taskLines.length && !archivedLines.length) return;
+
+  if (options.silent) {
+    await appendEmailDigest(env, { taskLines, archivedLines });
+    return;
+  }
 
   const sections: string[] = [];
   if (taskLines.length) sections.push("✅ *タスク登録*\n" + taskLines.join("\n"));

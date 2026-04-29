@@ -21,6 +21,7 @@ vi.mock("../../src/handlers/calendar.js", () => ({
 vi.mock("../../src/handlers/briefing.js", () => ({
   sendDailyBriefing: vi.fn().mockResolvedValue(undefined),
   sendCostReport: vi.fn().mockResolvedValue(undefined),
+  sendEmailDigest: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("../../src/handlers/escalation.js", () => ({
@@ -57,27 +58,36 @@ describe("scheduled handler - cron dispatch", () => {
     expect(learnFromCancelled).toHaveBeenCalledWith(env);
   });
 
-  it("50 22 * * * (morning_prep) runs gmail, calendar, escalation", async () => {
+  it("50 22 * * * (morning_prep) runs calendar, escalation (no gmail)", async () => {
     const env = createMockEnv();
     const { checkGmail } = await import("../../src/handlers/gmail.js");
     const { syncCalendar } = await import("../../src/handlers/calendar.js");
     const { sendEscalationNotice } = await import("../../src/handlers/escalation.js");
 
     await worker.scheduled(makeScheduledEvent("50 22 * * *"), env);
-    expect(checkGmail).toHaveBeenCalledWith(env);
+    expect(checkGmail).not.toHaveBeenCalled();
     expect(syncCalendar).toHaveBeenCalledWith(env);
     expect(sendEscalationNotice).toHaveBeenCalledWith(env);
   });
 
-  it("0 23 * * * (morning_briefing) runs briefing, cost, due_soon", async () => {
+  it("30 22-23,0-12 * * * (hourly_gmail) runs checkGmail in silent mode", async () => {
     const env = createMockEnv();
-    const { sendDailyBriefing, sendCostReport } = await import("../../src/handlers/briefing.js");
+    const { checkGmail } = await import("../../src/handlers/gmail.js");
+
+    await worker.scheduled(makeScheduledEvent("30 22-23,0-12 * * *"), env);
+    expect(checkGmail).toHaveBeenCalledWith(env, { silent: true });
+  });
+
+  it("0 23 * * * (morning_briefing) runs briefing, cost, due_soon, email_digest", async () => {
+    const env = createMockEnv();
+    const { sendDailyBriefing, sendCostReport, sendEmailDigest } = await import("../../src/handlers/briefing.js");
     const { sendDueSoonNotice } = await import("../../src/handlers/calendar.js");
 
     await worker.scheduled(makeScheduledEvent("0 23 * * *"), env);
     expect(sendDailyBriefing).toHaveBeenCalledWith(env);
     expect(sendCostReport).toHaveBeenCalledWith(env);
     expect(sendDueSoonNotice).toHaveBeenCalledWith(env);
+    expect(sendEmailDigest).toHaveBeenCalledWith(env);
   });
 
   it("dispatches sendStaleTasksNotice for 0 0 * * 1", async () => {
@@ -90,10 +100,10 @@ describe("scheduled handler - cron dispatch", () => {
 
   it("sends error notification to Telegram when job throws", async () => {
     const env = createMockEnv();
-    const { checkGmail } = await import("../../src/handlers/gmail.js");
+    const { syncCalendar } = await import("../../src/handlers/calendar.js");
     const { sendMessage } = await import("../../src/clients/telegram.js");
 
-    (checkGmail as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("API timeout"));
+    (syncCalendar as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("API timeout"));
 
     await worker.scheduled(makeScheduledEvent("50 22 * * *"), env);
     expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("エラー"));

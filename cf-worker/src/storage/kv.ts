@@ -45,6 +45,34 @@ export async function removeNoTaskSender(env: Env, email: string): Promise<boole
   return true;
 }
 
+// Email digest (accumulated by hourly checkGmail, sent by morning briefing)
+const EMAIL_DIGEST_KEY = "email_digest:pending";
+
+export interface EmailDigest {
+  taskLines: string[];
+  archivedLines: string[];
+}
+
+export async function appendEmailDigest(env: Env, batch: EmailDigest): Promise<void> {
+  if (!batch.taskLines.length && !batch.archivedLines.length) return;
+  const existing = (await env.AGENT_KV.get<EmailDigest>(EMAIL_DIGEST_KEY, "json")) ?? {
+    taskLines: [],
+    archivedLines: [],
+  };
+  existing.taskLines.push(...batch.taskLines);
+  existing.archivedLines.push(...batch.archivedLines);
+  await env.AGENT_KV.put(EMAIL_DIGEST_KEY, JSON.stringify(existing));
+}
+
+export async function takeEmailDigest(env: Env): Promise<EmailDigest> {
+  const existing = (await env.AGENT_KV.get<EmailDigest>(EMAIL_DIGEST_KEY, "json")) ?? {
+    taskLines: [],
+    archivedLines: [],
+  };
+  await env.AGENT_KV.delete(EMAIL_DIGEST_KEY);
+  return existing;
+}
+
 // Usage tracking
 export async function recordUsage(env: Env, job: string, inputTokens: number, outputTokens: number): Promise<void> {
   const dateStr = new Date().toISOString().slice(0, 10);
