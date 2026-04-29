@@ -171,6 +171,96 @@ describe("checkGmail", () => {
     await checkGmail(env);
     expect(sendMessage).not.toHaveBeenCalled();
   });
+
+  it("breaks loop on subrequest limit error and skips Telegram if no work done", async () => {
+    const env = createMockEnv();
+    const { listAllMessages, getMessage } = await import("../../../src/clients/gmail-api.js");
+    const { sendMessage } = await import("../../../src/clients/telegram.js");
+    const { isProcessed } = await import("../../../src/storage/d1.js");
+
+    (isProcessed as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+    (listAllMessages as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { id: "msg-a", threadId: "t-a" },
+      { id: "msg-b", threadId: "t-b" },
+    ]);
+    (getMessage as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("Too many subrequests by single Worker invocation"));
+
+    await checkGmail(env);
+    // Only first message attempted; loop breaks; no Telegram (nothing accumulated)
+    expect(getMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("continues loop on per-message non-limit errors", async () => {
+    const env = createMockEnv();
+    const { listAllMessages, getMessage, parseMessage, isCalendarInvite } = await import("../../../src/clients/gmail-api.js");
+    const { analyzeEmail } = await import("../../../src/clients/anthropic.js");
+    const { addTask } = await import("../../../src/clients/notion.js");
+    const { getThreadMapEntry, isProcessed } = await import("../../../src/storage/d1.js");
+
+    (isCalendarInvite as ReturnType<typeof vi.fn>).mockReturnValue(false);
+    (isProcessed as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+    (listAllMessages as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { id: "msg-bad", threadId: "t-bad" },
+      { id: "msg-good", threadId: "t-good" },
+    ]);
+    (getMessage as ReturnType<typeof vi.fn>)
+      .mockRejectedValueOnce(new Error("transient parse error"))
+      .mockResolvedValueOnce(gmailFixtures.newEmail);
+    (parseMessage as ReturnType<typeof vi.fn>).mockReturnValue({
+      subject: "ok",
+      body: "本文",
+      senderEmail: "ok@example.com",
+      threadId: "t-good",
+      gmailUrl: "https://mail.google.com/",
+    });
+    (analyzeEmail as ReturnType<typeof vi.fn>).mockResolvedValue({
+      summary: "要約",
+      tasks: [{ title: "やる", priority: "medium", due: null }],
+    });
+    (getThreadMapEntry as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    (addTask as ReturnType<typeof vi.fn>).mockResolvedValue("page-good");
+
+    await checkGmail(env);
+    expect(addTask).toHaveBeenCalledTimes(1);
+  });
+
+  it("silent mode accumulates digest to KV and skips Telegram", async () => {
+    const env = createMockEnv();
+    const { listAllMessages, getMessage, parseMessage, isCalendarInvite } = await import("../../../src/clients/gmail-api.js");
+    const { analyzeEmail } = await import("../../../src/clients/anthropic.js");
+    const { addTask } = await import("../../../src/clients/notion.js");
+    const { getThreadMapEntry, isProcessed } = await import("../../../src/storage/d1.js");
+    const { sendMessage } = await import("../../../src/clients/telegram.js");
+
+    (isCalendarInvite as ReturnType<typeof vi.fn>).mockReturnValue(false);
+    (isProcessed as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+    (listAllMessages as ReturnType<typeof vi.fn>).mockResolvedValue([{ id: "msg-silent", threadId: "t-silent" }]);
+    (getMessage as ReturnType<typeof vi.fn>).mockResolvedValue(gmailFixtures.newEmail);
+    (parseMessage as ReturnType<typeof vi.fn>).mockReturnValue({
+      subject: "サイレント件名",
+      body: "本文",
+      senderEmail: "silent@example.com",
+      threadId: "t-silent",
+      gmailUrl: "https://mail.google.com/",
+    });
+    (analyzeEmail as ReturnType<typeof vi.fn>).mockResolvedValue({
+      summary: "要約",
+      tasks: [{ title: "サイレントタスク", priority: "medium", due: null }],
+    });
+    (getThreadMapEntry as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    (addTask as ReturnType<typeof vi.fn>).mockResolvedValue("page-silent");
+
+    await checkGmail(env, { silent: true });
+
+    expect(sendMessage).not.toHaveBeenCalled();
+    const digest = await env.AGENT_KV.get<{ taskLines: string[]; archivedLines: string[] }>(
+      "email_digest:pending",
+      "json",
+    );
+    expect(digest?.taskLines.length).toBe(1);
+    expect(digest?.taskLines[0]).toContain("サイレント件名");
+  });
 });
 
 describe("learnFromCancelled", () => {

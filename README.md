@@ -27,15 +27,24 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 
 | 時刻 (JST) | ジョブ | 内容 |
 |---|---|---|
-| 07:50 | morning_prep | ①ブロックリスト学習 → ②Gmail処理 → ③カレンダー同期 → ④優先度昇格 |
-| 08:00 | morning_briefing | ①日次ブリーフィング → ②APIコストレポート → ③期限間近通知 |
+| 07:30〜21:30 毎時 | hourly_gmail | Gmail 未読を少しずつサイレント処理（通知せず KV に蓄積） |
+| 07:50 | morning_prep | ①ブロックリスト学習 → ②カレンダー同期 → ③優先度昇格 |
+| 08:00 | morning_briefing | ①日次ブリーフィング → ②APIコストレポート → ③期限間近通知 → ④メール処理サマリ |
 | 13:00 | task_reminder | 未着手タスク一覧を Telegram に送信 |
 | 月 09:00 | stale_tasks | 14日以上未更新タスクを通知 |
 
+**hourly_gmail の詳細:**
+- 未読メールを要約・タスク抽出し Notion に登録（返信スレッドは既存タスクを更新）
+- Telegram 通知はせず、結果を `email_digest:pending` (KV) に追記
+- Workers の subrequest 上限（無料プラン 50/呼び出し）に達したら break、未処理分は次回 cron に持ち越し
+- 個別メール処理エラーは log して続行
+
 **morning_prep の詳細:**
-- Gmail 未読メールを要約・タスク抽出し Notion に登録（返信スレッドは既存タスクを更新）
 - 完了済みタスクのカレンダーイベントを削除、未着手タスクを Calendar に登録
 - 期限3日以内の medium タスクを high に昇格
+
+**morning_briefing の詳細:**
+- 直近 24 時間に hourly_gmail が処理したメールをまとめて1通の「📧 メール処理サマリ」として Telegram 送信
 
 ## Telegram コマンド
 
