@@ -76,11 +76,16 @@ describe("handleTelegramWebhook", () => {
   it("/add command creates a task", async () => {
     const env = createMockEnv();
     const { addTask } = await import("../../../src/clients/notion.js");
+    const { sendMessage } = await import("../../../src/clients/telegram.js");
 
     await handleTelegramWebhook(env, telegramFixtures.addCommand);
     expect(addTask).toHaveBeenCalledWith(
       env,
       expect.objectContaining({ title: "資料を確認する", source: "Telegram" }),
+    );
+    expect(sendMessage).toHaveBeenCalledWith(
+      env,
+      expect.stringContaining("https://todo.eh6gac4.work/?task=page-new"),
     );
   });
 
@@ -120,6 +125,11 @@ describe("handleTelegramWebhook", () => {
       ["牛乳を買う", "卵を買う", "パンを買う"],
       undefined,
       "upload-id-001",
+    );
+    const { sendMessage } = await import("../../../src/clients/telegram.js");
+    expect(sendMessage).toHaveBeenCalledWith(
+      env,
+      expect.stringContaining("https://todo.eh6gac4.work/?task=page-new"),
     );
     vi.unstubAllGlobals();
   });

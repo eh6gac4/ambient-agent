@@ -76,12 +76,17 @@ describe("Telegram webhook E2E", () => {
   it("/add creates task and responds OK", async () => {
     const env = createMockEnv();
     const { addTask } = await import("../../src/clients/notion.js");
+    const { sendMessage } = await import("../../src/clients/telegram.js");
 
     const resp = await worker.fetch(webhookRequest(telegramFixtures.addCommand), env);
     expect(resp.status).toBe(200);
     expect(addTask).toHaveBeenCalledWith(
       env,
       expect.objectContaining({ title: "資料を確認する" }),
+    );
+    expect(sendMessage).toHaveBeenCalledWith(
+      env,
+      expect.stringContaining("https://todo.eh6gac4.work/?task=page-new"),
     );
   });
 

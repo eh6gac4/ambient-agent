@@ -11,6 +11,11 @@ import { sendDailyBriefing } from "./briefing.js";
 const URL_PATTERN = /https?:\/\/\S+/;
 const OPERATING_START_HOUR = 8;
 const OPERATING_END_HOUR = 21;
+const TODO_APP_BASE_URL = "https://todo.eh6gac4.work";
+
+function taskLink(pageId: string): string {
+  return `[🔗 アプリで開く](${TODO_APP_BASE_URL}/?task=${pageId})`;
+}
 
 function getJstHour(): number {
   return new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" })).getHours();
@@ -74,8 +79,9 @@ async function handleCommand(env: Env, text: string): Promise<void> {
         await sendMessage(env, "使い方: `/add 〇〇を確認する`");
         return;
       }
-      await addTask(env, { title: arg, source: "Telegram", priority: "medium" });
-      await sendMessage(env, `✅ タスクを追加しました\n\n*${arg}*`);
+      const id = await addTask(env, { title: arg, source: "Telegram", priority: "medium" });
+      const link = id ? `\n\n${taskLink(id)}` : "";
+      await sendMessage(env, `✅ タスクを追加しました\n\n*${arg}*${link}`);
       return;
     }
 
@@ -224,7 +230,7 @@ async function handlePhoto(env: Env, message: Record<string, unknown>): Promise<
     : { priority: "medium" as const };
   const title = (summary || tasks[0]?.title || "📷 画像メモ").slice(0, 200);
 
-  await addTask(
+  const id = await addTask(
     env,
     { title, due: dues[0] ?? null, priority: best.priority, source: "Telegram" },
     checklist,
@@ -235,6 +241,7 @@ async function handlePhoto(env: Env, message: Record<string, unknown>): Promise<
   const lines = [`✅ タスクを登録しました`, ``, `*${title}*`];
   if (checklist.length) lines.push(...checklist.map((t) => `• ${t}`));
   if (!uploadId) lines.push(``, `⚠️ 画像のアップロードに失敗したためテキストのみ登録`);
+  if (id) lines.push(``, taskLink(id));
   await sendMessage(env, lines.join("\n"));
 }
 
@@ -256,10 +263,15 @@ async function handleUrl(env: Env, url: string): Promise<void> {
   const tasks = await extractTasksFromUrlContent(env, url, content);
   const finalTasks = tasks.length ? tasks : [{ title: `${pageTitle}を確認する`, due: null, priority: "medium" as const }];
 
+  const created: Array<{ title: string; id: string | null }> = [];
   for (const task of finalTasks) {
-    await addTask(env, { ...task, source: "URL", sourceUrl: url });
+    const id = await addTask(env, { ...task, source: "URL", sourceUrl: url });
+    created.push({ title: task.title, id });
   }
-  await sendMessage(env, "✅ タスクを登録しました\n\n" + finalTasks.map((t) => `• ${t.title}`).join("\n"));
+  const body = created
+    .map((t) => (t.id ? `• ${t.title} ${taskLink(t.id)}` : `• ${t.title}`))
+    .join("\n");
+  await sendMessage(env, `✅ タスクを登録しました\n\n${body}`);
 }
 
 export async function handleTelegramWebhook(env: Env, body: unknown): Promise<void> {
@@ -303,10 +315,15 @@ export async function handleTelegramWebhook(env: Env, body: unknown): Promise<vo
   const subject = isForwarded ? "転送メッセージ" : "Telegram メッセージ";
   const tasks = await extractTasksFromText(env, "extract_tasks", subject, text);
   if (tasks.length) {
+    const created: Array<{ title: string; id: string | null }> = [];
     for (const task of tasks) {
-      await addTask(env, { ...task, source: "Telegram" });
+      const id = await addTask(env, { ...task, source: "Telegram" });
+      created.push({ title: task.title, id });
     }
-    await sendMessage(env, "✅ タスクを登録しました\n\n" + tasks.map((t) => `• ${t.title}`).join("\n"));
+    const body = created
+      .map((t) => (t.id ? `• ${t.title} ${taskLink(t.id)}` : `• ${t.title}`))
+      .join("\n");
+    await sendMessage(env, `✅ タスクを登録しました\n\n${body}`);
   } else {
     await sendMessage(env, "ℹ️ タスクは見つかりませんでした");
   }
