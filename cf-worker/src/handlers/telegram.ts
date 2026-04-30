@@ -13,7 +13,7 @@ const OPERATING_START_HOUR = 8;
 const OPERATING_END_HOUR = 21;
 const TODO_APP_BASE_URL = "https://todo.eh6gac4.work";
 
-function taskLink(pageId: string): string {
+export function taskLink(pageId: string): string {
   return `[🔗 アプリで開く](${TODO_APP_BASE_URL}/?task=${pageId})`;
 }
 
