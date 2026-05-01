@@ -3,7 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "dotenv -e .env.local -- wrangler dev",
+    "dev": "wrangler dev --test-scheduled",
+    "tunnel:dev:setup": "dotenv -e .env.local -- node scripts/setup-dev-tunnel.mjs",
+    "tunnel:dev": "dotenv -e .env.local -- node scripts/run-dev-tunnel.mjs",
+    "webhook:dev": "dotenv -e .dev.vars -- node scripts/set-dev-webhook.mjs",
     "deploy": "dotenv -e .env.local -- wrangler deploy",
     "d1": "dotenv -e .env.local -- wrangler d1",
     "kv": "dotenv -e .env.local -- wrangler kv",
