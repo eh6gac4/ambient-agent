@@ -103,9 +103,11 @@ ambient-agent/
 │   ├── migrations/               # D1 スキーマ
 │   ├── scripts/
 │   │   ├── push-secrets.mjs      # Worker Secrets 一括登録
+│   │   ├── set-dev-webhook.mjs   # dev bot の Telegram webhook を tunnel URL に登録
 │   │   └── migrate-data.ts       # 既存 JSON → D1/KV 移行
 │   ├── wrangler.toml             # Cloudflare 設定（D1・KV・Cron）
-│   └── .env.local.example        # 環境変数テンプレート
+│   ├── .env.local.example        # 本番デプロイ用環境変数テンプレート
+│   └── .env.dev.local.example    # ローカル dev 環境用テンプレート
 ├── agent/                        # Python 実装（旧・参照用）
 ├── prompts/
 │   ├── extract_tasks.md          # タスク抽出プロンプト
@@ -197,9 +199,59 @@ cd cf-worker
 # テスト
 npm test
 
-# ローカル開発サーバー
+# ローカル開発サーバー（dev 環境セットアップ後）
 npm run dev
 
 # ログ監視（デプロイ済み Worker）
 npx dotenv -e .env.local -- wrangler tail --format=pretty
 ```
+
+### ローカル dev 環境
+
+本番にデプロイせず、ローカルで Telegram / cron を含めた挙動を検証できる。D1・KV は wrangler dev のローカルエミュレーションを使うため本番データと完全に分離される。Notion は dev 専用 DB（ダミーで OK）を別途用意し、Gmail / Calendar / Anthropic は本番と同じ認証情報を流用する。
+
+#### 一度だけのセットアップ
+
+1. **dev 用 Telegram bot を作成**: [@BotFather](https://t.me/BotFather) で `/newbot` → 別名で作成し、トークンを控える
+2. **dev 用 Notion DB を作成**: 既存タスク DB を Notion 上で複製（右クリック → 複製）→ インテグレーションを接続 → URL 末尾 32 文字を控える
+3. **cloudflared をインストール**: 一時的な公開 HTTPS URL を発行するため
+   - macOS: `brew install cloudflared`
+   - Linux: [公式ガイド](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)
+4. **環境変数ファイルを作成**:
+   ```bash
+   cp .env.dev.local.example .env.dev.local
+   # dev bot トークン・dev Notion DB ID を埋める
+   # Anthropic / Google は .env.local と同じ値で OK
+   ```
+
+#### 毎回の起動手順
+
+```bash
+# ターミナル1: dev サーバー起動
+cd cf-worker
+npm run dev   # http://localhost:8787 で待ち受け
+
+# ターミナル2: 一時 HTTPS URL を発行
+cloudflared tunnel --url http://localhost:8787
+# 出力に表示される https://<random>.trycloudflare.com を控える
+
+# ターミナル3: dev bot の webhook を tunnel URL に登録
+cd cf-worker
+npm run webhook:dev -- https://<random>.trycloudflare.com
+
+# 終了時（任意）: dev bot の webhook を解除
+npm run webhook:dev -- delete
+```
+
+dev bot にメッセージを送ると、ローカル Worker が処理し、ログがターミナル1に出る。
+
+#### cron ジョブの手動実行
+
+`wrangler dev --test-scheduled` 起動済みなので、以下で個別ジョブを発火できる:
+
+```bash
+# 例: 13:00 task_reminder ジョブを実行
+curl "http://localhost:8787/__scheduled?cron=0+4+*+*+*"
+```
+
+`cron` クエリは `wrangler.toml` の cron 文字列をスペース区切り → `+` 置換した値を使う。
