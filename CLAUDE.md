@@ -17,6 +17,21 @@ cd cf-worker && npx wrangler tail
 - master への直接 push はしない。
 - コミット前に全テストをパスさせる: `pytest` または `docker compose run --rm agent pytest`
 
+## 開発フロー
+
+`cf-worker/` 配下のコード変更を伴う機能開発では、dev 環境（`npm run dev` + `npm run tunnel:dev`）を **Claude が自動で起動・停止する**。ユーザーは手動でコマンドを叩かない。
+
+- **起動タイミング**: `cf-worker/src/`・`cf-worker/test/`・`cf-worker/wrangler.toml` 等を変更する feat/fix ブランチに着手する直前に、バックグラウンドで両プロセスを起動する
+  - ターミナル1: `cd cf-worker && npm run dev`
+  - ターミナル2: `cd cf-worker && npm run tunnel:dev`
+- **停止タイミング**: 対応 PR がマージされたタイミングで両プロセスを `TaskStop` で停止する
+- **対象外**: ドキュメントのみの変更、`cf-worker/` 外の変更、READ-ONLY な調査タスクでは起動不要
+- 既に起動中なら再起動しない（バックグラウンド task ID をセッション内で管理）
+- ユーザーが「起動しないで」と明示した場合は従う
+- dev URL は固定: `https://dev-bot.eh6gac4.work`（再登録不要）
+
+詳細手順は `README.md`「ローカル dev 環境」を参照。
+
 ## 重要な注意事項
 
 - **メインの実行環境は Cloudflare Workers（`cf-worker/`）。** Docker は使用しない。
