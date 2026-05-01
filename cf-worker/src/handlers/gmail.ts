@@ -3,6 +3,7 @@ import { listAllMessages, getMessage, parseMessage, isCalendarInvite, archiveMes
 import { analyzeEmail } from "../clients/anthropic.js";
 import { addTask, updateTaskFromReply, getTaskStatus } from "../clients/notion.js";
 import { sendMessage, escapeMd } from "../clients/telegram.js";
+import { taskLink } from "./telegram.js";
 import {
   getThreadMapEntry,
   setThreadMapEntry,
@@ -75,7 +76,7 @@ export async function checkGmail(env: Env, options: CheckGmailOptions = {}): Pro
           await updateTaskFromReply(env, existingPageId, checklist, best.priority, dues[0] ?? null, body);
           if (taskLabelId) await addLabel(env, meta.id, taskLabelId);
           taskLines.push(
-            `• *${escapeMd(subject)}*（更新）\n  ${escapeMd(summary)}\n  → ${checklist.map(escapeMd).join("、")}\n  [📧 Gmail で開く](${gmailUrl})`,
+            `• *${escapeMd(subject)}*（更新）\n  ${escapeMd(summary)}\n  → ${checklist.map(escapeMd).join("、")}\n  ${taskLink(existingPageId)}`,
           );
         } else {
           const pageId = await addTask(
@@ -89,8 +90,9 @@ export async function checkGmail(env: Env, options: CheckGmailOptions = {}): Pro
             await setSenderForTask(env, pageId, senderEmail);
             if (taskLabelId) await addLabel(env, meta.id, taskLabelId);
           }
+          const link = pageId ? taskLink(pageId) : `[📧 Gmail で開く](${gmailUrl})`;
           taskLines.push(
-            `• *${escapeMd(subject)}*\n  ${escapeMd(summary)}\n  → ${checklist.map(escapeMd).join("、")}\n  [📧 Gmail で開く](${gmailUrl})`,
+            `• *${escapeMd(subject)}*\n  ${escapeMd(summary)}\n  → ${checklist.map(escapeMd).join("、")}\n  ${link}`,
           );
         }
       } else {
