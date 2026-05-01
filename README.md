@@ -102,12 +102,14 @@ ambient-agent/
 │   ├── test/                     # Vitest テスト（84件）
 │   ├── migrations/               # D1 スキーマ
 │   ├── scripts/
-│   │   ├── push-secrets.mjs      # Worker Secrets 一括登録
-│   │   ├── set-dev-webhook.mjs   # dev bot の Telegram webhook を tunnel URL に登録
-│   │   └── migrate-data.ts       # 既存 JSON → D1/KV 移行
-│   ├── wrangler.toml             # Cloudflare 設定（D1・KV・Cron）
-│   ├── .env.local.example        # 本番デプロイ用環境変数テンプレート
-│   └── .env.dev.local.example    # ローカル dev 環境用テンプレート
+│   │   ├── push-secrets.mjs       # Worker Secrets 一括登録
+│   │   ├── setup-dev-tunnel.mjs   # dev 用 Cloudflare Named Tunnel + DNS をセットアップ
+│   │   ├── run-dev-tunnel.mjs     # cloudflared を connector token で起動
+│   │   ├── set-dev-webhook.mjs    # dev bot の Telegram webhook を登録/解除
+│   │   └── migrate-data.ts        # 既存 JSON → D1/KV 移行
+│   ├── wrangler.toml              # Cloudflare 設定（D1・KV・Cron）
+│   ├── .env.local.example         # 本番デプロイ用環境変数テンプレート
+│   └── .dev.vars.example          # ローカル dev 用 secrets テンプレート
 ├── agent/                        # Python 実装（旧・参照用）
 ├── prompts/
 │   ├── extract_tasks.md          # タスク抽出プロンプト
@@ -208,20 +210,31 @@ npx dotenv -e .env.local -- wrangler tail --format=pretty
 
 ### ローカル dev 環境
 
-本番にデプロイせず、ローカルで Telegram / cron を含めた挙動を検証できる。D1・KV は wrangler dev のローカルエミュレーションを使うため本番データと完全に分離される。Notion は dev 専用 DB（ダミーで OK）を別途用意し、Gmail / Calendar / Anthropic は本番と同じ認証情報を流用する。
+本番にデプロイせず、ローカルで Telegram / cron を含めた挙動を検証できる。D1・KV は wrangler dev のローカルエミュレーションで本番と完全分離。Notion は dummy（dev 専用 DB を作っても可）、Gmail / Calendar / Anthropic は本番と同じ認証情報を流用する。
+
+公開 URL には Cloudflare Named Tunnel（`dev-bot.eh6gac4.work`）を使い、connector token は API から都度取得するためローカル保存しない。
 
 #### 一度だけのセットアップ
 
 1. **dev 用 Telegram bot を作成**: [@BotFather](https://t.me/BotFather) で `/newbot` → 別名で作成し、トークンを控える
-2. **dev 用 Notion DB を作成**: 既存タスク DB を Notion 上で複製（右クリック → 複製）→ インテグレーションを接続 → URL 末尾 32 文字を控える
-3. **cloudflared をインストール**: 一時的な公開 HTTPS URL を発行するため
+2. **cloudflared をインストール**:
    - macOS: `brew install cloudflared`
    - Linux: [公式ガイド](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)
-4. **環境変数ファイルを作成**:
+3. **`.env.local` を整備**: `CLOUDFLARE_API_TOKEN` には Account → Cloudflare Tunnel: Edit と Zone → DNS: Edit (`eh6gac4.work`) の権限を付与する
+4. **`.dev.vars` を作成** (`wrangler dev` のローカル secret オーバーライド):
    ```bash
-   cp .env.dev.local.example .env.dev.local
-   # dev bot トークン・dev Notion DB ID を埋める
-   # Anthropic / Google は .env.local と同じ値で OK
+   cp .dev.vars.example .dev.vars
+   # TELEGRAM_BOT_TOKEN を dev bot の値に
+   # Notion は dummy のまま、Anthropic / Google は .env.local と同じ値を入れる
+   ```
+5. **Tunnel + DNS をセットアップ** (idempotent):
+   ```bash
+   npm run tunnel:dev:setup
+   # tunnel "ambient-agent-dev" を作成、DNS CNAME (dev-bot.eh6gac4.work) を作成
+   ```
+6. **dev bot の webhook を登録** (URL は固定なので一度だけ):
+   ```bash
+   npm run webhook:dev -- https://dev-bot.eh6gac4.work
    ```
 
 #### 毎回の起動手順
@@ -231,19 +244,11 @@ npx dotenv -e .env.local -- wrangler tail --format=pretty
 cd cf-worker
 npm run dev   # http://localhost:8787 で待ち受け
 
-# ターミナル2: 一時 HTTPS URL を発行
-cloudflared tunnel --url http://localhost:8787
-# 出力に表示される https://<random>.trycloudflare.com を控える
-
-# ターミナル3: dev bot の webhook を tunnel URL に登録
-cd cf-worker
-npm run webhook:dev -- https://<random>.trycloudflare.com
-
-# 終了時（任意）: dev bot の webhook を解除
-npm run webhook:dev -- delete
+# ターミナル2: cloudflared tunnel 起動
+npm run tunnel:dev   # API から token 取得 → cloudflared を spawn
 ```
 
-dev bot にメッセージを送ると、ローカル Worker が処理し、ログがターミナル1に出る。
+`@amby_dev_bot` にメッセージを送ると、Cloudflare edge → tunnel → ローカル Worker と流れ、ターミナル1にログが出る。Notion 関連のコマンドは dummy creds で 401 になる（想定通り）。
 
 #### cron ジョブの手動実行
 
