@@ -22,18 +22,57 @@ load_dotenv(ROOT / ".env")
 from agent.telegram_notifier import send_message
 
 MAX_CHARS = 4000  # Telegram メッセージ上限 4096 の余裕分
+TAIL_CHARS = 1500  # stdout/stderr ごとの抜粋上限
+
+_ERROR_PATTERNS: list[tuple[tuple[str, ...], str]] = [
+    (("credit balance", "billing_error"), "💳 Anthropic API クレジット残高不足 (console.anthropic.com でチャージ)"),
+    (("rate_limit", "rate limit", "429"), "⏱️ Anthropic API レート制限"),
+    (("invalid_api_key", "authentication_error", "401"), "🔐 認証エラー (ANTHROPIC_API_KEY を確認)"),
+    (("messages are required for agent hooks",), "🪝 Agent hook バグ (.claude/settings.local.json の hooks を確認)"),
+    (("context_length", "context window", "prompt is too long"), "📏 コンテキスト長超過"),
+    (("overloaded",), "🚧 Anthropic API 過負荷"),
+]
 
 
 def _run(cmd: list[str], **kwargs) -> subprocess.CompletedProcess:
     return subprocess.run(cmd, capture_output=True, text=True, cwd=str(ROOT), **kwargs)
 
 
+def _tail(text: str, n: int = TAIL_CHARS) -> str:
+    return text if len(text) <= n else "…(省略)…\n" + text[-n:]
+
+
+def _detect_cause(combined: str) -> str:
+    if not combined:
+        return ""
+    low = combined.lower()
+    for keywords, message in _ERROR_PATTERNS:
+        if any(k in low for k in keywords):
+            return message
+    return ""
+
+
+def _format_error(title: str, returncode: int, stdout: str, stderr: str) -> str:
+    out = stdout.strip()
+    err = stderr.strip()
+    cause = _detect_cause(out + "\n" + err) if (out or err) else ""
+    parts = [f"⚠️ *{title}* (exit {returncode})"]
+    if cause:
+        parts.append(f"原因: {cause}")
+    if out:
+        parts.append(f"*stdout*\n```\n{_tail(out)}\n```")
+    if err:
+        parts.append(f"*stderr*\n```\n{_tail(err)}\n```")
+    if not out and not err:
+        parts.append("_出力なし_")
+    return "\n\n".join(parts)[:MAX_CHARS]
+
+
 def main():
     # /simplify 実行
     result = _run(["/home/ctoshiki/.local/bin/claude", "-p", "/simplify\n\nすべての出力・コメント・説明は日本語で記述してください。", "--output-format", "text"])
     if result.returncode != 0:
-        stderr = result.stderr.strip()
-        send_message(f"⚠️ /simplify 実行エラー (exit {result.returncode})\n\n```\n{stderr[:MAX_CHARS]}\n```")
+        send_message(_format_error("/simplify 実行エラー", result.returncode, result.stdout, result.stderr))
         return
 
     # 変更があるか確認
@@ -65,7 +104,7 @@ def main():
     ])
 
     if pr_result.returncode != 0:
-        send_message(f"⚠️ PR 作成に失敗しました\n\n```\n{pr_result.stderr.strip()[:MAX_CHARS]}\n```")
+        send_message(_format_error("PR 作成失敗", pr_result.returncode, pr_result.stdout, pr_result.stderr))
         return
 
     pr_url = pr_result.stdout.strip()
