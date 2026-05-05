@@ -16,6 +16,7 @@ export interface Env {
   COST_REPORT_HOUR?: string;
   GMAIL_TASK_LABEL?: string;
   GMAIL_ACCOUNT_INDEX?: string;
+  ADMIN_TOKEN?: string;
 }
 
 export interface Task {

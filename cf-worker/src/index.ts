@@ -24,12 +24,20 @@ async function morningBriefing(env: Env): Promise<void> {
   await sendEmailDigest(env);
 }
 
-const CRON_JOBS: Record<string, (env: Env) => Promise<void>> = {
-  "30 22-23,0-12 * * *": hourlyGmail,  // 毎時30分 (JST 07:30-21:30): silent gmail batch
-  "50 22 * * *": morningPrep,          // 07:50 JST: learn→calendar→escalation
-  "0 23 * * *": morningBriefing,       // 08:00 JST: briefing→cost→due_soon→email_digest
-  "0 4 * * *": sendTaskReminder,       // 13:00 JST
-  "0 0 * * 1": sendStaleTasksNotice,   // 月 09:00 JST
+const JOBS: Record<string, (env: Env) => Promise<void>> = {
+  hourlyGmail,
+  morningPrep,
+  morningBriefing,
+  taskReminder: sendTaskReminder,
+  staleTasksNotice: sendStaleTasksNotice,
+};
+
+const CRON_JOBS: Record<string, keyof typeof JOBS> = {
+  "30 22-23,0-12 * * *": "hourlyGmail",  // 毎時30分 (JST 07:30-21:30): silent gmail batch
+  "50 22 * * *": "morningPrep",          // 07:50 JST: learn→calendar→escalation
+  "0 23 * * *": "morningBriefing",       // 08:00 JST: briefing→cost→due_soon→email_digest
+  "0 4 * * *": "taskReminder",           // 13:00 JST
+  "0 0 * * 1": "staleTasksNotice",       // 月 09:00 JST
 };
 
 export default {
@@ -46,21 +54,41 @@ export default {
       return new Response("OK");
     }
 
+    if (url.pathname === "/admin/run" && req.method === "POST") {
+      const expected = env.ADMIN_TOKEN;
+      if (!expected) return new Response("ADMIN_TOKEN not configured", { status: 503 });
+      const auth = req.headers.get("authorization") ?? "";
+      const provided = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+      if (provided !== expected) return new Response("unauthorized", { status: 401 });
+
+      const jobName = url.searchParams.get("job") ?? "";
+      const job = JOBS[jobName];
+      if (!job) {
+        return new Response(`unknown job: ${jobName}. valid: ${Object.keys(JOBS).join(", ")}`, { status: 400 });
+      }
+      try {
+        await job(env);
+        return new Response(`ok: ${jobName}\n`);
+      } catch (err) {
+        console.error(`admin/run ${jobName} failed:`, err);
+        return new Response(`error: ${err}\n`, { status: 500 });
+      }
+    }
+
     return new Response("ambient-agent", { status: 200 });
   },
 
   async scheduled(event: ScheduledEvent, env: Env): Promise<void> {
-    const job = CRON_JOBS[event.cron];
-    if (!job) {
+    const jobName = CRON_JOBS[event.cron];
+    if (!jobName) {
       console.warn("Unknown cron:", event.cron);
       return;
     }
 
     try {
-      await job(env);
+      await JOBS[jobName](env);
     } catch (err) {
-      const jobName = Object.entries(CRON_JOBS).find(([, fn]) => fn === job)?.[0] ?? event.cron;
-      const msg = `⚠️ *Ambient Agent エラー*\nJob: \`${jobName}\`\n\`\`\`\n${err}\n\`\`\``;
+      const msg = `⚠️ *Ambient Agent エラー*\nJob: \`${jobName}\` (\`${event.cron}\`)\n\`\`\`\n${err}\n\`\`\``;
       console.error(msg, err);
       try {
         await sendMessage(env, msg);

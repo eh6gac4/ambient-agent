@@ -176,6 +176,7 @@ npm run secrets:push
 | `GOOGLE_CLIENT_ID` | Google Cloud Console → 認証情報 |
 | `GOOGLE_CLIENT_SECRET` | 同上 |
 | `GOOGLE_REFRESH_TOKEN` | `data/token.json` の `refresh_token` |
+| `ADMIN_TOKEN` | `openssl rand -hex 32` で生成（`/admin/run` の Bearer 認証用、任意） |
 
 ### 5. デプロイ & Webhook 登録
 
@@ -260,3 +261,20 @@ curl "http://localhost:8787/__scheduled?cron=0+4+*+*+*"
 ```
 
 `cron` クエリは `wrangler.toml` の cron 文字列をスペース区切り → `+` 置換した値を使う。
+
+### 本番ジョブの手動再実行 (`/admin/run`)
+
+朝のジョブが失敗した場合などに、本番 Worker のジョブをジョブ名で再実行できる。`ADMIN_TOKEN`（`wrangler secret put ADMIN_TOKEN` で登録）を Bearer 認証に使う。
+
+```bash
+TOKEN=$(cat /path/to/admin_token)
+URL="https://ambient-agent.toshiki-cho-dev.workers.dev/admin/run"
+
+# morning_prep を再実行
+curl -X POST -H "Authorization: Bearer $TOKEN" "$URL?job=morningPrep"
+
+# morning_briefing を再実行
+curl -X POST -H "Authorization: Bearer $TOKEN" "$URL?job=morningBriefing"
+```
+
+利用可能な `job` 名: `hourlyGmail` / `morningPrep` / `morningBriefing` / `taskReminder` / `staleTasksNotice`。`ADMIN_TOKEN` 未設定なら 503、トークン不一致なら 401、未知のジョブ名なら 400 を返す。

@@ -26,3 +26,9 @@ ANTHROPIC_API_KEY=sk-ant-
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 GOOGLE_REFRESH_TOKEN=
+
+# ------------------------------------------------------------
+# /admin/run 用トークン（手動でジョブ再実行する際の Bearer 認証）
+# `openssl rand -hex 32` で生成した値を入れる。本番は wrangler secret put ADMIN_TOKEN
+# ------------------------------------------------------------
+ADMIN_TOKEN=
