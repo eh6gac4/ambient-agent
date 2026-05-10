@@ -31,22 +31,14 @@ function isCalendarInvite(payload: GmailPayload): boolean {
   return (payload.parts ?? []).some(isCalendarInvite);
 }
 
-function extractCharset(payload: GmailPayload): string {
-  const ct = (payload.headers ?? []).find((h) => h.name.toLowerCase() === "content-type")?.value ?? "";
-  const m = ct.match(/charset\s*=\s*"?([^";]+)"?/i);
-  return m ? m[1].trim().toLowerCase() : "utf-8";
-}
+// Gmail API は body.data を元メールの charset に関係なく UTF-8 へ正規化して返すため、
+// Content-Type ヘッダの charset= は無視して常に UTF-8 でデコードする。
+const UTF8_DECODER = new TextDecoder("utf-8");
 
-function decodeBase64Url(data: string, charset: string): string {
+function decodeBase64Url(data: string): string {
   const binary = atob(data.replace(/-/g, "+").replace(/_/g, "/"));
   const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
-  let decoder: TextDecoder;
-  try {
-    decoder = new TextDecoder(charset);
-  } catch {
-    decoder = new TextDecoder("utf-8");
-  }
-  return decoder.decode(bytes);
+  return UTF8_DECODER.decode(bytes);
 }
 
 function extractBody(payload: GmailPayload): string {
@@ -54,7 +46,7 @@ function extractBody(payload: GmailPayload): string {
     const data = payload.body?.data ?? "";
     if (!data) return "";
     try {
-      return decodeBase64Url(data, extractCharset(payload));
+      return decodeBase64Url(data);
     } catch {
       return "";
     }

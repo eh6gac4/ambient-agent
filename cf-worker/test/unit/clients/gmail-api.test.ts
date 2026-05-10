@@ -77,8 +77,11 @@ describe("parseMessage body decoding", () => {
     expect(parseMessage(msg as never).body).toBe(body);
   });
 
-  it("falls back to UTF-8 for unsupported charset label", () => {
-    const body = "サポート外 charset でもUTF-8として読む";
+  it("decodes as UTF-8 even when Content-Type declares charset=ISO-2022-JP (Gmail normalizes body to UTF-8)", () => {
+    // Gmail API は元メールの charset に関係なく body.data を UTF-8 バイト列で返すが、
+    // Content-Type ヘッダは元メールの宣言値（例: ISO-2022-JP）が残る。
+    // charset を信用して ISO-2022-JP デコーダに通すと UTF-8 バイト列が壊れるため、常に UTF-8 で読む。
+    const body = "利用者ID　0017902933　様\r\nまもなく下記の資料の返却期限日となりますので、お知らせいたします。";
     const msg = {
       id: "m4",
       threadId: "t4",
@@ -87,7 +90,7 @@ describe("parseMessage body decoding", () => {
         headers: [
           { name: "Subject", value: "x" },
           { name: "From", value: "x@example.com" },
-          { name: "Content-Type", value: "text/plain; charset=x-unknown-codec" },
+          { name: "Content-Type", value: "text/plain; charset=ISO-2022-JP" },
         ],
         body: { data: utf8B64Url(body) },
       },
