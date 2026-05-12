@@ -17,6 +17,7 @@ const EXTRACT_TASKS_PROMPT = `あなたはメールからタスクを抽出す�
     "title": "タスクのタイトル（簡潔に）",
     "due": "YYYY-MM-DD または YYYY-MM-DDTHH:MM または null（時刻が明示されていれば時刻付きで返す）",
     "priority": "high | medium | low",
+    "icon": "タスク内容を端的に表す絵文字を1文字（例: 📩 返信 / 📅 予定 / 💰 支払い / 📝 提出 / 🔍 確認 / 🛒 買い物）",
     "source": "Gmail"
   }
 ]
@@ -26,6 +27,7 @@ const EXTRACT_TASKS_PROMPT = `あなたはメールからタスクを抽出す�
 - 返信・確認・提出・対応などのアクション動詞を含む文をタスクとして抽出する
 - 期日が明示されていればそれを due に設定する（不明な場合は null）
 - 緊急・至急・本日中 → high、それ以外は medium を基本とする
+- icon: タスクの性質（返信・予定・支払い・確認・買い物 等）を最もよく表す絵文字を Unicode 1 文字だけ返す。迷ったら 📋
 - 広告・通知・ニュースレターからはタスクを抽出しない`;
 
 const ANALYZE_EMAIL_PROMPT = `あなたはメールを分析するアシスタントです。
@@ -42,6 +44,7 @@ const ANALYZE_EMAIL_PROMPT = `あなたはメールを分析するアシスタ�
       "title": "タスクのタイトル（簡潔に）",
       "due": "YYYY-MM-DD または YYYY-MM-DDTHH:MM または null",
       "priority": "high | medium | low",
+      "icon": "タスク内容を端的に表す絵文字を1文字（例: 📩 返信 / 📅 予定 / 💰 支払い / 📝 提出 / 🔍 確認 / 🛒 買い物）",
       "source": "Gmail"
     }
   ]
@@ -53,6 +56,7 @@ const ANALYZE_EMAIL_PROMPT = `あなたはメールを分析するアシスタ�
 - tasks: 返信・確認・提出・対応などのアクション動詞を含む文をタスクとして抽出する
 - 期日が明示されていればそれを due に設定する（不明な場合は null）
 - 緊急・至急・本日中 → high、それ以外は medium を基本とする
+- icon: タスクの性質（返信・予定・支払い・確認・買い物 等）を最もよく表す絵文字を Unicode 1 文字だけ返す。迷ったら 📋
 - 広告・通知・ニュースレターからはタスクを抽出せず tasks は []`;
 
 interface AnthropicResponse {
@@ -156,6 +160,7 @@ const ANALYZE_IMAGE_PROMPT = `あなたは画像からタスクを分析する�
       "title": "具体的にやること（簡潔に）",
       "due": "YYYY-MM-DD または null",
       "priority": "high | medium | low",
+      "icon": "タスク内容を端的に表す絵文字を1文字（例: 🧾 レシート / 📝 メモ / 🛒 買い物 / 💰 支払い / 📅 予定 / 🔍 確認）",
       "source": "Telegram"
     }
   ]
@@ -166,7 +171,8 @@ const ANALYZE_IMAGE_PROMPT = `あなたは画像からタスクを分析する�
 - summary: 「何の画像か / なぜ撮ったと考えられるか」を1文に。タスク登録時のタイトルになるので具体的に
 - tasks: 関連する一連のアクションは細切れにせず、できるだけ少ない数にまとめる
 - 期日が画像内に明示されていれば due に設定する（不明なら null）
-- 緊急・至急 → high、通常 → medium`;
+- 緊急・至急 → high、通常 → medium
+- icon: タスクの性質（レシート整理・メモ転記・買い物・支払い・予定登録 等）を最もよく表す絵文字を Unicode 1 文字だけ返す。迷ったら 📋`;
 
 export async function analyzeImage(env: Env, imageData: ArrayBuffer, mediaType: string): Promise<EmailAnalysis> {
   const userContent = [

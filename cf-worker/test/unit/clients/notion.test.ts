@@ -89,6 +89,28 @@ describe("addTask", () => {
     expect(lastChunk).toContain("…(以下省略)");
   });
 
+  it("sets page icon when icon is provided", async () => {
+    const env = createMockEnv();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(notionFixtures.createResponse), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await addTask(env, { title: "絵文字アイコン付き", icon: "📩" });
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.icon).toEqual({ type: "emoji", emoji: "📩" });
+  });
+
+  it("omits icon field when not provided", async () => {
+    const env = createMockEnv();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(notionFixtures.createResponse), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await addTask(env, { title: "アイコンなし" });
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.icon).toBeUndefined();
+  });
+
   it("does not append body blocks when bodyText is empty", async () => {
     const env = createMockEnv();
     const fetchMock = vi.fn()

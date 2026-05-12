@@ -196,6 +196,10 @@ export async function addTask(
     properties,
   };
 
+  if (task.icon) {
+    body.icon = { type: "emoji", emoji: task.icon };
+  }
+
   const checklistBlocks = (checklist ?? []).map((item) => ({
     object: "block",
     type: "to_do",

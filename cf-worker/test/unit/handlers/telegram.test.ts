@@ -81,7 +81,7 @@ describe("handleTelegramWebhook", () => {
     await handleTelegramWebhook(env, telegramFixtures.addCommand);
     expect(addTask).toHaveBeenCalledWith(
       env,
-      expect.objectContaining({ title: "資料を確認する", source: "Telegram" }),
+      expect.objectContaining({ title: "資料を確認する", source: "Telegram", icon: "📌" }),
     );
     expect(sendMessage).toHaveBeenCalledWith(
       env,
@@ -99,7 +99,7 @@ describe("handleTelegramWebhook", () => {
   });
 
   it("photo message: consolidates all extracted tasks into ONE Notion task with image attached", async () => {
-    const env = createMockEnv();
+    const env = createMockEnv({ OPERATING_START_HOUR: "0", OPERATING_END_HOUR: "24" });
     const { addTask, uploadImageToNotion } = await import("../../../src/clients/notion.js");
     const { analyzeImage } = await import("../../../src/clients/anthropic.js");
     const { getFileUrl } = await import("../../../src/clients/telegram.js");
@@ -135,7 +135,7 @@ describe("handleTelegramWebhook", () => {
   });
 
   it("photo message: largest photo is selected", async () => {
-    const env = createMockEnv();
+    const env = createMockEnv({ OPERATING_START_HOUR: "0", OPERATING_END_HOUR: "24" });
     const { getFileUrl } = await import("../../../src/clients/telegram.js");
 
     (getFileUrl as ReturnType<typeof vi.fn>).mockResolvedValue("https://api.telegram.org/file/bot/photo.jpg");

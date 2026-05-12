@@ -79,7 +79,7 @@ async function handleCommand(env: Env, text: string): Promise<void> {
         await sendMessage(env, "使い方: `/add 〇〇を確認する`");
         return;
       }
-      const id = await addTask(env, { title: arg, source: "Telegram", priority: "medium" });
+      const id = await addTask(env, { title: arg, source: "Telegram", priority: "medium", icon: "📌" });
       const link = id ? `\n\n${taskLink(id)}` : "";
       await sendMessage(env, `✅ タスクを追加しました\n\n*${arg}*${link}`);
       return;
@@ -227,12 +227,12 @@ async function handlePhoto(env: Env, message: Record<string, unknown>): Promise<
   const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
   const best = tasks.length
     ? tasks.reduce((a, b) => ((priorityOrder[a.priority] ?? 1) <= (priorityOrder[b.priority] ?? 1) ? a : b))
-    : { priority: "medium" as const };
+    : { priority: "medium" as const, icon: "🖼" as string | undefined };
   const title = (summary || tasks[0]?.title || "📷 画像メモ").slice(0, 200);
 
   const id = await addTask(
     env,
-    { title, due: dues[0] ?? null, priority: best.priority, source: "Telegram" },
+    { title, due: dues[0] ?? null, priority: best.priority, icon: best.icon, source: "Telegram" },
     checklist,
     undefined,
     uploadId ?? undefined,
@@ -261,7 +261,9 @@ async function handleUrl(env: Env, url: string): Promise<void> {
   }
 
   const tasks = await extractTasksFromUrlContent(env, url, content);
-  const finalTasks = tasks.length ? tasks : [{ title: `${pageTitle}を確認する`, due: null, priority: "medium" as const }];
+  const finalTasks = tasks.length
+    ? tasks
+    : [{ title: `${pageTitle}を確認する`, due: null, priority: "medium" as const, icon: "🔍" }];
 
   const created: Array<{ title: string; id: string | null }> = [];
   for (const task of finalTasks) {
