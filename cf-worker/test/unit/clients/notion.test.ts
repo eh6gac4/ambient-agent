@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { addTask, getOpenTasks, completeTask, cancelTask, updateTaskDue, escalatePriorityTasks } from "../../../src/clients/notion.js";
+import { addTask, getOpenTasks, completeTask, cancelTask, updateTaskDue, escalatePriorityTasks, sanitizeEmoji } from "../../../src/clients/notion.js";
 import { createMockEnv } from "../../helpers/mocks.js";
 import notionFixtures from "../../fixtures/notion-tasks.json" assert { type: "json" };
 
@@ -109,6 +109,20 @@ describe("addTask", () => {
     await addTask(env, { title: "アイコンなし" });
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(body.icon).toBeUndefined();
+  });
+
+  it("drops invalid icon and still creates the task (no 400 from Notion)", async () => {
+    const env = createMockEnv();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(notionFixtures.createResponse), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    // LLM が絵文字でなく説明文を返したケース
+    const id = await addTask(env, { title: "不正アイコン", icon: "📩 返信" });
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.icon).toBeUndefined();
+    expect(body.properties).toBeDefined();
+    expect(id).toBe(notionFixtures.createResponse.id);
   });
 
   it("does not append body blocks when bodyText is empty", async () => {
@@ -233,5 +247,34 @@ describe("escalatePriorityTasks", () => {
     const escalated = await escalatePriorityTasks(env);
     expect(escalated).toHaveLength(1);
     expect(escalated[0].title).toBe("緊急タスク");
+  });
+});
+
+describe("sanitizeEmoji", () => {
+  it("keeps a plain single emoji", () => {
+    expect(sanitizeEmoji("📩")).toBe("📩");
+  });
+
+  it("keeps emoji with variation selector / ZWJ sequence / skin tone / flag / keycap", () => {
+    expect(sanitizeEmoji("✋️")).toBe("✋️");
+    expect(sanitizeEmoji("🧑‍💻")).toBe("🧑‍💻");
+    expect(sanitizeEmoji("👍🏽")).toBe("👍🏽");
+    expect(sanitizeEmoji("🇯🇵")).toBe("🇯🇵");
+    expect(sanitizeEmoji("1️⃣")).toBe("1️⃣");
+  });
+
+  it("trims surrounding whitespace", () => {
+    expect(sanitizeEmoji("  📅 ")).toBe("📅");
+  });
+
+  it("drops non-emoji / mixed / empty input", () => {
+    expect(sanitizeEmoji(undefined)).toBeUndefined();
+    expect(sanitizeEmoji("")).toBeUndefined();
+    expect(sanitizeEmoji("   ")).toBeUndefined();
+    expect(sanitizeEmoji("返信")).toBeUndefined();
+    expect(sanitizeEmoji("task")).toBeUndefined();
+    expect(sanitizeEmoji("📩 返信")).toBeUndefined();
+    expect(sanitizeEmoji(":email:")).toBeUndefined();
+    expect(sanitizeEmoji("9".repeat(20))).toBeUndefined();
   });
 });

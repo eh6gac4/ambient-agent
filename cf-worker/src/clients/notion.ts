@@ -12,6 +12,23 @@ const STATUS_CANCELLED = "中止";
 const EMAIL_BODY_MAX_CHARS = 10000;
 const NOTION_RICH_TEXT_MAX = 2000;
 
+// LLM が "返信" や "📩 返信" のような非絵文字/混在文字列を返すと
+// Notion の icon.emoji が 400 で拒否され、タスク登録ごと失敗する。
+// 絵文字（ZWJ シーケンス・肌色修飾・国旗・キーキャップ含む）のみ通し、
+// それ以外は undefined を返して icon を付けずに登録を継続させる。
+const EMOJI_ALLOWED_RE =
+  /^(?:\p{Extended_Pictographic}|\p{Emoji_Modifier}|\p{Regional_Indicator}|[\u200D\uFE0F\u20E3#*0-9])+$/u;
+const EMOJI_REQUIRED_RE = /[\p{Extended_Pictographic}\p{Regional_Indicator}\u20E3]/u;
+
+export function sanitizeEmoji(icon?: string): string | undefined {
+  if (!icon) return undefined;
+  const trimmed = icon.trim();
+  if (!trimmed || trimmed.length > 16) return undefined;
+  if (!EMOJI_ALLOWED_RE.test(trimmed)) return undefined;
+  if (!EMOJI_REQUIRED_RE.test(trimmed)) return undefined;
+  return trimmed;
+}
+
 function buildEmailBodyBlocks(bodyText: string, headingLabel: string): Array<Record<string, unknown>> {
   const trimmed = bodyText.trim();
   if (!trimmed) return [];
@@ -196,8 +213,9 @@ export async function addTask(
     properties,
   };
 
-  if (task.icon) {
-    body.icon = { type: "emoji", emoji: task.icon };
+  const emoji = sanitizeEmoji(task.icon);
+  if (emoji) {
+    body.icon = { type: "emoji", emoji };
   }
 
   const checklistBlocks = (checklist ?? []).map((item) => ({
