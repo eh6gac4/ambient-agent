@@ -28,6 +28,13 @@ vi.mock("../../../src/clients/telegram.js", () => ({
   escapeMd: (t: string) => t,
 }));
 
+vi.mock("../../../src/handlers/calendar.js", () => ({
+  syncTaskCalendarEventSafe: vi.fn().mockResolvedValue(undefined),
+  deleteCalendarEventForTask: vi.fn().mockResolvedValue(undefined),
+  getTodaysEvents: vi.fn().mockResolvedValue([]),
+  syncCalendar: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("../../../src/storage/d1.js", () => ({
   getThreadMapEntry: vi.fn(),
   setThreadMapEntry: vi.fn().mockResolvedValue(undefined),
@@ -75,6 +82,11 @@ describe("checkGmail", () => {
       expect.objectContaining({ title: "プロジェクトの進捗確認", source: "Gmail" }),
       ["進捗を報告する"],
       "内容",
+    );
+    const { syncTaskCalendarEventSafe } = await import("../../../src/handlers/calendar.js");
+    expect(syncTaskCalendarEventSafe).toHaveBeenCalledWith(
+      env,
+      { pageId: "page-new-001", title: "プロジェクトの進捗確認", due: "2026-04-30" },
     );
   });
 

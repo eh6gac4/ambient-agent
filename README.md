@@ -43,6 +43,10 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 - 完了済みタスクのカレンダーイベントを削除、未着手タスクを Calendar に登録
 - 期限3日以内の medium タスクを high に昇格
 
+**カレンダー登録のタイミング:**
+- 期日付きタスクは作成時（Gmail / Telegram テキスト・画像・URL）に即座に Calendar へ登録（同日時刻指定タスクの取りこぼし防止）
+- morning_prep の同期は補完用。重複防止は D1 `calendar_sync` で行い、dedup キーは「期日時刻」単位（同一日付で時刻だけ変わっても反映）
+
 **morning_briefing の詳細:**
 - 直近 24 時間に hourly_gmail が処理したメールをまとめて1通の「📧 メール処理サマリ」として Telegram 送信
 

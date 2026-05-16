@@ -4,6 +4,7 @@ import { analyzeEmail } from "../clients/anthropic.js";
 import { addTask, updateTaskFromReply, getTaskStatus } from "../clients/notion.js";
 import { sendMessage, escapeMd } from "../clients/telegram.js";
 import { taskLink } from "./telegram.js";
+import { syncTaskCalendarEventSafe } from "./calendar.js";
 import {
   getThreadMapEntry,
   setThreadMapEntry,
@@ -89,6 +90,7 @@ export async function checkGmail(env: Env, options: CheckGmailOptions = {}): Pro
             if (threadId) await setThreadMapEntry(env, threadId, pageId);
             await setSenderForTask(env, pageId, senderEmail);
             if (taskLabelId) await addLabel(env, meta.id, taskLabelId);
+            await syncTaskCalendarEventSafe(env, { pageId, title: subject, due: dues[0] ?? null });
           }
           const link = pageId ? taskLink(pageId) : `[📧 Gmail で開く](${gmailUrl})`;
           taskLines.push(
