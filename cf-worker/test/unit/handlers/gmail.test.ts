@@ -78,6 +78,38 @@ describe("checkGmail", () => {
     );
   });
 
+  it("passes the LLM-extracted icon through to addTask", async () => {
+    const env = createMockEnv();
+    const { listAllMessages, getMessage, parseMessage } = await import("../../../src/clients/gmail-api.js");
+    const { analyzeEmail } = await import("../../../src/clients/anthropic.js");
+    const { addTask } = await import("../../../src/clients/notion.js");
+    const { getThreadMapEntry } = await import("../../../src/storage/d1.js");
+
+    (listAllMessages as ReturnType<typeof vi.fn>).mockResolvedValue([{ id: "msg-001", threadId: "thread-001" }]);
+    (getMessage as ReturnType<typeof vi.fn>).mockResolvedValue(gmailFixtures.newEmail);
+    (parseMessage as ReturnType<typeof vi.fn>).mockReturnValue({
+      subject: "支払いのご案内",
+      body: "内容",
+      senderEmail: "billing@example.com",
+      threadId: "thread-001",
+      gmailUrl: "https://mail.google.com/mail/u/0/#search/rfc822msgid:",
+    });
+    (analyzeEmail as ReturnType<typeof vi.fn>).mockResolvedValue({
+      summary: "請求書の支払い依頼",
+      tasks: [{ title: "支払う", priority: "high", due: "2026-05-20", icon: "💰" }],
+    });
+    (getThreadMapEntry as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    (addTask as ReturnType<typeof vi.fn>).mockResolvedValue("page-pay-001");
+
+    await checkGmail(env);
+    expect(addTask).toHaveBeenCalledWith(
+      env,
+      expect.objectContaining({ source: "Gmail", icon: "💰" }),
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
   it("updates existing task for reply email (same threadId)", async () => {
     const env = createMockEnv();
     const { listAllMessages, getMessage, parseMessage } = await import("../../../src/clients/gmail-api.js");
