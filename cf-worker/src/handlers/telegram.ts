@@ -1,4 +1,4 @@
-import type { Env } from "../types.js";
+import type { Env, ExtractedTask } from "../types.js";
 import { sendMessage, getFileUrl } from "../clients/telegram.js";
 import { addTask, getOpenTasks, completeTask, cancelTask, updateTaskDue, uploadImageToNotion } from "../clients/notion.js";
 import { extractTasksFromText, extractTasksFromUrlContent, analyzeImage } from "../clients/anthropic.js";
@@ -12,6 +12,9 @@ const URL_PATTERN = /https?:\/\/\S+/;
 const OPERATING_START_HOUR = 8;
 const OPERATING_END_HOUR = 21;
 const TODO_APP_BASE_URL = "https://todo.eh6gac4.work";
+
+// LLM がタスクを抽出できなかった経路のフォールバック絵文字。
+const FALLBACK_ICON = { add: "📌", photo: "🖼", url: "🔍" } as const;
 
 export function taskLink(pageId: string): string {
   return `[🔗 アプリで開く](${TODO_APP_BASE_URL}/?task=${pageId})`;
@@ -79,7 +82,7 @@ async function handleCommand(env: Env, text: string): Promise<void> {
         await sendMessage(env, "使い方: `/add 〇〇を確認する`");
         return;
       }
-      const id = await addTask(env, { title: arg, source: "Telegram", priority: "medium" });
+      const id = await addTask(env, { title: arg, source: "Telegram", priority: "medium", icon: FALLBACK_ICON.add });
       const link = id ? `\n\n${taskLink(id)}` : "";
       await sendMessage(env, `✅ タスクを追加しました\n\n*${arg}*${link}`);
       return;
@@ -225,14 +228,14 @@ async function handlePhoto(env: Env, message: Record<string, unknown>): Promise<
   const checklist = tasks.map((t) => t.title);
   const dues = tasks.map((t) => t.due).filter((d): d is string => Boolean(d)).sort();
   const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
-  const best = tasks.length
+  const best: Pick<ExtractedTask, "priority" | "icon"> = tasks.length
     ? tasks.reduce((a, b) => ((priorityOrder[a.priority] ?? 1) <= (priorityOrder[b.priority] ?? 1) ? a : b))
-    : { priority: "medium" as const };
+    : { priority: "medium", icon: FALLBACK_ICON.photo };
   const title = (summary || tasks[0]?.title || "📷 画像メモ").slice(0, 200);
 
   const id = await addTask(
     env,
-    { title, due: dues[0] ?? null, priority: best.priority, source: "Telegram" },
+    { title, due: dues[0] ?? null, priority: best.priority, icon: best.icon, source: "Telegram" },
     checklist,
     undefined,
     uploadId ?? undefined,
@@ -261,7 +264,9 @@ async function handleUrl(env: Env, url: string): Promise<void> {
   }
 
   const tasks = await extractTasksFromUrlContent(env, url, content);
-  const finalTasks = tasks.length ? tasks : [{ title: `${pageTitle}を確認する`, due: null, priority: "medium" as const }];
+  const finalTasks = tasks.length
+    ? tasks
+    : [{ title: `${pageTitle}を確認する`, due: null, priority: "medium" as const, icon: FALLBACK_ICON.url }];
 
   const created: Array<{ title: string; id: string | null }> = [];
   for (const task of finalTasks) {

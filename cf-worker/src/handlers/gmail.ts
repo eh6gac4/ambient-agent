@@ -81,7 +81,7 @@ export async function checkGmail(env: Env, options: CheckGmailOptions = {}): Pro
         } else {
           const pageId = await addTask(
             env,
-            { title: subject, due: dues[0] ?? null, priority: best.priority, source: "Gmail", sourceUrl: gmailUrl },
+            { title: subject, due: dues[0] ?? null, priority: best.priority, icon: best.icon, source: "Gmail", sourceUrl: gmailUrl },
             checklist,
             body,
           );

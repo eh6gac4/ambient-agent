@@ -19,6 +19,7 @@ describe("analyzeEmail", () => {
     expect(result.tasks).toHaveLength(1);
     expect(result.tasks[0].title).toBe("プロジェクト進捗を報告する");
     expect(result.tasks[0].priority).toBe("high");
+    expect(result.tasks[0].icon).toBe("📩");
   });
 
   it("returns empty tasks array for newsletters", async () => {
@@ -57,6 +58,7 @@ describe("extractTasksFromText", () => {
     expect(tasks).toHaveLength(1);
     expect(tasks[0].title).toBe("プロジェクト資料を確認する");
     expect(tasks[0].due).toBe("2026-04-30");
+    expect(tasks[0].icon).toBe("🔍");
   });
 
   it("returns empty array when no JSON list in response", async () => {

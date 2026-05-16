@@ -34,12 +34,14 @@ export interface TaskInput {
   priority?: "high" | "medium" | "low";
   source?: string;
   sourceUrl?: string;
+  icon?: string;
 }
 
 export interface ExtractedTask {
   title: string;
   due: string | null;
   priority: "high" | "medium" | "low";
+  icon?: string;
 }
 
 export interface EmailAnalysis {
