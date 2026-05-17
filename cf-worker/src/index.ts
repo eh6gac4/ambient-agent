@@ -4,6 +4,7 @@ import { syncCalendar, sendDueSoonNotice, sendTaskReminder } from "./handlers/ca
 import { sendDailyBriefing, sendCostReport, sendEmailDigest } from "./handlers/briefing.js";
 import { sendEscalationNotice, sendStaleTasksNotice } from "./handlers/escalation.js";
 import { handleTelegramWebhook } from "./handlers/telegram.js";
+import { handleAlert } from "./handlers/alert.js";
 import { sendMessage } from "./clients/telegram.js";
 
 // 無料プランの Cron 上限（5個）に合わせて5ジョブに統合
@@ -42,6 +43,21 @@ export default {
         await handleTelegramWebhook(env, body);
       } catch (err) {
         console.error("Webhook error:", err);
+      }
+      return new Response("OK");
+    }
+
+    // home server 監視層からのアラート受口。Bearer トークンで認証。
+    if (url.pathname === "/alert" && req.method === "POST") {
+      const auth = req.headers.get("Authorization");
+      if (!env.ALERT_TOKEN || auth !== `Bearer ${env.ALERT_TOKEN}`) {
+        return new Response("Unauthorized", { status: 401 });
+      }
+      try {
+        const body = await req.json();
+        await handleAlert(env, body);
+      } catch (err) {
+        console.error("Alert error:", err);
       }
       return new Response("OK");
     }
