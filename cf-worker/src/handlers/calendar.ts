@@ -1,4 +1,4 @@
-import type { Env } from "../types.js";
+import type { Env, Task } from "../types.js";
 import { getTodaysEvents, insertEvent, deleteEvent } from "../clients/gcal-api.js";
 import { getOpenTasks } from "../clients/notion.js";
 import { sendMessage } from "../clients/telegram.js";
@@ -9,8 +9,6 @@ export async function syncCalendar(env: Env): Promise<void> {
   const tasks = await getOpenTasks(env);
   const pendingIds = new Set(tasks.map((t) => t.pageId));
   const store = await getAllCalendarSync(env);
-
-  const today = new Date().toISOString().slice(0, 10);
 
   // Remove events for completed/deleted tasks
   for (const [pageId, { eventId }] of store) {
@@ -23,29 +21,60 @@ export async function syncCalendar(env: Env): Promise<void> {
     await deleteCalendarSync(env, pageId);
   }
 
-  // Sync pending tasks
+  // Sync pending tasks (same code path as the immediate-creation flow)
   for (const task of tasks) {
-    if (!task.due) continue;
-    const dueDate = task.due.slice(0, 10);
-    const isOverdue = dueDate < today;
-    const targetDate = isOverdue ? today : dueDate;
+    await syncTaskCalendarEvent(env, task);
+  }
+}
 
-    const record = store.get(task.pageId);
-    if (record?.calendarDate === targetDate) continue;
+/**
+ * 1 タスク分のカレンダーイベントを作成/更新する。
+ * 翌朝の syncCalendar cron とタスク作成時の即時同期で共通利用する。
+ * dedup キーは「カレンダー上の実日時 (eventDue)」単位。日付のみだと
+ * 同一日付で時刻だけ変わった際に古い時刻のまま取り残される不具合を防ぐ。
+ */
+export async function syncTaskCalendarEvent(
+  env: Env,
+  task: Pick<Task, "pageId" | "title" | "due">,
+): Promise<void> {
+  if (!task.due) return;
 
-    if (record?.eventId) {
-      try {
-        await deleteEvent(env, record.eventId);
-      } catch {
-        // ignore
-      }
+  const today = new Date().toISOString().slice(0, 10);
+  const dueDate = task.due.slice(0, 10);
+  const isOverdue = dueDate < today;
+  const targetDate = isOverdue ? today : dueDate;
+  const eventDue = isOverdue ? targetDate : task.due;
+
+  const record = await getCalendarSync(env, task.pageId);
+  if (record && record.calendarDate === eventDue) return;
+
+  if (record?.eventId) {
+    try {
+      await deleteEvent(env, record.eventId);
+    } catch {
+      // ignore
     }
+  }
 
-    const eventDue = isOverdue ? targetDate : task.due;
-    const eventId = await insertEvent(env, task.title, eventDue);
-    if (eventId) {
-      await setCalendarSync(env, task.pageId, eventId, targetDate);
-    }
+  const eventId = await insertEvent(env, task.title, eventDue);
+  if (eventId) {
+    await setCalendarSync(env, task.pageId, eventId, eventDue);
+  }
+}
+
+/**
+ * タスク作成直後にハンドラから呼ぶ即時同期。
+ * カレンダー/D1 の失敗がタスク作成・ユーザー応答を壊さないよう throw しない。
+ */
+export async function syncTaskCalendarEventSafe(
+  env: Env,
+  task: { pageId: string; title: string; due: string | null },
+): Promise<void> {
+  if (!task.due) return;
+  try {
+    await syncTaskCalendarEvent(env, task);
+  } catch (err) {
+    console.error("immediate calendar sync failed:", err);
   }
 }
 

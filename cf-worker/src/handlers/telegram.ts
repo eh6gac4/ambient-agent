@@ -4,7 +4,7 @@ import { addTask, getOpenTasks, completeTask, cancelTask, updateTaskDue, uploadI
 import { extractTasksFromText, extractTasksFromUrlContent, analyzeImage } from "../clients/anthropic.js";
 import { getSenderForTask } from "../storage/d1.js";
 import { getTaskCache, setTaskCache, getNoTaskSenders, addNoTaskSender, removeNoTaskSender } from "../storage/kv.js";
-import { deleteCalendarEventForTask } from "./calendar.js";
+import { deleteCalendarEventForTask, syncTaskCalendarEventSafe } from "./calendar.js";
 import { formatTaskList, sortTasks } from "./task-formatter.js";
 import { sendDailyBriefing } from "./briefing.js";
 
@@ -240,6 +240,7 @@ async function handlePhoto(env: Env, message: Record<string, unknown>): Promise<
     undefined,
     uploadId ?? undefined,
   );
+  if (id) await syncTaskCalendarEventSafe(env, { pageId: id, title, due: dues[0] ?? null });
 
   const lines = [`✅ タスクを登録しました`, ``, `*${title}*`];
   if (checklist.length) lines.push(...checklist.map((t) => `• ${t}`));
@@ -271,6 +272,7 @@ async function handleUrl(env: Env, url: string): Promise<void> {
   const created: Array<{ title: string; id: string | null }> = [];
   for (const task of finalTasks) {
     const id = await addTask(env, { ...task, source: "URL", sourceUrl: url });
+    if (id) await syncTaskCalendarEventSafe(env, { pageId: id, title: task.title, due: task.due ?? null });
     created.push({ title: task.title, id });
   }
   const body = created
@@ -323,6 +325,7 @@ export async function handleTelegramWebhook(env: Env, body: unknown): Promise<vo
     const created: Array<{ title: string; id: string | null }> = [];
     for (const task of tasks) {
       const id = await addTask(env, { ...task, source: "Telegram" });
+      if (id) await syncTaskCalendarEventSafe(env, { pageId: id, title: task.title, due: task.due ?? null });
       created.push({ title: task.title, id });
     }
     const body = created

@@ -24,6 +24,7 @@ vi.mock("../../../src/handlers/calendar.js", () => ({
   syncCalendar: vi.fn().mockResolvedValue(undefined),
   sendDueSoonNotice: vi.fn().mockResolvedValue(undefined),
   sendTaskReminder: vi.fn().mockResolvedValue(undefined),
+  syncTaskCalendarEventSafe: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("../../../src/handlers/briefing.js", () => ({
@@ -145,6 +146,25 @@ describe("handleTelegramWebhook", () => {
 
     expect(getFileUrl).toHaveBeenCalledWith(env, "photo-large");
     vi.unstubAllGlobals();
+  });
+
+  it("text message: immediately syncs a dated task to the calendar", async () => {
+    const env = createMockEnv({ OPERATING_START_HOUR: "0", OPERATING_END_HOUR: "24" });
+    const { extractTasksFromText } = await import("../../../src/clients/anthropic.js");
+    const { addTask } = await import("../../../src/clients/notion.js");
+    const { syncTaskCalendarEventSafe } = await import("../../../src/handlers/calendar.js");
+
+    (extractTasksFromText as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { title: "歯医者に行く", due: "2099-05-17T17:00:00", priority: "high" },
+    ]);
+    (addTask as ReturnType<typeof vi.fn>).mockResolvedValue("page-new");
+
+    await handleTelegramWebhook(env, telegramFixtures.textMessage);
+
+    expect(syncTaskCalendarEventSafe).toHaveBeenCalledWith(
+      env,
+      { pageId: "page-new", title: "歯医者に行く", due: "2099-05-17T17:00:00" },
+    );
   });
 
   it("/done command without prior /tasks sends guidance message", async () => {
