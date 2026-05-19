@@ -17,6 +17,7 @@ export interface Env {
   COST_REPORT_HOUR?: string;
   GMAIL_TASK_LABEL?: string;
   GMAIL_ACCOUNT_INDEX?: string;
+  NOTION_SUBITEM_PARENT_PROP?: string;
 }
 
 export interface Task {

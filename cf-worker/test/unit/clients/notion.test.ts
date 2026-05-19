@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { addTask, getOpenTasks, completeTask, cancelTask, updateTaskDue, escalatePriorityTasks, sanitizeEmoji } from "../../../src/clients/notion.js";
+import { addTask, addSubtask, getOpenTasks, completeTask, cancelTask, updateTaskDue, escalatePriorityTasks, sanitizeEmoji } from "../../../src/clients/notion.js";
 import { createMockEnv } from "../../helpers/mocks.js";
 import notionFixtures from "../../fixtures/notion-tasks.json" assert { type: "json" };
 
@@ -29,34 +29,65 @@ describe("addTask", () => {
     expect(body.properties.Due.date.start).toBe("2026-05-01");
   });
 
-  it("appends checklist as to_do blocks when provided", async () => {
+  it("creates subtask pages with parent relation when subtasks provided", async () => {
     const env = createMockEnv();
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify(notionFixtures.createResponse), { status: 200 }));
+      .mockResolvedValueOnce(new Response(JSON.stringify(notionFixtures.createResponse), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: "sub-1" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: "sub-2" }), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
-    await addTask(env, { title: "チェックリスト付き" }, ["項目1", "項目2"]);
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(body.children).toHaveLength(2);
-    expect(body.children[0].type).toBe("to_do");
-    expect(body.children[0].to_do.rich_text[0].text.content).toBe("項目1");
+    await addTask(env, { title: "親タスク", source: "Gmail", sourceUrl: "https://mail.google.com/x" }, [
+      { title: "項目1", priority: "high", due: "2026-05-21", icon: "📩" },
+      { title: "項目2", priority: "medium", due: null },
+    ]);
+
+    expect(fetchMock.mock.calls).toHaveLength(3);
+
+    const sub1 = JSON.parse(fetchMock.mock.calls[1][1].body);
+    expect(sub1.parent.database_id).toBe(env.NOTION_TASKS_DB_ID);
+    expect(sub1.properties["タイトル"].title[0].text.content).toBe("項目1");
+    expect(sub1.properties["親アイテム"].relation[0].id).toBe("page-new-001");
+    expect(sub1.properties.Priority.select.name).toBe("high");
+    expect(sub1.properties.Due.date.start).toBe("2026-05-21");
+    expect(sub1.properties.Source.rich_text[0].text.content).toBe("Gmail");
+    expect(sub1.properties.SourceURL.url).toBe("https://mail.google.com/x");
+    expect(sub1.icon).toEqual({ type: "emoji", emoji: "📩" });
+
+    const sub2 = JSON.parse(fetchMock.mock.calls[2][1].body);
+    expect(sub2.properties["タイトル"].title[0].text.content).toBe("項目2");
+    expect(sub2.properties.Due).toBeUndefined();
   });
 
-  it("appends email body blocks after checklist when bodyText provided", async () => {
+  it("uses NOTION_SUBITEM_PARENT_PROP override when set", async () => {
+    const env = createMockEnv({ NOTION_SUBITEM_PARENT_PROP: "Parent task" });
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(notionFixtures.createResponse), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: "sub-x" }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await addTask(env, { title: "親", source: "Gmail" }, [
+      { title: "子", priority: "medium", due: null },
+    ]);
+    const sub = JSON.parse(fetchMock.mock.calls[1][1].body);
+    expect(sub.properties["Parent task"].relation[0].id).toBe("page-new-001");
+  });
+
+  it("appends only email body blocks (no checklist) when bodyText provided", async () => {
     const env = createMockEnv();
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify(notionFixtures.createResponse), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
-    await addTask(env, { title: "メール本文付き" }, ["項目1"], "これはメール本文です。");
+    await addTask(env, { title: "メール本文付き" }, undefined, "これはメール本文です。");
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(body.children).toHaveLength(4);
-    expect(body.children[0].type).toBe("to_do");
-    expect(body.children[1].type).toBe("divider");
-    expect(body.children[2].type).toBe("heading_3");
-    expect(body.children[2].heading_3.rich_text[0].text.content).toBe("📧 メール本文");
-    expect(body.children[3].type).toBe("paragraph");
-    expect(body.children[3].paragraph.rich_text[0].text.content).toBe("これはメール本文です。");
+    expect(body.children).toHaveLength(3);
+    expect(body.children[0].type).toBe("divider");
+    expect(body.children[1].type).toBe("heading_3");
+    expect(body.children[1].heading_3.rich_text[0].text.content).toBe("📧 メール本文");
+    expect(body.children[2].type).toBe("paragraph");
+    expect(body.children[2].paragraph.rich_text[0].text.content).toBe("これはメール本文です。");
+    expect(body.children.some((b: { type: string }) => b.type === "to_do")).toBe(false);
   });
 
   it("splits long email body into multiple paragraph blocks of 2000 chars each", async () => {
@@ -66,7 +97,7 @@ describe("addTask", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const longBody = "あ".repeat(4500);
-    await addTask(env, { title: "長文メール" }, [], longBody);
+    await addTask(env, { title: "長文メール" }, undefined, longBody);
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     const paragraphs = body.children.filter((b: { type: string }) => b.type === "paragraph");
     expect(paragraphs).toHaveLength(3);
@@ -82,7 +113,7 @@ describe("addTask", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     const hugeBody = "x".repeat(15000);
-    await addTask(env, { title: "超長文" }, [], hugeBody);
+    await addTask(env, { title: "超長文" }, undefined, hugeBody);
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     const paragraphs = body.children.filter((b: { type: string }) => b.type === "paragraph");
     const lastChunk = paragraphs[paragraphs.length - 1].paragraph.rich_text[0].text.content;
@@ -125,16 +156,51 @@ describe("addTask", () => {
     expect(id).toBe(notionFixtures.createResponse.id);
   });
 
-  it("does not append body blocks when bodyText is empty", async () => {
+  it("omits children array entirely when no body and no image", async () => {
     const env = createMockEnv();
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify(notionFixtures.createResponse), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
 
-    await addTask(env, { title: "本文なし" }, ["項目1"], "");
+    await addTask(env, { title: "本文なし" }, undefined, "");
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(body.children).toHaveLength(1);
-    expect(body.children[0].type).toBe("to_do");
+    expect(body.children).toBeUndefined();
+  });
+});
+
+describe("addSubtask", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("creates a DB page with parent relation set", async () => {
+    const env = createMockEnv();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: "sub-page-id" }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const id = await addSubtask(env, "parent-page-id", {
+      title: "サブ",
+      priority: "high",
+      due: "2026-05-21T10:30",
+      icon: "📩",
+      source: "Gmail",
+    });
+    expect(id).toBe("sub-page-id");
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.properties["親アイテム"].relation).toEqual([{ id: "parent-page-id" }]);
+    expect(body.properties.Due.date.start).toBe("2026-05-21T10:30+09:00");
+    expect(body.icon).toEqual({ type: "emoji", emoji: "📩" });
+  });
+
+  it("returns null and does not throw on Notion failure", async () => {
+    const env = createMockEnv();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response("err", { status: 400 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const id = await addSubtask(env, "p", { title: "子" });
+    expect(id).toBeNull();
   });
 });
 

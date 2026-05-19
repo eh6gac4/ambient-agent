@@ -225,7 +225,7 @@ async function handlePhoto(env: Env, message: Record<string, unknown>): Promise<
     uploadImageToNotion(env, imageData, mediaType, `telegram-${largest.file_id}.${ext}`),
   ]);
 
-  const checklist = tasks.map((t) => t.title);
+  const subtaskTitles = tasks.map((t) => t.title);
   const dues = tasks.map((t) => t.due).filter((d): d is string => Boolean(d)).sort();
   const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
   const best: Pick<ExtractedTask, "priority" | "icon"> = tasks.length
@@ -236,14 +236,14 @@ async function handlePhoto(env: Env, message: Record<string, unknown>): Promise<
   const id = await addTask(
     env,
     { title, due: dues[0] ?? null, priority: best.priority, icon: best.icon, source: "Telegram" },
-    checklist,
+    tasks,
     undefined,
     uploadId ?? undefined,
   );
   if (id) await syncTaskCalendarEventSafe(env, { pageId: id, title, due: dues[0] ?? null });
 
   const lines = [`✅ タスクを登録しました`, ``, `*${title}*`];
-  if (checklist.length) lines.push(...checklist.map((t) => `• ${t}`));
+  if (subtaskTitles.length) lines.push(...subtaskTitles.map((t) => `• ${t}`));
   if (!uploadId) lines.push(``, `⚠️ 画像のアップロードに失敗したためテキストのみ登録`);
   if (id) lines.push(``, taskLink(id));
   await sendMessage(env, lines.join("\n"));
