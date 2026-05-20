@@ -76,6 +76,10 @@ function headers(token: string): Record<string, string> {
   };
 }
 
+function getSubitemParentProp(env: Env): string {
+  return env.NOTION_SUBITEM_PARENT_PROP ?? "親アイテム";
+}
+
 async function getDataSourceId(env: Env): Promise<string | null> {
   const cached = await env.AGENT_KV.get(DATA_SOURCE_KV_KEY);
   if (cached) return cached;
@@ -181,13 +185,7 @@ export async function uploadImageToNotion(
   }
 }
 
-export async function addTask(
-  env: Env,
-  task: TaskInput,
-  checklist?: string[],
-  bodyText?: string,
-  imageUploadId?: string,
-): Promise<string | null> {
+function buildTaskProperties(env: Env, task: TaskInput, parentPageId?: string): Record<string, unknown> {
   const properties: Record<string, unknown> = {
     "タイトル": { title: [{ text: { content: task.title } }] },
     Status: { status: { name: STATUS_PENDING } },
@@ -208,9 +206,23 @@ export async function addTask(
     properties["Priority"] = { select: { name: priority } };
   }
 
+  if (parentPageId) {
+    properties[getSubitemParentProp(env)] = { relation: [{ id: parentPageId }] };
+  }
+
+  return properties;
+}
+
+export async function addTask(
+  env: Env,
+  task: TaskInput,
+  subtasks?: ExtractedTask[],
+  bodyText?: string,
+  imageUploadId?: string,
+): Promise<string | null> {
   const body: Record<string, unknown> = {
     parent: { database_id: env.NOTION_TASKS_DB_ID },
-    properties,
+    properties: buildTaskProperties(env, task),
   };
 
   const emoji = sanitizeEmoji(task.icon);
@@ -218,17 +230,9 @@ export async function addTask(
     body.icon = { type: "emoji", emoji };
   }
 
-  const checklistBlocks = (checklist ?? []).map((item) => ({
-    object: "block",
-    type: "to_do",
-    to_do: {
-      rich_text: [{ type: "text", text: { content: item } }],
-      checked: false,
-    },
-  }));
   const bodyBlocks = buildEmailBodyBlocks(bodyText ?? "", "📧 メール本文");
   const imageBlocks = buildImageBlocks(imageUploadId);
-  const children = [...checklistBlocks, ...bodyBlocks, ...imageBlocks];
+  const children = [...bodyBlocks, ...imageBlocks];
   if (children.length) {
     body.children = children;
   }
@@ -239,6 +243,49 @@ export async function addTask(
     body: JSON.stringify(body),
   });
   if (!resp.ok) throw new Error(`Notion addTask failed: ${resp.status}`);
+  const page = await resp.json<{ id: string }>();
+  const pageId = page.id ?? null;
+
+  if (pageId && subtasks?.length) {
+    for (const sub of subtasks) {
+      await addSubtask(env, pageId, {
+        title: sub.title,
+        due: sub.due,
+        priority: sub.priority,
+        icon: sub.icon,
+        source: task.source,
+        sourceUrl: task.sourceUrl,
+      });
+    }
+  }
+
+  return pageId;
+}
+
+export async function addSubtask(
+  env: Env,
+  parentPageId: string,
+  task: TaskInput,
+): Promise<string | null> {
+  const body: Record<string, unknown> = {
+    parent: { database_id: env.NOTION_TASKS_DB_ID },
+    properties: buildTaskProperties(env, task, parentPageId),
+  };
+
+  const emoji = sanitizeEmoji(task.icon);
+  if (emoji) {
+    body.icon = { type: "emoji", emoji };
+  }
+
+  const resp = await fetch(`${NOTION_API}/pages`, {
+    method: "POST",
+    headers: headers(env.NOTION_TOKEN),
+    body: JSON.stringify(body),
+  });
+  if (!resp.ok) {
+    console.warn(`Notion addSubtask failed for parent=${parentPageId}: ${resp.status}`);
+    return null;
+  }
   const page = await resp.json<{ id: string }>();
   return page.id ?? null;
 }
@@ -328,7 +375,7 @@ export async function updateTaskDue(env: Env, pageId: string, due: string): Prom
 export async function updateTaskFromReply(
   env: Env,
   pageId: string,
-  checklist: string[],
+  subtasks: ExtractedTask[],
   priority: string,
   due: string | null,
   bodyText?: string,
@@ -345,6 +392,8 @@ export async function updateTaskFromReply(
   const currentPriority = ((props["Priority"] as Record<string, unknown> | undefined)?.select as { name: string } | undefined)?.name ?? "medium";
   const currentDueObj = (props["Due"] as Record<string, unknown> | undefined)?.date as { start: string } | undefined;
   const currentDue = currentDueObj?.start?.slice(0, 10) ?? null;
+  const sourceUrlObj = props["SourceURL"] as { url?: string } | undefined;
+  const inheritedSourceUrl = sourceUrlObj?.url ?? undefined;
 
   const updates: Record<string, unknown> = {};
 
@@ -367,22 +416,23 @@ export async function updateTaskFromReply(
     });
   }
 
-  const checklistBlocks = checklist.map((item) => ({
-    object: "block",
-    type: "to_do",
-    to_do: {
-      rich_text: [{ type: "text", text: { content: item } }],
-      checked: false,
-    },
-  }));
   const bodyBlocks = buildEmailBodyBlocks(bodyText ?? "", "📧 返信メール");
-  const appendChildren = [...checklistBlocks, ...bodyBlocks];
-
-  if (appendChildren.length) {
+  if (bodyBlocks.length) {
     await fetch(`${NOTION_API}/blocks/${pageId}/children`, {
       method: "PATCH",
       headers: headers(env.NOTION_TOKEN),
-      body: JSON.stringify({ children: appendChildren }),
+      body: JSON.stringify({ children: bodyBlocks }),
+    });
+  }
+
+  for (const sub of subtasks) {
+    await addSubtask(env, pageId, {
+      title: sub.title,
+      due: sub.due,
+      priority: sub.priority,
+      icon: sub.icon,
+      source: "Gmail",
+      sourceUrl: inheritedSourceUrl,
     });
   }
 }

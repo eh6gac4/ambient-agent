@@ -123,7 +123,11 @@ describe("handleTelegramWebhook", () => {
     expect(addTask).toHaveBeenCalledWith(
       env,
       expect.objectContaining({ title: "週末の買い物リスト", priority: "high", due: "2026-05-01", source: "Telegram" }),
-      ["牛乳を買う", "卵を買う", "パンを買う"],
+      [
+        expect.objectContaining({ title: "牛乳を買う", priority: "medium" }),
+        expect.objectContaining({ title: "卵を買う", priority: "high", due: "2026-05-01" }),
+        expect.objectContaining({ title: "パンを買う", priority: "low" }),
+      ],
       undefined,
       "upload-id-001",
     );

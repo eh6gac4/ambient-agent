@@ -74,7 +74,7 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 | `/unblock <メール>` | 送信者のブロックを解除 |
 | URL 送信 | ページ内容を取得してタスクを抽出し Notion に登録 |
 | テキスト・転送メッセージ送信 | Claude でタスク抽出して Notion に登録 |
-| 画像送信 | Claude Vision で要約・タスク抽出 → 1タスクにまとめて Notion 登録、複数アクションはチェックリスト化、画像をページ本文に添付 |
+| 画像送信 | Claude Vision で要約・タスク抽出 → 親タスクを Notion 登録、各アクションは Notion DB のサブアイテムとして個別登録、画像をページ本文に添付 |
 
 ## Notion DB 必須プロパティ
 
@@ -86,6 +86,9 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 | Status | ステータス | 未着手 / 完了 / 中止 など |
 | Source | テキスト | Gmail / Telegram / URL など |
 | SourceURL | URL | メール元タスクの Gmail リンク |
+| 親アイテム | リレーション（同DB・自己） | Notion の「サブアイテム」機能で自動生成される双方向リレーション。プロパティ名が異なる場合は環境変数 `NOTION_SUBITEM_PARENT_PROP` で上書き可能 |
+
+**サブタスク化:** メール／画像からタスクを生成する際、Claude が抽出した各アクションは親ページ本文内のチェックボックスではなく **DB のサブアイテム（独立した子ページ）** として作成され、それぞれ Due / Priority / アイコンを個別に持つ。親ページはメール件名・本文を保持。
 
 ## ファイル構成
 
