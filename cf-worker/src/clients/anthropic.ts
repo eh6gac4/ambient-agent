@@ -202,7 +202,7 @@ export async function summarizeDay(
   const tasksText = tasks.map((t) => `- [${t.priority}] ${t.title} (期限: ${t.due ?? "未定"})`).join("\n") || "（なし）";
   const overdueText = overdueTasks.map((t) => `- [${t.priority}] ${t.title} (期限: ${t.due ?? ""})`).join("\n") || "（なし）";
 
-  const prompt = `今日の予定とタスクをもとに、簡潔な日次ブリーフィングを日本語で作成してください。
+  const prompt = `今日の予定とタスクをもとに、ユーザーへの短いコメントを日本語で作成してください。
 
 ## 今日の予定
 ${eventsText}
@@ -213,7 +213,11 @@ ${tasksText}
 ## 期限切れタスク
 ${overdueText}
 
-ブリーフィングは3〜5文程度にまとめてください。期限切れタスクがある場合は必ず言及してください。`;
+## 出力ルール
+- 予定とタスクの具体的なリストは別途表示するので、ここでは羅列しない
+- 全体感（忙しさ・優先すべきポイント・期限切れの注意喚起など）を 1〜2 文で簡潔に
+- 期限切れタスクがある場合は必ず触れる
+- 装飾やマークダウン記号は使わず、プレーンな文章のみ`;
 
   return callClaude(env, "summarize_day", "", prompt, 512);
 }
