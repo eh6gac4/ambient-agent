@@ -1,4 +1,4 @@
-import type { Env } from "../types.js";
+import type { Env, CalendarEvent, Task } from "../types.js";
 import { getTodaysEvents } from "../clients/gcal-api.js";
 import { getOpenTasks } from "../clients/notion.js";
 import { summarizeDay } from "../clients/anthropic.js";
@@ -21,6 +21,53 @@ function jstDateStr(): string {
   }).replace(/\//g, "-");
 }
 
+function formatEventTime(start: string): string {
+  if (!start.includes("T")) return "終日";
+  return new Date(start).toLocaleTimeString("ja-JP", {
+    timeZone: "Asia/Tokyo",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+function formatDueShort(due: string | null): string {
+  if (!due) return "";
+  const [, m, d] = due.slice(0, 10).split("-");
+  return `${parseInt(m, 10)}/${parseInt(d, 10)}`;
+}
+
+function formatEventsSection(events: CalendarEvent[]): string {
+  if (!events.length) return "*🗓 今日の予定*\n（なし）";
+  const lines = events.map((e) => `• ${formatEventTime(e.start)} ${e.summary || "(タイトルなし)"}`);
+  return `*🗓 今日の予定 (${events.length}件)*\n${lines.join("\n")}`;
+}
+
+function formatOverdueSection(overdue: Task[]): string {
+  if (!overdue.length) return "";
+  const icon = { high: "🔴", medium: "🟡", low: "🟢" } as const;
+  const lines = overdue.map((t) => `• ${icon[t.priority]} ${t.title} (${formatDueShort(t.due)})`);
+  return `*⚠️ 期限切れ (${overdue.length}件)*\n${lines.join("\n")}`;
+}
+
+function formatTasksSection(tasks: Task[]): string {
+  if (!tasks.length) return "*✅ 未完了タスク*\n（なし）";
+  const grouped: Record<"high" | "medium" | "low", Task[]> = { high: [], medium: [], low: [] };
+  for (const t of tasks) grouped[t.priority].push(t);
+
+  const labels = { high: "🔴 *High*", medium: "🟡 *Medium*", low: "🟢 *Low*" } as const;
+  const lines: string[] = [];
+  for (const p of ["high", "medium", "low"] as const) {
+    if (!grouped[p].length) continue;
+    lines.push(labels[p]);
+    for (const t of grouped[p]) {
+      const due = t.due ? ` (〜${formatDueShort(t.due)})` : "";
+      lines.push(`• ${t.title}${due}`);
+    }
+  }
+  return `*✅ 未完了タスク (${tasks.length}件)*\n${lines.join("\n")}`;
+}
+
 export async function sendDailyBriefing(env: Env): Promise<void> {
   const [events, tasks] = await Promise.all([getTodaysEvents(env), getOpenTasks(env)]);
 
@@ -28,10 +75,20 @@ export async function sendDailyBriefing(env: Env): Promise<void> {
     .toISOString()
     .slice(0, 10);
   const overdue = tasks.filter((t) => t.due && t.due.slice(0, 10) < todayStr);
+  const openTasks = tasks.filter((t) => !overdue.includes(t));
 
-  const summary = await summarizeDay(env, events, tasks, overdue);
+  const summary = await summarizeDay(env, events, openTasks, overdue);
   const dateStr = jstDateStr();
-  await sendMessage(env, `*📅 日次ブリーフィング ${dateStr}*\n\n${summary}`);
+
+  const sections = [
+    `*📅 日次ブリーフィング ${dateStr}*`,
+    summary.trim(),
+    formatEventsSection(events),
+    formatOverdueSection(overdue),
+    formatTasksSection(openTasks),
+  ].filter(Boolean);
+
+  await sendMessage(env, sections.join("\n\n"));
 }
 
 export async function sendCostReport(env: Env): Promise<void> {
