@@ -103,4 +103,20 @@ describe("formatTaskList", () => {
     const result = formatTaskList(tasks);
     expect(result).toContain("[タスク\\[1\\]](https://todo.eh6gac4.work/?task=abc123)");
   });
+
+  it("escapes *, _ and ` in title within link text", () => {
+    const tasks: Task[] = [
+      { title: "見積_資料 *至急*", due: null, priority: "high", status: "未着手", lastEdited: null, url: "https://notion.so/p", pageId: "abc123" },
+    ];
+    const result = formatTaskList(tasks);
+    expect(result).toContain("[見積\\_資料 \\*至急\\*](https://todo.eh6gac4.work/?task=abc123)");
+  });
+
+  it("escapes special characters in plain title when pageId is empty", () => {
+    const tasks: Task[] = [
+      { title: "メモ_確認", due: null, priority: "medium", status: "未着手", lastEdited: null, url: "", pageId: "" },
+    ];
+    const result = formatTaskList(tasks);
+    expect(result).toContain("メモ\\_確認");
+  });
 });

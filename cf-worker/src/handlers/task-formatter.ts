@@ -1,4 +1,5 @@
 import type { Task } from "../types.js";
+import { escapeMd } from "../clients/telegram.js";
 
 const TASK_APP_URL = "https://todo.eh6gac4.work";
 
@@ -68,9 +69,11 @@ export function formatTaskList(tasks: Task[], numbered = false): string {
     const due = t.due ? `（${fmtDue(t.due)}）` : "";
     const icon = PRIORITY_LABELS[t.priority] ?? "";
     const prefix = numbered ? `${i + 1}. ` : "• ";
+    // escapeMd は \ * _ ` [ を処理する。リンクテキスト内は ] も閉じ括弧扱いになるため追加でエスケープ。
+    const safeTitle = escapeMd(t.title);
     const titleLink = t.pageId
-      ? `[${t.title.replaceAll("[", "\\[").replaceAll("]", "\\]")}](${TASK_APP_URL}/?task=${t.pageId})`
-      : t.title;
+      ? `[${safeTitle.replaceAll("]", "\\]")}](${TASK_APP_URL}/?task=${t.pageId})`
+      : safeTitle;
     lines.push(`${prefix}${icon} ${titleLink}${due}`);
   }
   return lines.join("\n");

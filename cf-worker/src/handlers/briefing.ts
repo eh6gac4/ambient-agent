@@ -2,7 +2,7 @@ import type { Env, CalendarEvent, Task } from "../types.js";
 import { getTodaysEvents } from "../clients/gcal-api.js";
 import { getOpenTasks } from "../clients/notion.js";
 import { summarizeDay } from "../clients/anthropic.js";
-import { sendMessage } from "../clients/telegram.js";
+import { sendMessage, escapeMd } from "../clients/telegram.js";
 import { getDailyUsage, takeEmailDigest } from "../storage/kv.js";
 
 const PRICE_INPUT_PER_M = 0.8;
@@ -39,14 +39,16 @@ function formatDueShort(due: string | null): string {
 
 function formatEventsSection(events: CalendarEvent[]): string {
   if (!events.length) return "*🗓 今日の予定*\n（なし）";
-  const lines = events.map((e) => `• ${formatEventTime(e.start)} ${e.summary || "(タイトルなし)"}`);
+  const lines = events.map(
+    (e) => `• ${formatEventTime(e.start)} ${e.summary ? escapeMd(e.summary) : "(タイトルなし)"}`,
+  );
   return `*🗓 今日の予定 (${events.length}件)*\n${lines.join("\n")}`;
 }
 
 function formatOverdueSection(overdue: Task[]): string {
   if (!overdue.length) return "";
   const icon = { high: "🔴", medium: "🟡", low: "🟢" } as const;
-  const lines = overdue.map((t) => `• ${icon[t.priority]} ${t.title} (${formatDueShort(t.due)})`);
+  const lines = overdue.map((t) => `• ${icon[t.priority]} ${escapeMd(t.title)} (${formatDueShort(t.due)})`);
   return `*⚠️ 期限切れ (${overdue.length}件)*\n${lines.join("\n")}`;
 }
 
@@ -62,7 +64,7 @@ function formatTasksSection(tasks: Task[]): string {
     lines.push(labels[p]);
     for (const t of grouped[p]) {
       const due = t.due ? ` (〜${formatDueShort(t.due)})` : "";
-      lines.push(`• ${t.title}${due}`);
+      lines.push(`• ${escapeMd(t.title)}${due}`);
     }
   }
   return `*✅ 未完了タスク (${tasks.length}件)*\n${lines.join("\n")}`;
@@ -82,7 +84,7 @@ export async function sendDailyBriefing(env: Env): Promise<void> {
 
   const sections = [
     `*📅 日次ブリーフィング ${dateStr}*`,
-    summary.trim(),
+    escapeMd(summary.trim()),
     formatEventsSection(events),
     formatOverdueSection(overdue),
     formatTasksSection(openTasks),
