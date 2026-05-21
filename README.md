@@ -116,7 +116,7 @@ ambient-agent/
 │   │   └── storage/              # D1・KV アクセス層
 │   │       ├── d1.ts             # D1 CRUD ヘルパー
 │   │       └── kv.ts             # KV ヘルパー
-│   ├── test/                     # Vitest テスト（84件）
+│   ├── test/                     # Vitest テスト（134件）
 │   ├── migrations/               # D1 スキーマ
 │   ├── scripts/
 │   │   ├── push-secrets.mjs       # Worker Secrets 一括登録

@@ -7,7 +7,9 @@ vi.mock("../../../src/clients/notion.js", () => ({
   getOpenTasks: vi.fn(),
 }));
 
-vi.mock("../../../src/clients/telegram.js", () => ({
+// sendMessage のみモックし、escapeMd は実装をそのまま使う（エスケープを検証するため）
+vi.mock("../../../src/clients/telegram.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../src/clients/telegram.js")>()),
   sendMessage: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -51,6 +53,22 @@ describe("sendDueSoonNotice", () => {
     expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("今日期限タスク"));
     expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("明日期限タスク"));
     expect(sendMessage).toHaveBeenCalledWith(env, expect.not.stringContaining("来週のタスク"));
+  });
+
+  it("escapes Markdown special characters in task titles", async () => {
+    const env = createMockEnv();
+    const { getOpenTasks } = await import("../../../src/clients/notion.js");
+    const { sendMessage } = await import("../../../src/clients/telegram.js");
+
+    const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
+    const today = now.toISOString().slice(0, 10);
+
+    (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { title: "請求書_確認 *重要*", due: today, priority: "high", status: "未着手", lastEdited: null, url: "", pageId: "p1" },
+    ]);
+
+    await sendDueSoonNotice(env);
+    expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("請求書\\_確認 \\*重要\\*"));
   });
 
   it("does not send when no tasks due soon", async () => {

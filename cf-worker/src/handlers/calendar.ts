@@ -1,7 +1,7 @@
 import type { Env, Task } from "../types.js";
 import { getTodaysEvents, insertEvent, deleteEvent } from "../clients/gcal-api.js";
 import { getOpenTasks } from "../clients/notion.js";
-import { sendMessage } from "../clients/telegram.js";
+import { sendMessage, escapeMd } from "../clients/telegram.js";
 import { formatTaskList, fmtDue } from "./task-formatter.js";
 import { getCalendarSync, setCalendarSync, deleteCalendarSync, getAllCalendarSync } from "../storage/d1.js";
 
@@ -104,10 +104,14 @@ export async function sendDueSoonNotice(env: Env): Promise<void> {
 
   const sections: string[] = [];
   if (dueToday.length) {
-    sections.push(`*📅 今日期限 (${dueToday.length}件)*\n` + dueToday.map((t) => `• ${t.title}`).join("\n"));
+    sections.push(
+      `*📅 今日期限 (${dueToday.length}件)*\n` + dueToday.map((t) => `• ${escapeMd(t.title)}`).join("\n"),
+    );
   }
   if (dueTomorrow.length) {
-    sections.push(`*📅 明日期限 (${dueTomorrow.length}件)*\n` + dueTomorrow.map((t) => `• ${t.title}`).join("\n"));
+    sections.push(
+      `*📅 明日期限 (${dueTomorrow.length}件)*\n` + dueTomorrow.map((t) => `• ${escapeMd(t.title)}`).join("\n"),
+    );
   }
   await sendMessage(env, "*⏰ 期限間近タスク*\n\n" + sections.join("\n\n"));
 }

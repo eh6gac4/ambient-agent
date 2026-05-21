@@ -8,7 +8,9 @@ vi.mock("../../../src/clients/notion.js", () => ({
   escalatePriorityTasks: vi.fn(),
 }));
 
-vi.mock("../../../src/clients/telegram.js", () => ({
+// sendMessage のみモックし、escapeMd は実装をそのまま使う（エスケープを検証するため）
+vi.mock("../../../src/clients/telegram.js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../src/clients/telegram.js")>()),
   sendMessage: vi.fn().mockResolvedValue(undefined),
 }));
 
@@ -40,6 +42,19 @@ describe("sendEscalationNotice", () => {
 
     await sendEscalationNotice(env);
     expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("escapes Markdown special characters in task titles", async () => {
+    const env = createMockEnv();
+    const { escalatePriorityTasks } = await import("../../../src/clients/notion.js");
+    const { sendMessage } = await import("../../../src/clients/telegram.js");
+
+    (escalatePriorityTasks as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { title: "見積_資料 *至急*", due: "2026-04-27", priority: "high", status: "未着手", lastEdited: null, url: "", pageId: "p1" },
+    ]);
+
+    await sendEscalationNotice(env);
+    expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("見積\\_資料 \\*至急\\*"));
   });
 });
 

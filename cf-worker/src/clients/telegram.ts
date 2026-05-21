@@ -6,6 +6,16 @@ function apiUrl(token: string, method: string): string {
   return `https://api.telegram.org/bot${token}/${method}`;
 }
 
+function postMessage(env: Env, url: string, text: string, parseMode?: "Markdown"): Promise<Response> {
+  const payload: Record<string, unknown> = { chat_id: env.TELEGRAM_CHAT_ID, text };
+  if (parseMode) payload.parse_mode = parseMode;
+  return fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function sendMessage(env: Env, text: string): Promise<void> {
   const url = apiUrl(env.TELEGRAM_BOT_TOKEN, "sendMessage");
   const chunks: string[] = [];
@@ -13,19 +23,20 @@ export async function sendMessage(env: Env, text: string): Promise<void> {
     chunks.push(text.slice(i, i + MAX_LENGTH));
   }
   for (const chunk of chunks) {
-    const resp = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chat_id: env.TELEGRAM_CHAT_ID,
-        text: chunk,
-        parse_mode: "Markdown",
-      }),
-    });
-    if (!resp.ok) {
-      const body = await resp.text();
-      throw new Error(`Telegram sendMessage failed: ${resp.status} ${body}`);
+    const resp = await postMessage(env, url, chunk, "Markdown");
+    if (resp.ok) continue;
+
+    const body = await resp.text();
+    // レガシー Markdown はエスケープ漏れ 1 文字で 400 になる。
+    // パース失敗時は parse_mode なし（プレーンテキスト）で再送し、配信を死守する。
+    if (resp.status === 400 && body.includes("can't parse entities")) {
+      console.error(`Telegram Markdown parse failed, retrying as plain text: ${body}`);
+      const retry = await postMessage(env, url, chunk);
+      if (retry.ok) continue;
+      const retryBody = await retry.text();
+      throw new Error(`Telegram sendMessage failed (plain retry): ${retry.status} ${retryBody}`);
     }
+    throw new Error(`Telegram sendMessage failed: ${resp.status} ${body}`);
   }
 }
 

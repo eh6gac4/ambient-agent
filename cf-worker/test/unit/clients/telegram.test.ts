@@ -56,4 +56,53 @@ describe("sendMessage", () => {
 
     await expect(sendMessage(env, "test")).rejects.toThrow("401");
   });
+
+  it("retries as plain text when Markdown parsing fails", async () => {
+    const env = createMockEnv();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ ok: false, error_code: 400, description: "Bad Request: can't parse entities" }),
+          { status: 400 },
+        ),
+      )
+      .mockResolvedValueOnce(new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await sendMessage(env, "壊れた *Markdown");
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const firstBody = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const retryBody = JSON.parse(fetchMock.mock.calls[1][1].body);
+    expect(firstBody.parse_mode).toBe("Markdown");
+    // 再送はプレーンテキスト（parse_mode なし）で、本文はそのまま届く
+    expect(retryBody.parse_mode).toBeUndefined();
+    expect(retryBody.text).toBe("壊れた *Markdown");
+  });
+
+  it("does not retry on non-parse 400 errors", async () => {
+    const env = createMockEnv();
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ description: "Bad Request: chat not found" }), { status: 400 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(sendMessage(env, "test")).rejects.toThrow("chat not found");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("throws when the plain-text retry also fails", async () => {
+    const env = createMockEnv();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ description: "can't parse entities" }), { status: 400 }),
+      )
+      .mockResolvedValueOnce(new Response("Internal Server Error", { status: 500 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(sendMessage(env, "test")).rejects.toThrow("plain retry");
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
 });
