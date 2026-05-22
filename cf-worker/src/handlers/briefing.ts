@@ -140,7 +140,11 @@ export async function sendEmailDigest(env: Env): Promise<void> {
   if (!taskLines.length && !archivedLines.length) return;
 
   const sections: string[] = [];
-  if (taskLines.length) sections.push("✅ *タスク登録*\n" + taskLines.join("\n"));
+  if (taskLines.length) {
+    sections.push(
+      `✅ *タスク登録*: ${taskLines.length}件\n[🔗 ダッシュボードで確認](https://todo.eh6gac4.work)`,
+    );
+  }
   if (archivedLines.length) sections.push("📦 *アーカイブ済み*\n" + archivedLines.join("\n"));
   await sendMessage(env, "*📧 メール処理サマリ*\n\n" + sections.join("\n\n"));
 }
