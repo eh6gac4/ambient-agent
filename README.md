@@ -57,7 +57,7 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 - morning_prep の同期は補完用。重複防止は D1 `calendar_sync` で行い、dedup キーは「期日時刻」単位（同一日付で時刻だけ変わっても反映）
 
 **morning_briefing の詳細:**
-- 直近 24 時間に hourly_gmail が処理したメールをまとめて1通の「📧 メール処理サマリ」として Telegram 送信
+- 直近 24 時間に hourly_gmail が処理したメールをまとめて1通の「📧 メール処理サマリ」として Telegram 送信（タスク登録は件数のみ＋ダッシュボードリンク、アーカイブは件名一覧）
 
 ## Telegram コマンド
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { sendDailyBriefing } from "../../../src/handlers/briefing.js";
+import { sendDailyBriefing, sendEmailDigest } from "../../../src/handlers/briefing.js";
 import { createMockEnv } from "../../helpers/mocks.js";
 
 vi.mock("../../../src/clients/gcal-api.js", () => ({
@@ -12,6 +12,11 @@ vi.mock("../../../src/clients/notion.js", () => ({
 
 vi.mock("../../../src/clients/anthropic.js", () => ({
   summarizeDay: vi.fn(),
+}));
+
+vi.mock("../../../src/storage/kv.js", () => ({
+  takeEmailDigest: vi.fn(),
+  getDailyUsage: vi.fn(),
 }));
 
 // sendMessage のみモックし、escapeMd は実装をそのまま使う（エスケープを検証するため）
@@ -68,5 +73,92 @@ describe("sendDailyBriefing", () => {
 
     const sent = (sendMessage as ReturnType<typeof vi.fn>).mock.calls[0][1] as string;
     expect(sent).toContain("期限切れ\\_タスク");
+  });
+});
+
+describe("sendEmailDigest", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("displays count and dashboard link only — no per-task details", async () => {
+    const env = createMockEnv();
+    const { takeEmailDigest } = await import("../../../src/storage/kv.js");
+    const { sendMessage } = await import("../../../src/clients/telegram.js");
+
+    (takeEmailDigest as ReturnType<typeof vi.fn>).mockResolvedValue({
+      taskLines: [
+        "• *会議の準備*\n  会議資料を作成\n  → 資料作成、レビュー依頼\n  [🔗 アプリで開く](https://todo.eh6gac4.work/?task=p1)",
+        "• *レポート提出*\n  週次レポート\n  → 提出\n  [🔗 アプリで開く](https://todo.eh6gac4.work/?task=p2)",
+        "• *コードレビュー*\n  PR レビュー\n  → 確認\n  [🔗 アプリで開く](https://todo.eh6gac4.work/?task=p3)",
+      ],
+      archivedLines: [],
+    });
+
+    await sendEmailDigest(env);
+
+    expect(sendMessage).toHaveBeenCalledOnce();
+    const sent = (sendMessage as ReturnType<typeof vi.fn>).mock.calls[0][1] as string;
+    expect(sent).toContain("✅ *タスク登録*: 3件");
+    expect(sent).toContain("[🔗 ダッシュボードで確認](https://todo.eh6gac4.work)");
+    // 個別タスクの件名やサブタスクが含まれていないこと
+    expect(sent).not.toContain("会議の準備");
+    expect(sent).not.toContain("レポート提出");
+    expect(sent).not.toContain("コードレビュー");
+    // アーカイブセクションは出さない
+    expect(sent).not.toContain("アーカイブ済み");
+  });
+
+  it("shows only archive section when no tasks were registered", async () => {
+    const env = createMockEnv();
+    const { takeEmailDigest } = await import("../../../src/storage/kv.js");
+    const { sendMessage } = await import("../../../src/clients/telegram.js");
+
+    (takeEmailDigest as ReturnType<typeof vi.fn>).mockResolvedValue({
+      taskLines: [],
+      archivedLines: ["• *通知メール*\n  自動通知", "• *ニュースレター*\n  購読しているメルマガ"],
+    });
+
+    await sendEmailDigest(env);
+
+    const sent = (sendMessage as ReturnType<typeof vi.fn>).mock.calls[0][1] as string;
+    expect(sent).not.toContain("✅ *タスク登録*");
+    expect(sent).toContain("📦 *アーカイブ済み*");
+    expect(sent).toContain("通知メール");
+    expect(sent).toContain("ニュースレター");
+  });
+
+  it("includes both sections in order when tasks and archives coexist", async () => {
+    const env = createMockEnv();
+    const { takeEmailDigest } = await import("../../../src/storage/kv.js");
+    const { sendMessage } = await import("../../../src/clients/telegram.js");
+
+    (takeEmailDigest as ReturnType<typeof vi.fn>).mockResolvedValue({
+      taskLines: ["• *仕事メール*\n  ..."],
+      archivedLines: ["• *通知*\n  ..."],
+    });
+
+    await sendEmailDigest(env);
+
+    const sent = (sendMessage as ReturnType<typeof vi.fn>).mock.calls[0][1] as string;
+    const taskIdx = sent.indexOf("✅ *タスク登録*: 1件");
+    const archiveIdx = sent.indexOf("📦 *アーカイブ済み*");
+    expect(taskIdx).toBeGreaterThan(-1);
+    expect(archiveIdx).toBeGreaterThan(taskIdx);
+  });
+
+  it("does not send a message when digest is empty", async () => {
+    const env = createMockEnv();
+    const { takeEmailDigest } = await import("../../../src/storage/kv.js");
+    const { sendMessage } = await import("../../../src/clients/telegram.js");
+
+    (takeEmailDigest as ReturnType<typeof vi.fn>).mockResolvedValue({
+      taskLines: [],
+      archivedLines: [],
+    });
+
+    await sendEmailDigest(env);
+
+    expect(sendMessage).not.toHaveBeenCalled();
   });
 });
