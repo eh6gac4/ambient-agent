@@ -48,6 +48,8 @@ export interface ExtractedTask {
 
 export interface EmailAnalysis {
   summary: string;
+  /** タスク一覧に表示するための簡潔なタイトル。メール件名より要点が分かる形を期待する。 */
+  task_title?: string;
   tasks: ExtractedTask[];
 }
 

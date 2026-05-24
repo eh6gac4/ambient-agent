@@ -363,6 +363,23 @@ export async function getTaskStatus(env: Env, pageId: string): Promise<string | 
   return statusObj?.name ?? null;
 }
 
+export async function getTaskTitleAndDue(
+  env: Env,
+  pageId: string,
+): Promise<{ title: string; due: string | null } | null> {
+  const resp = await fetch(`${NOTION_API}/pages/${pageId}`, {
+    headers: headers(env.NOTION_TOKEN),
+  });
+  if (!resp.ok) return null;
+  const page = await resp.json<{ archived?: boolean; properties?: Record<string, unknown> }>();
+  if (page.archived) return null;
+  const props = (page.properties ?? {}) as Record<string, unknown>;
+  const titleArr = ((props["タイトル"] as Record<string, unknown> | undefined)?.title as Array<{ text: { content: string } }> | undefined) ?? [];
+  const title = titleArr[0]?.text.content ?? "";
+  const dueObj = (props["Due"] as Record<string, unknown> | undefined)?.date as { start: string } | undefined;
+  return { title, due: dueObj?.start ?? null };
+}
+
 export async function updateTaskDue(env: Env, pageId: string, due: string): Promise<void> {
   const resp = await fetch(`${NOTION_API}/pages/${pageId}`, {
     method: "PATCH",

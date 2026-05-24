@@ -15,12 +15,17 @@ vi.mock("../../../src/clients/gmail-api.js", () => ({
 
 vi.mock("../../../src/clients/anthropic.js", () => ({
   analyzeEmail: vi.fn(),
+  pickTaskTitle: (analysis: { task_title?: string }, subject: string) => {
+    const t = analysis.task_title?.trim();
+    return t && t.length > 0 ? t : subject;
+  },
 }));
 
 vi.mock("../../../src/clients/notion.js", () => ({
   addTask: vi.fn(),
   updateTaskFromReply: vi.fn(),
   getTaskStatus: vi.fn(),
+  getTaskTitleAndDue: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("../../../src/clients/telegram.js", () => ({
@@ -69,6 +74,7 @@ describe("checkGmail", () => {
       gmailUrl: "https://mail.google.com/mail/u/0/#search/rfc822msgid:",
     });
     (analyzeEmail as ReturnType<typeof vi.fn>).mockResolvedValue({
+      task_title: "田中さんへの進捗報告",
       summary: "進捗確認の依頼",
       tasks: [{ title: "進捗を報告する", priority: "high", due: "2026-04-30" }],
     });
@@ -79,14 +85,46 @@ describe("checkGmail", () => {
     expect(addTask).toHaveBeenCalledTimes(1);
     expect(addTask).toHaveBeenCalledWith(
       env,
-      expect.objectContaining({ title: "プロジェクトの進捗確認", source: "Gmail" }),
+      expect.objectContaining({ title: "田中さんへの進捗報告", source: "Gmail" }),
       [expect.objectContaining({ title: "進捗を報告する", priority: "high", due: "2026-04-30" })],
       "内容",
     );
     const { syncTaskCalendarEventSafe } = await import("../../../src/handlers/calendar.js");
     expect(syncTaskCalendarEventSafe).toHaveBeenCalledWith(
       env,
-      { pageId: "page-new-001", title: "プロジェクトの進捗確認", due: "2026-04-30" },
+      { pageId: "page-new-001", title: "田中さんへの進捗報告", due: "2026-04-30" },
+    );
+  });
+
+  it("falls back to email subject when LLM omits task_title", async () => {
+    const env = createMockEnv();
+    const { listAllMessages, getMessage, parseMessage } = await import("../../../src/clients/gmail-api.js");
+    const { analyzeEmail } = await import("../../../src/clients/anthropic.js");
+    const { addTask } = await import("../../../src/clients/notion.js");
+    const { getThreadMapEntry } = await import("../../../src/storage/d1.js");
+
+    (listAllMessages as ReturnType<typeof vi.fn>).mockResolvedValue([{ id: "msg-002", threadId: "thread-002" }]);
+    (getMessage as ReturnType<typeof vi.fn>).mockResolvedValue(gmailFixtures.newEmail);
+    (parseMessage as ReturnType<typeof vi.fn>).mockReturnValue({
+      subject: "件名そのまま",
+      body: "本文",
+      senderEmail: "x@example.com",
+      threadId: "thread-002",
+      gmailUrl: "https://mail.google.com/",
+    });
+    (analyzeEmail as ReturnType<typeof vi.fn>).mockResolvedValue({
+      summary: "要約",
+      tasks: [{ title: "やる", priority: "medium", due: null }],
+    });
+    (getThreadMapEntry as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    (addTask as ReturnType<typeof vi.fn>).mockResolvedValue("page-fallback");
+
+    await checkGmail(env);
+    expect(addTask).toHaveBeenCalledWith(
+      env,
+      expect.objectContaining({ title: "件名そのまま" }),
+      expect.anything(),
+      expect.anything(),
     );
   });
 
@@ -154,6 +192,41 @@ describe("checkGmail", () => {
       "返信内容",
     );
     expect(addTask).not.toHaveBeenCalled();
+  });
+
+  it("syncs calendar with updated due after a reply email shortens the due date", async () => {
+    const env = createMockEnv();
+    const { listAllMessages, getMessage, parseMessage } = await import("../../../src/clients/gmail-api.js");
+    const { analyzeEmail } = await import("../../../src/clients/anthropic.js");
+    const { getTaskTitleAndDue } = await import("../../../src/clients/notion.js");
+    const { getThreadMapEntry } = await import("../../../src/storage/d1.js");
+    const { syncTaskCalendarEventSafe } = await import("../../../src/handlers/calendar.js");
+
+    (listAllMessages as ReturnType<typeof vi.fn>).mockResolvedValue([{ id: "msg-reply-due", threadId: "thread-reply" }]);
+    (getMessage as ReturnType<typeof vi.fn>).mockResolvedValue(gmailFixtures.replyEmail);
+    (parseMessage as ReturnType<typeof vi.fn>).mockReturnValue({
+      subject: "Re: 締切前倒し",
+      body: "前倒しでお願いします",
+      senderEmail: "boss@example.com",
+      threadId: "thread-reply",
+      gmailUrl: "https://mail.google.com/",
+    });
+    (analyzeEmail as ReturnType<typeof vi.fn>).mockResolvedValue({
+      summary: "締切が前倒しに",
+      tasks: [{ title: "前倒し対応", priority: "high", due: "2026-05-25" }],
+    });
+    (getThreadMapEntry as ReturnType<typeof vi.fn>).mockResolvedValue("existing-page-id");
+    (getTaskTitleAndDue as ReturnType<typeof vi.fn>).mockResolvedValue({
+      title: "プロジェクト納品",
+      due: "2026-05-25",
+    });
+
+    await checkGmail(env);
+
+    expect(syncTaskCalendarEventSafe).toHaveBeenCalledWith(
+      env,
+      { pageId: "existing-page-id", title: "プロジェクト納品", due: "2026-05-25" },
+    );
   });
 
   it("skips blocked senders", async () => {

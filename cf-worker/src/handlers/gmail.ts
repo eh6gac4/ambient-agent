@@ -1,7 +1,7 @@
 import type { Env } from "../types.js";
 import { listAllMessages, getMessage, parseMessage, isCalendarInvite, archiveMessage, addLabel, getOrCreateLabel } from "../clients/gmail-api.js";
-import { analyzeEmail } from "../clients/anthropic.js";
-import { addTask, updateTaskFromReply, getTaskStatus } from "../clients/notion.js";
+import { analyzeEmail, pickTaskTitle } from "../clients/anthropic.js";
+import { addTask, updateTaskFromReply, getTaskStatus, getTaskTitleAndDue } from "../clients/notion.js";
 import { sendMessage, escapeMd } from "../clients/telegram.js";
 import { taskLink } from "./telegram.js";
 import { syncTaskCalendarEventSafe } from "./calendar.js";
@@ -62,6 +62,7 @@ export async function checkGmail(env: Env, options: CheckGmailOptions = {}): Pro
 
       const analysis = await analyzeEmail(env, subject, body);
       const { summary, tasks } = analysis;
+      const taskTitle = pickTaskTitle(analysis, subject);
 
       if (tasks.length) {
         const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
@@ -76,13 +77,18 @@ export async function checkGmail(env: Env, options: CheckGmailOptions = {}): Pro
         if (existingPageId) {
           await updateTaskFromReply(env, existingPageId, tasks, best.priority, dues[0] ?? null, body);
           if (taskLabelId) await addLabel(env, meta.id, taskLabelId);
+          // updateTaskFromReply で Due が前倒しされた場合に備えて Notion の最新値で同期
+          const latest = await getTaskTitleAndDue(env, existingPageId);
+          if (latest) {
+            await syncTaskCalendarEventSafe(env, { pageId: existingPageId, title: latest.title, due: latest.due });
+          }
           taskLines.push(
-            `• *${escapeMd(subject)}*（更新）\n  ${escapeMd(summary)}\n  → ${subtaskTitles.map(escapeMd).join("、")}\n  ${taskLink(existingPageId)}`,
+            `• *${escapeMd(taskTitle)}*（更新）\n  ${escapeMd(summary)}\n  → ${subtaskTitles.map(escapeMd).join("、")}\n  ${taskLink(existingPageId)}`,
           );
         } else {
           const pageId = await addTask(
             env,
-            { title: subject, due: dues[0] ?? null, priority: best.priority, icon: best.icon, source: "Gmail", sourceUrl: gmailUrl },
+            { title: taskTitle, due: dues[0] ?? null, priority: best.priority, icon: best.icon, source: "Gmail", sourceUrl: gmailUrl },
             tasks,
             body,
           );
@@ -90,15 +96,15 @@ export async function checkGmail(env: Env, options: CheckGmailOptions = {}): Pro
             if (threadId) await setThreadMapEntry(env, threadId, pageId);
             await setSenderForTask(env, pageId, senderEmail);
             if (taskLabelId) await addLabel(env, meta.id, taskLabelId);
-            await syncTaskCalendarEventSafe(env, { pageId, title: subject, due: dues[0] ?? null });
+            await syncTaskCalendarEventSafe(env, { pageId, title: taskTitle, due: dues[0] ?? null });
           }
           const link = pageId ? taskLink(pageId) : `[📧 Gmail で開く](${gmailUrl})`;
           taskLines.push(
-            `• *${escapeMd(subject)}*\n  ${escapeMd(summary)}\n  → ${subtaskTitles.map(escapeMd).join("、")}\n  ${link}`,
+            `• *${escapeMd(taskTitle)}*\n  ${escapeMd(summary)}\n  → ${subtaskTitles.map(escapeMd).join("、")}\n  ${link}`,
           );
         }
       } else {
-        archivedLines.push(`• *${escapeMd(subject)}*\n  ${escapeMd(summary)}`);
+        archivedLines.push(`• *${escapeMd(taskTitle)}*\n  ${escapeMd(summary)}`);
       }
 
       await archiveMessage(env, meta.id);

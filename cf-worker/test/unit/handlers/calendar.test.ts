@@ -17,6 +17,7 @@ vi.mock("../../../src/clients/gcal-api.js", () => ({
   getTodaysEvents: vi.fn().mockResolvedValue([]),
   insertEvent: vi.fn().mockResolvedValue("event-id"),
   deleteEvent: vi.fn().mockResolvedValue(undefined),
+  updateEventDateTime: vi.fn().mockResolvedValue(true),
 }));
 
 vi.mock("../../../src/storage/d1.js", () => ({
@@ -130,19 +131,39 @@ describe("syncTaskCalendarEvent", () => {
     expect(setCalendarSync).not.toHaveBeenCalled();
   });
 
-  it("re-creates the event when only the time changes on the same date (dedup regression)", async () => {
+  it("PATCHes the existing event when only the time changes on the same date (preserves event metadata)", async () => {
     const env = createMockEnv();
-    const { insertEvent, deleteEvent } = await import("../../../src/clients/gcal-api.js");
+    const { insertEvent, deleteEvent, updateEventDateTime } = await import("../../../src/clients/gcal-api.js");
     const { getCalendarSync, setCalendarSync } = await import("../../../src/storage/d1.js");
     // legacy row stored date-only
     (getCalendarSync as ReturnType<typeof vi.fn>).mockResolvedValue({
       eventId: "ev-old",
       calendarDate: "2099-05-17",
     });
+    (updateEventDateTime as ReturnType<typeof vi.fn>).mockResolvedValue(true);
 
     await syncTaskCalendarEvent(env, { pageId: "p1", title: "歯医者", due: "2099-05-17T17:00:00" });
 
-    expect(deleteEvent).toHaveBeenCalledWith(env, "ev-old");
+    expect(updateEventDateTime).toHaveBeenCalledWith(env, "ev-old", "2099-05-17T17:00:00");
+    expect(deleteEvent).not.toHaveBeenCalled();
+    expect(insertEvent).not.toHaveBeenCalled();
+    expect(setCalendarSync).toHaveBeenCalledWith(env, "p1", "ev-old", "2099-05-17T17:00:00");
+  });
+
+  it("falls back to recreate when PATCH returns false (event already gone)", async () => {
+    const env = createMockEnv();
+    const { insertEvent, deleteEvent, updateEventDateTime } = await import("../../../src/clients/gcal-api.js");
+    const { getCalendarSync, setCalendarSync } = await import("../../../src/storage/d1.js");
+    (getCalendarSync as ReturnType<typeof vi.fn>).mockResolvedValue({
+      eventId: "ev-stale",
+      calendarDate: "2099-05-17",
+    });
+    (updateEventDateTime as ReturnType<typeof vi.fn>).mockResolvedValue(false);
+
+    await syncTaskCalendarEvent(env, { pageId: "p1", title: "歯医者", due: "2099-05-17T17:00:00" });
+
+    expect(updateEventDateTime).toHaveBeenCalledWith(env, "ev-stale", "2099-05-17T17:00:00");
+    expect(deleteEvent).toHaveBeenCalledWith(env, "ev-stale");
     expect(insertEvent).toHaveBeenCalledWith(env, "歯医者", "2099-05-17T17:00:00");
     expect(setCalendarSync).toHaveBeenCalledWith(env, "p1", "event-id", "2099-05-17T17:00:00");
   });

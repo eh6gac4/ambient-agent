@@ -10,6 +10,13 @@ import { sendMessage } from "./clients/telegram.js";
 // 無料プランの Cron 上限（5個）に合わせて5ジョブに統合
 async function hourlyGmail(env: Env): Promise<void> {
   await checkGmail(env, { silent: true });
+  // Notion で日時が編集されたタスクをカレンダーへ反映。
+  // 失敗してもメール処理結果には影響させない。
+  try {
+    await syncCalendar(env);
+  } catch (err) {
+    console.error("hourlyGmail: syncCalendar failed:", err);
+  }
 }
 
 async function morningPrep(env: Env): Promise<void> {
