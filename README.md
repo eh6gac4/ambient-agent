@@ -19,7 +19,7 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 | Cloudflare Workers | メイン実行環境（TypeScript） |
 | Cloudflare D1 | スレッドマップ・カレンダー同期・処理済みメッセージ管理 |
 | Cloudflare KV | Telegram オフセット・タスクキャッシュ・ブロックリスト |
-| Cloudflare Cron Triggers | 定期ジョブのスケジューリング（4ジョブ） |
+| Cloudflare Cron Triggers | 定期ジョブのスケジューリング（5ジョブ） |
 
 ## HTTP エンドポイント
 
@@ -51,8 +51,9 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 - メール処理後に `syncCalendar` を実行し、Notion で編集された日時を Google Calendar へ伝播（既存イベントは PATCH で日時のみ差し替え）
 
 **morning_prep の詳細:**
-- 完了済みタスクのカレンダーイベントを削除、未着手タスクを Calendar に登録
-- 期限3日以内の medium タスクを high に昇格
+- ブロックリスト学習: `sender_map` を走査し、ステータスが「中止」のタスクの送信者を `no_task_senders` (KV) に追加。完了済みは `sender_map` から外すだけ
+- カレンダー同期: 完了済みタスクのカレンダーイベントを削除、未着手タスクを Calendar に登録
+- 優先度昇格: 期限3日以内の medium タスクを high に昇格
 
 **カレンダー登録のタイミング:**
 - 期日付きタスクは作成時（Gmail / Telegram テキスト・画像・URL）に即座に Calendar へ登録（同日時刻指定タスクの取りこぼし防止）
@@ -120,7 +121,7 @@ ambient-agent/
 │   │   └── storage/              # D1・KV アクセス層
 │   │       ├── d1.ts             # D1 CRUD ヘルパー
 │   │       └── kv.ts             # KV ヘルパー
-│   ├── test/                     # Vitest テスト（134件）
+│   ├── test/                     # Vitest テスト（144件）
 │   ├── migrations/               # D1 スキーマ
 │   ├── scripts/
 │   │   ├── push-secrets.mjs       # Worker Secrets 一括登録
