@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { analyzeEmail, extractTasksFromText, extractTasksFromUrlContent } from "../../../src/clients/anthropic.js";
+import { analyzeEmail, extractTasksFromText, extractTasksFromUrlContent, pickTaskTitle } from "../../../src/clients/anthropic.js";
 import { createMockEnv } from "../../helpers/mocks.js";
 import claudeFixtures from "../../fixtures/claude-responses.json" assert { type: "json" };
 
@@ -16,6 +16,7 @@ describe("analyzeEmail", () => {
 
     const result = await analyzeEmail(env, "プロジェクトの進捗確認", "内容...");
     expect(result.summary).toContain("田中さん");
+    expect(result.task_title).toBe("田中さんへのプロジェクト進捗報告");
     expect(result.tasks).toHaveLength(1);
     expect(result.tasks[0].title).toBe("プロジェクト進捗を報告する");
     expect(result.tasks[0].priority).toBe("high");
@@ -44,6 +45,22 @@ describe("analyzeEmail", () => {
     const result = await analyzeEmail(env, "件名", "本文");
     expect(result.tasks).toEqual([]);
     expect(typeof result.summary).toBe("string");
+  });
+});
+
+describe("pickTaskTitle", () => {
+  it("returns task_title when present and non-empty", () => {
+    expect(pickTaskTitle({ task_title: "ACME社4月分請求書の支払い", summary: "", tasks: [] }, "【重要】請求書発行のご案内")).toBe(
+      "ACME社4月分請求書の支払い",
+    );
+  });
+
+  it("falls back to subject when task_title is missing", () => {
+    expect(pickTaskTitle({ summary: "", tasks: [] }, "件名そのまま")).toBe("件名そのまま");
+  });
+
+  it("falls back to subject when task_title is whitespace only", () => {
+    expect(pickTaskTitle({ task_title: "   ", summary: "", tasks: [] }, "件名そのまま")).toBe("件名そのまま");
   });
 });
 

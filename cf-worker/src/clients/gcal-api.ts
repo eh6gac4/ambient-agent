@@ -74,6 +74,40 @@ export async function insertEvent(env: Env, title: string, due: string): Promise
   return event.id ?? null;
 }
 
+/**
+ * 既存イベントの start/end を PATCH で書き換える。
+ * delete+insert と違い、イベント ID や追加されたメモ・出席者情報を保持できる。
+ * 404 (eventId が無効) のときだけ false を返し、呼び出し側で再作成にフォールバックさせる。
+ */
+export async function updateEventDateTime(env: Env, eventId: string, due: string): Promise<boolean> {
+  const token = await getAccessToken(env);
+
+  let body: Record<string, unknown>;
+  if (due.includes("T")) {
+    const startDt = new Date(due);
+    const endDt = new Date(startDt.getTime() + 60 * 60 * 1000);
+    body = {
+      start: { dateTime: startDt.toISOString(), timeZone: "Asia/Tokyo" },
+      end: { dateTime: endDt.toISOString(), timeZone: "Asia/Tokyo" },
+    };
+  } else {
+    body = {
+      start: { date: due },
+      end: { date: due },
+    };
+  }
+
+  const resp = await fetch(`${BASE}/events/${eventId}`, {
+    method: "PATCH",
+    headers: { ...authHeader(token), "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (resp.status === 404 || resp.status === 410) return false;
+  if (!resp.ok) throw new Error(`updateEventDateTime failed: ${resp.status}`);
+  return true;
+}
+
 export async function deleteEvent(env: Env, eventId: string): Promise<void> {
   const token = await getAccessToken(env);
   await fetch(`${BASE}/events/${eventId}`, {

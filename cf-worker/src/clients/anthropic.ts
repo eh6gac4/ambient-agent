@@ -32,12 +32,13 @@ const EXTRACT_TASKS_PROMPT = `あなたはメールからタスクを抽出す�
 
 const ANALYZE_EMAIL_PROMPT = `あなたはメールを分析するアシスタントです。
 
-以下のメールを読み、要約とアクションが必要なタスクを JSON で返してください。
+以下のメールを読み、タスク一覧で使うタイトル・要約・アクションが必要なタスクを JSON で返してください。
 
 ## 出力フォーマット（JSON のみ、説明文不要）
 
 \`\`\`json
 {
+  "task_title": "タスク一覧に並べたとき一目で内容が分かる短いタイトル（日本語・20文字程度）",
   "summary": "メールの内容を1〜2文で要約（日本語）",
   "tasks": [
     {
@@ -52,6 +53,7 @@ const ANALYZE_EMAIL_PROMPT = `あなたはメールを分析するアシスタ�
 \`\`\`
 
 ## 判断基準
+- task_title: メール件名そのままにせず、誰から何の用件かが分かる短文にする。例「件名: 【重要なお知らせ】請求書発行のご連絡」→ task_title: 「ACME社4月分請求書の支払い」。社名・人物名が分かれば含めると良い。広告・通知でタスクが無い場合は「{送信元}からのお知らせ」程度で良い
 - summary: 誰から何の用件か、重要ポイントを1〜2文で
 - tasks: 返信・確認・提出・対応などのアクション動詞を含む文をタスクとして抽出する
 - 期日が明示されていればそれを due に設定する（不明な場合は null）
@@ -123,6 +125,12 @@ export async function analyzeEmail(env: Env, subject: string, body: string): Pro
   } catch {
     return { summary: text.trim(), tasks: [] };
   }
+}
+
+/** Notion ページのタイトル候補。LLM が task_title を返さなければ件名にフォールバック。 */
+export function pickTaskTitle(analysis: EmailAnalysis, subject: string): string {
+  const t = analysis.task_title?.trim();
+  return t && t.length > 0 ? t : subject;
 }
 
 export async function extractTasksFromUrlContent(env: Env, url: string, content: string): Promise<ExtractedTask[]> {

@@ -70,12 +70,14 @@ describe("scheduled handler - cron dispatch", () => {
     expect(sendEscalationNotice).toHaveBeenCalledWith(env);
   });
 
-  it("30 22-23,0-12 * * * (hourly_gmail) runs checkGmail in silent mode", async () => {
+  it("30 22-23,0-12 * * * (hourly_gmail) runs checkGmail in silent mode and syncs calendar", async () => {
     const env = createMockEnv();
     const { checkGmail } = await import("../../src/handlers/gmail.js");
+    const { syncCalendar } = await import("../../src/handlers/calendar.js");
 
     await worker.scheduled(makeScheduledEvent("30 22-23,0-12 * * *"), env);
     expect(checkGmail).toHaveBeenCalledWith(env, { silent: true });
+    expect(syncCalendar).toHaveBeenCalledWith(env);
   });
 
   it("0 23 * * * (morning_briefing) runs briefing, cost, due_soon, email_digest", async () => {

@@ -1,5 +1,5 @@
 import type { Env, Task } from "../types.js";
-import { getTodaysEvents, insertEvent, deleteEvent } from "../clients/gcal-api.js";
+import { getTodaysEvents, insertEvent, deleteEvent, updateEventDateTime } from "../clients/gcal-api.js";
 import { getOpenTasks } from "../clients/notion.js";
 import { sendMessage, escapeMd } from "../clients/telegram.js";
 import { formatTaskList, fmtDue } from "./task-formatter.js";
@@ -48,7 +48,18 @@ export async function syncTaskCalendarEvent(
   const record = await getCalendarSync(env, task.pageId);
   if (record && record.calendarDate === eventDue) return;
 
+  // 既存イベントがあれば PATCH で日時だけ差し替え（イベント ID と Calendar 側のメモを保持）
   if (record?.eventId) {
+    try {
+      const ok = await updateEventDateTime(env, record.eventId, eventDue);
+      if (ok) {
+        await setCalendarSync(env, task.pageId, record.eventId, eventDue);
+        return;
+      }
+    } catch (err) {
+      console.warn("updateEventDateTime failed, falling back to recreate:", err);
+    }
+    // PATCH が 404/410 や失敗のときは作り直しにフォールバック
     try {
       await deleteEvent(env, record.eventId);
     } catch {

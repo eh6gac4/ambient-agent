@@ -12,7 +12,7 @@
     "content": [
       {
         "type": "text",
-        "text": "{\"summary\": \"田中さんからプロジェクトの進捗確認依頼。期限は4月30日。\", \"tasks\": [{\"title\": \"プロジェクト進捗を報告する\", \"due\": \"2026-04-30\", \"priority\": \"high\", \"icon\": \"📩\", \"source\": \"Gmail\"}]}"
+        "text": "{\"task_title\": \"田中さんへのプロジェクト進捗報告\", \"summary\": \"田中さんからプロジェクトの進捗確認依頼。期限は4月30日。\", \"tasks\": [{\"title\": \"プロジェクト進捗を報告する\", \"due\": \"2026-04-30\", \"priority\": \"high\", \"icon\": \"📩\", \"source\": \"Gmail\"}]}"
       }
     ],
     "usage": { "input_tokens": 200, "output_tokens": 80 }
