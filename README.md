@@ -37,7 +37,7 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 | 時刻 (JST) | ジョブ | 内容 |
 |---|---|---|
 | 07:30〜21:30 毎時 | hourly_gmail | Gmail 未読を少しずつサイレント処理（通知せず KV に蓄積） + カレンダー同期 |
-| 07:50 | morning_prep | ①ブロックリスト学習 → ②カレンダー同期 → ③優先度昇格 |
+| 07:50 | morning_prep | ①ブロックリスト学習 → ②カレンダー同期 → ③バックログ昇格 → ④優先度昇格 |
 | 08:00 | morning_briefing | ①日次ブリーフィング → ②APIコストレポート → ③期限間近通知 → ④メール処理サマリ |
 | 13:00 | task_reminder | 未着手タスク一覧を Telegram に送信 |
 | 月 09:00 | stale_tasks | 14日以上未更新タスクを通知 |
@@ -53,6 +53,7 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 **morning_prep の詳細:**
 - ブロックリスト学習: `sender_map` を走査し、ステータスが「中止」のタスクの送信者を `no_task_senders` (KV) に追加。完了済みは `sender_map` から外すだけ
 - カレンダー同期: 完了済みタスクのカレンダーイベントを削除、未着手タスクを Calendar に登録
+- バックログ昇格: 期限3日以内（過去 due 含む）の「バックログ」ステータスのタスクを「未着手」に昇格。Due 未設定のバックログは対象外
 - 優先度昇格: 期限3日以内の medium タスクを high に昇格
 
 **カレンダー登録のタイミング:**
@@ -88,7 +89,7 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 | タイトル | タイトル | |
 | Due | 日付 | |
 | Priority | セレクト | high / medium / low |
-| Status | ステータス | 未着手 / 完了 / 中止 など |
+| Status | ステータス | 未着手 / 完了 / 中止 / バックログ など |
 | Source | テキスト | Gmail / Telegram / URL など |
 | SourceURL | URL | メール元タスクの Gmail リンク |
 | 親アイテム | リレーション（同DB・自己） | Notion の「サブアイテム」機能で自動生成される双方向リレーション。プロパティ名が異なる場合は環境変数 `NOTION_SUBITEM_PARENT_PROP` で上書き可能 |

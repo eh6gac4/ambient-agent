@@ -25,6 +25,7 @@ vi.mock("../../src/handlers/briefing.js", () => ({
 }));
 
 vi.mock("../../src/handlers/escalation.js", () => ({
+  sendBacklogPromotionNotice: vi.fn().mockResolvedValue(undefined),
   sendEscalationNotice: vi.fn().mockResolvedValue(undefined),
   sendStaleTasksNotice: vi.fn().mockResolvedValue(undefined),
 }));
@@ -58,15 +59,16 @@ describe("scheduled handler - cron dispatch", () => {
     expect(learnFromCancelled).toHaveBeenCalledWith(env);
   });
 
-  it("50 22 * * * (morning_prep) runs calendar, escalation (no gmail)", async () => {
+  it("50 22 * * * (morning_prep) runs calendar, backlog promotion, escalation (no gmail)", async () => {
     const env = createMockEnv();
     const { checkGmail } = await import("../../src/handlers/gmail.js");
     const { syncCalendar } = await import("../../src/handlers/calendar.js");
-    const { sendEscalationNotice } = await import("../../src/handlers/escalation.js");
+    const { sendBacklogPromotionNotice, sendEscalationNotice } = await import("../../src/handlers/escalation.js");
 
     await worker.scheduled(makeScheduledEvent("50 22 * * *"), env);
     expect(checkGmail).not.toHaveBeenCalled();
     expect(syncCalendar).toHaveBeenCalledWith(env);
+    expect(sendBacklogPromotionNotice).toHaveBeenCalledWith(env);
     expect(sendEscalationNotice).toHaveBeenCalledWith(env);
   });
 

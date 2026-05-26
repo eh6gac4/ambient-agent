@@ -8,6 +8,7 @@ const STATUS_PENDING = "未着手";
 const STATUS_IN_PROGRESS_GROUP = ["進行中", "確認中", "一時中断"];
 const STATUS_DONE = "完了";
 const STATUS_CANCELLED = "中止";
+const STATUS_BACKLOG = "バックログ";
 
 const EMAIL_BODY_MAX_CHARS = 10000;
 const NOTION_RICH_TEXT_MAX = 2000;
@@ -332,6 +333,34 @@ export async function escalatePriorityTasks(env: Env): Promise<Task[]> {
     escalated.push(task);
   }
   return escalated;
+}
+
+// バックログに退避してあるタスクのうち、due が今から 3 日以内 (過去 due 含む) に
+// 入っているものを未着手に昇格させる。締切のないバックログ (due=null) は対象外。
+export async function promoteBacklogTasks(env: Env): Promise<Task[]> {
+  const today = new Date();
+  const deadline = new Date(today);
+  deadline.setDate(deadline.getDate() + 3);
+  const deadlineStr = deadline.toISOString().slice(0, 10);
+
+  const result = await queryDB(env, {
+    and: [
+      { property: "Status", status: { equals: STATUS_BACKLOG } },
+      { property: "Due", date: { on_or_before: deadlineStr } },
+    ],
+  });
+
+  const promoted: Task[] = [];
+  for (const page of result.results as Record<string, unknown>[]) {
+    const task = parseTaskPage(page);
+    await fetch(`${NOTION_API}/pages/${task.pageId}`, {
+      method: "PATCH",
+      headers: headers(env.NOTION_TOKEN),
+      body: JSON.stringify({ properties: { Status: { status: { name: STATUS_PENDING } } } }),
+    });
+    promoted.push(task);
+  }
+  return promoted;
 }
 
 export async function completeTask(env: Env, pageId: string): Promise<void> {

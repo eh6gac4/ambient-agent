@@ -1,5 +1,5 @@
 import type { Env } from "../types.js";
-import { getOpenTasks, escalatePriorityTasks } from "../clients/notion.js";
+import { getOpenTasks, escalatePriorityTasks, promoteBacklogTasks } from "../clients/notion.js";
 import { sendMessage, escapeMd } from "../clients/telegram.js";
 import { fmtDue } from "./task-formatter.js";
 
@@ -13,6 +13,17 @@ export async function sendEscalationNotice(env: Env): Promise<void> {
   await sendMessage(
     env,
     `*⬆️ 優先度を high に昇格しました (${escalated.length}件)*\n\n` + lines.join("\n"),
+  );
+}
+
+export async function sendBacklogPromotionNotice(env: Env): Promise<void> {
+  const promoted = await promoteBacklogTasks(env);
+  if (!promoted.length) return;
+
+  const lines = promoted.map((t) => `• ${escapeMd(t.title)}（期限: ${fmtDue(t.due)}）`);
+  await sendMessage(
+    env,
+    `*📥 バックログから未着手に昇格しました (${promoted.length}件)*\n\n` + lines.join("\n"),
   );
 }
 
