@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { sendEscalationNotice, sendStaleTasksNotice } from "../../../src/handlers/escalation.js";
+import { sendBacklogPromotionNotice, sendEscalationNotice, sendStaleTasksNotice } from "../../../src/handlers/escalation.js";
 import { createMockEnv, sampleTasks } from "../../helpers/mocks.js";
 import type { Task } from "../../../src/types.js";
 
 vi.mock("../../../src/clients/notion.js", () => ({
   getOpenTasks: vi.fn(),
   escalatePriorityTasks: vi.fn(),
+  promoteBacklogTasks: vi.fn(),
 }));
 
 // sendMessage のみモックし、escapeMd は実装をそのまま使う（エスケープを検証するため）
@@ -55,6 +56,37 @@ describe("sendEscalationNotice", () => {
 
     await sendEscalationNotice(env);
     expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("見積\\_資料 \\*至急\\*"));
+  });
+});
+
+describe("sendBacklogPromotionNotice", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("sends notice when backlog tasks are promoted", async () => {
+    const env = createMockEnv();
+    const { promoteBacklogTasks } = await import("../../../src/clients/notion.js");
+    const { sendMessage } = await import("../../../src/clients/telegram.js");
+
+    (promoteBacklogTasks as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { title: "原稿チェック", due: "2026-05-27", priority: "medium", status: "未着手", lastEdited: null, url: "", pageId: "p1" },
+    ]);
+
+    await sendBacklogPromotionNotice(env);
+    expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("原稿チェック"));
+    expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("バックログから未着手に昇格"));
+  });
+
+  it("does not send when nothing was promoted", async () => {
+    const env = createMockEnv();
+    const { promoteBacklogTasks } = await import("../../../src/clients/notion.js");
+    const { sendMessage } = await import("../../../src/clients/telegram.js");
+
+    (promoteBacklogTasks as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+    await sendBacklogPromotionNotice(env);
+    expect(sendMessage).not.toHaveBeenCalled();
   });
 });
 

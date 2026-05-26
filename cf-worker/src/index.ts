@@ -2,7 +2,7 @@ import type { Env } from "./types.js";
 import { checkGmail, learnFromCancelled } from "./handlers/gmail.js";
 import { syncCalendar, sendDueSoonNotice, sendTaskReminder } from "./handlers/calendar.js";
 import { sendDailyBriefing, sendCostReport, sendEmailDigest } from "./handlers/briefing.js";
-import { sendEscalationNotice, sendStaleTasksNotice } from "./handlers/escalation.js";
+import { sendBacklogPromotionNotice, sendEscalationNotice, sendStaleTasksNotice } from "./handlers/escalation.js";
 import { handleTelegramWebhook } from "./handlers/telegram.js";
 import { handleAlert } from "./handlers/alert.js";
 import { sendMessage } from "./clients/telegram.js";
@@ -22,6 +22,7 @@ async function hourlyGmail(env: Env): Promise<void> {
 async function morningPrep(env: Env): Promise<void> {
   await learnFromCancelled(env);
   await syncCalendar(env);
+  await sendBacklogPromotionNotice(env);
   await sendEscalationNotice(env);
 }
 

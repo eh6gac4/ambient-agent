@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { addTask, addSubtask, getOpenTasks, completeTask, cancelTask, updateTaskDue, escalatePriorityTasks, sanitizeEmoji } from "../../../src/clients/notion.js";
+import { addTask, addSubtask, getOpenTasks, completeTask, cancelTask, updateTaskDue, escalatePriorityTasks, promoteBacklogTasks, sanitizeEmoji } from "../../../src/clients/notion.js";
 import { createMockEnv } from "../../helpers/mocks.js";
 import notionFixtures from "../../fixtures/notion-tasks.json" assert { type: "json" };
 
@@ -313,6 +313,60 @@ describe("escalatePriorityTasks", () => {
     const escalated = await escalatePriorityTasks(env);
     expect(escalated).toHaveLength(1);
     expect(escalated[0].title).toBe("緊急タスク");
+  });
+});
+
+describe("promoteBacklogTasks", () => {
+  it("promotes backlog tasks due within 3 days to 未着手", async () => {
+    const env = createMockEnv();
+    const today = new Date();
+    const dueSoon = new Date(today);
+    dueSoon.setDate(dueSoon.getDate() + 2);
+    const dueStr = dueSoon.toISOString().slice(0, 10);
+
+    const backlogTask = {
+      id: "page-promote",
+      url: "",
+      last_edited_time: today.toISOString(),
+      properties: {
+        "タイトル": { title: [{ text: { content: "下書きレビュー" } }] },
+        Due: { date: { start: dueStr } },
+        Priority: { select: { name: "medium" } },
+        Status: { status: { name: "バックログ" } },
+      },
+    };
+
+    const patchSpy = vi.fn().mockResolvedValue(new Response("{}", { status: 200 }));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn()
+        .mockResolvedValueOnce(new Response(JSON.stringify({ data_sources: [] }), { status: 200 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({ results: [backlogTask] }), { status: 200 }))
+        .mockImplementation(patchSpy),
+    );
+
+    const promoted = await promoteBacklogTasks(env);
+    expect(promoted).toHaveLength(1);
+    expect(promoted[0].title).toBe("下書きレビュー");
+
+    const patchCall = patchSpy.mock.calls[0];
+    expect(patchCall[0]).toContain("page-promote");
+    expect(patchCall[1].method).toBe("PATCH");
+    expect(patchCall[1].body).toContain("未着手");
+  });
+
+  it("returns empty when no backlog tasks are eligible", async () => {
+    const env = createMockEnv();
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn()
+        .mockResolvedValueOnce(new Response(JSON.stringify({ data_sources: [] }), { status: 200 }))
+        .mockResolvedValueOnce(new Response(JSON.stringify({ results: [] }), { status: 200 })),
+    );
+
+    const promoted = await promoteBacklogTasks(env);
+    expect(promoted).toHaveLength(0);
   });
 });
 
