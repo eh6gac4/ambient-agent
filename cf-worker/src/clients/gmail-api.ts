@@ -41,20 +41,59 @@ function decodeBase64Url(data: string): string {
   return UTF8_DECODER.decode(bytes);
 }
 
-function extractBody(payload: GmailPayload): string {
-  if (payload.mimeType === "text/plain") {
-    const data = payload.body?.data ?? "";
-    if (!data) return "";
-    try {
-      return decodeBase64Url(data);
-    } catch {
-      return "";
-    }
+function decodePart(payload: GmailPayload): string {
+  const data = payload.body?.data ?? "";
+  if (!data) return "";
+  try {
+    return decodeBase64Url(data);
+  } catch {
+    return "";
   }
+}
+
+// MIME ツリーを再帰的に探索し、最初に見つかった指定 mimeType パートの本文を返す。
+function extractByMime(payload: GmailPayload, mimeType: string): string {
+  if (payload.mimeType === mimeType) return decodePart(payload);
   for (const part of payload.parts ?? []) {
-    const result = extractBody(part);
+    const result = extractByMime(part, mimeType);
     if (result) return result;
   }
+  return "";
+}
+
+const HTML_ENTITIES: Record<string, string> = {
+  "&nbsp;": " ",
+  "&amp;": "&",
+  "&lt;": "<",
+  "&gt;": ">",
+  "&quot;": '"',
+  "&#39;": "'",
+  "&apos;": "'",
+};
+
+// HTML 本文を LLM に渡せるプレーンテキストへ簡易変換する。
+// Workers 環境では cheerio/jsdom が重いため、正規表現ベースの軽量ストリッパで処理する。
+function stripHtml(html: string): string {
+  return html
+    .replace(/<(script|style|head)[^>]*>[\s\S]*?<\/\1>/gi, "") // 不可視ブロックを除去
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|tr|li|h[1-6]|table)>/gi, "\n") // ブロック要素末尾を改行に
+    .replace(/<[^>]+>/g, "") // 残りのタグを除去
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&[a-z]+;/gi, (m) => HTML_ENTITIES[m.toLowerCase()] ?? m)
+    .replace(/[ \t]+/g, " ")
+    .replace(/ *\n */g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+// text/plain を優先し、無ければ text/html をタグ除去してフォールバックする。
+function extractBody(payload: GmailPayload): string {
+  const plain = extractByMime(payload, "text/plain");
+  if (plain) return plain;
+  const html = extractByMime(payload, "text/html");
+  if (html) return stripHtml(html);
   return "";
 }
 

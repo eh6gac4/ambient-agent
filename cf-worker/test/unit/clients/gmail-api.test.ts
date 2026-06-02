@@ -77,6 +77,78 @@ describe("parseMessage body decoding", () => {
     expect(parseMessage(msg as never).body).toBe(body);
   });
 
+  it("falls back to text/html (tag-stripped) when no text/plain part exists", () => {
+    const html =
+      "<html><head><style>p{color:red}</style></head><body>" +
+      "<p>請求書の件です。</p><div>支払期限は&nbsp;6/30&nbsp;まで&amp;要確認。</div>" +
+      "<br>よろしくお願いします。</body></html>";
+    const msg = {
+      id: "m5",
+      threadId: "t5",
+      payload: {
+        mimeType: "multipart/alternative",
+        headers: [
+          { name: "Subject", value: "請求書" },
+          { name: "From", value: "biller <b@example.com>" },
+        ],
+        parts: [
+          {
+            mimeType: "text/html",
+            headers: [{ name: "Content-Type", value: "text/html; charset=UTF-8" }],
+            body: { data: utf8B64Url(html) },
+          },
+        ],
+      },
+    };
+    const parsed = parseMessage(msg as never);
+    expect(parsed.body).toBe("請求書の件です。\n支払期限は 6/30 まで&要確認。\n\nよろしくお願いします。");
+  });
+
+  it("decodes numeric and hex HTML entities in html fallback", () => {
+    const html = "<p>&#26716;&#x4E95;</p>"; // 桜井
+    const msg = {
+      id: "m6",
+      threadId: "t6",
+      payload: {
+        mimeType: "text/html",
+        headers: [
+          { name: "Subject", value: "x" },
+          { name: "From", value: "x@example.com" },
+        ],
+        body: { data: utf8B64Url(html) },
+      },
+    };
+    expect(parseMessage(msg as never).body).toBe("桜井");
+  });
+
+  it("prefers text/plain over text/html when both are present", () => {
+    const plain = "プレーン本文";
+    const msg = {
+      id: "m7",
+      threadId: "t7",
+      payload: {
+        mimeType: "multipart/alternative",
+        headers: [
+          { name: "Subject", value: "x" },
+          { name: "From", value: "x@example.com" },
+        ],
+        parts: [
+          {
+            mimeType: "text/html",
+            headers: [{ name: "Content-Type", value: "text/html; charset=UTF-8" }],
+            body: { data: utf8B64Url("<p>HTML 本文</p>") },
+          },
+          {
+            mimeType: "text/plain",
+            headers: [{ name: "Content-Type", value: "text/plain; charset=UTF-8" }],
+            body: { data: utf8B64Url(plain) },
+          },
+        ],
+      },
+    };
+    expect(parseMessage(msg as never).body).toBe(plain);
+  });
+
   it("decodes as UTF-8 even when Content-Type declares charset=ISO-2022-JP (Gmail normalizes body to UTF-8)", () => {
     // Gmail API は元メールの charset に関係なく body.data を UTF-8 バイト列で返すが、
     // Content-Type ヘッダは元メールの宣言値（例: ISO-2022-JP）が残る。
