@@ -5,6 +5,7 @@ import { sendDailyBriefing, sendCostReport, sendEmailDigest } from "./handlers/b
 import { sendBacklogPromotionNotice, sendEscalationNotice, sendStaleTasksNotice } from "./handlers/escalation.js";
 import { handleTelegramWebhook } from "./handlers/telegram.js";
 import { handleHomeArrival } from "./handlers/home-arrival.js";
+import { handleOfficeLeave } from "./handlers/office-leave.js";
 import { sendMessage } from "./clients/telegram.js";
 import { isHoliday } from "./utils/holiday.js";
 
@@ -76,6 +77,27 @@ export default {
         });
       } catch (err) {
         console.error("home-arrival error:", err);
+        return new Response(JSON.stringify({ notifications: [] }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    // iPhone ショートカット（会社Wi-Fi切断時）から呼ばれる退社トリガー。Bearer トークンで認証。
+    if (url.pathname === "/office-leave" && req.method === "GET") {
+      const auth = req.headers.get("Authorization");
+      if (!env.ALERT_TOKEN || auth !== `Bearer ${env.ALERT_TOKEN}`) {
+        return new Response("Unauthorized", { status: 401 });
+      }
+      try {
+        const notifications = await handleOfficeLeave(env);
+        return new Response(JSON.stringify({ notifications }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      } catch (err) {
+        console.error("office-leave error:", err);
         return new Response(JSON.stringify({ notifications: [] }), {
           status: 500,
           headers: { "Content-Type": "application/json" },

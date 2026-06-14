@@ -1,5 +1,5 @@
 import type { Env } from "../types.js";
-import { getAccessToken } from "./google-auth.js";
+import { getAccessToken, authHeader } from "./google-auth.js";
 
 const BASE = "https://gmail.googleapis.com/gmail/v1/users/me";
 const GMAIL_QUERY = "is:unread in:inbox -category:promotions";
@@ -16,10 +16,6 @@ interface GmailPayload {
   mimeType: string;
   body?: { data?: string };
   parts?: GmailPayload[];
-}
-
-function authHeader(token: string): Record<string, string> {
-  return { Authorization: `Bearer ${token}` };
 }
 
 function parseHeaders(payload: GmailPayload): Record<string, string> {

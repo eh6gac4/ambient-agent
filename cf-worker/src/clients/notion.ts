@@ -1,4 +1,6 @@
 import type { Env, Task, TaskInput, ExtractedTask } from "../types.js";
+import { toDateStr } from "../utils/jst.js";
+import { PRIORITY_ORDER } from "../utils/task.js";
 
 const NOTION_API = "https://api.notion.com/v1";
 const NOTION_VERSION = "2022-06-28";
@@ -79,6 +81,32 @@ function headers(token: string): Record<string, string> {
 
 function getSubitemParentProp(env: Env): string {
   return env.NOTION_SUBITEM_PARENT_PROP ?? "親アイテム";
+}
+
+/**
+ * ページの properties を PATCH する共通リクエスト。Response をそのまま返すので、
+ * エラー時に throw するか黙殺するか（fire-and-forget）は呼び出し側の判断に委ねる。
+ */
+function patchNotionPage(env: Env, pageId: string, properties: Record<string, unknown>): Promise<Response> {
+  return fetch(`${NOTION_API}/pages/${pageId}`, {
+    method: "PATCH",
+    headers: headers(env.NOTION_TOKEN),
+    body: JSON.stringify({ properties }),
+  });
+}
+
+/**
+ * ページを取得し properties を返す。取得失敗(!ok)・アーカイブ済みは null。
+ * （!ok を throw する経路や archived を見ない経路では使わないこと）
+ */
+async function fetchTaskPage(env: Env, pageId: string): Promise<Record<string, unknown> | null> {
+  const resp = await fetch(`${NOTION_API}/pages/${pageId}`, {
+    headers: headers(env.NOTION_TOKEN),
+  });
+  if (!resp.ok) return null;
+  const page = await resp.json<{ archived?: boolean; properties?: Record<string, unknown> }>();
+  if (page.archived) return null;
+  return (page.properties ?? {}) as Record<string, unknown>;
 }
 
 async function getDataSourceId(env: Env): Promise<string | null> {
@@ -303,10 +331,10 @@ export async function getOpenTasks(env: Env): Promise<Task[]> {
 export async function escalatePriorityTasks(env: Env): Promise<Task[]> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const todayStr = today.toISOString().slice(0, 10);
+  const todayStr = toDateStr(today);
   const deadline = new Date(today);
   deadline.setDate(deadline.getDate() + 3);
-  const deadlineStr = deadline.toISOString().slice(0, 10);
+  const deadlineStr = toDateStr(deadline);
 
   const statusFilters = [STATUS_PENDING, ...STATUS_IN_PROGRESS_GROUP].map((s) => ({
     property: "Status",
@@ -325,11 +353,7 @@ export async function escalatePriorityTasks(env: Env): Promise<Task[]> {
   const escalated: Task[] = [];
   for (const page of result.results as Record<string, unknown>[]) {
     const task = parseTaskPage(page);
-    await fetch(`${NOTION_API}/pages/${task.pageId}`, {
-      method: "PATCH",
-      headers: headers(env.NOTION_TOKEN),
-      body: JSON.stringify({ properties: { Priority: { select: { name: "high" } } } }),
-    });
+    await patchNotionPage(env, task.pageId, { Priority: { select: { name: "high" } } });
     escalated.push(task);
   }
   return escalated;
@@ -341,7 +365,7 @@ export async function promoteBacklogTasks(env: Env): Promise<Task[]> {
   const today = new Date();
   const deadline = new Date(today);
   deadline.setDate(deadline.getDate() + 3);
-  const deadlineStr = deadline.toISOString().slice(0, 10);
+  const deadlineStr = toDateStr(deadline);
 
   const result = await queryDB(env, {
     and: [
@@ -353,42 +377,26 @@ export async function promoteBacklogTasks(env: Env): Promise<Task[]> {
   const promoted: Task[] = [];
   for (const page of result.results as Record<string, unknown>[]) {
     const task = parseTaskPage(page);
-    await fetch(`${NOTION_API}/pages/${task.pageId}`, {
-      method: "PATCH",
-      headers: headers(env.NOTION_TOKEN),
-      body: JSON.stringify({ properties: { Status: { status: { name: STATUS_PENDING } } } }),
-    });
+    await patchNotionPage(env, task.pageId, { Status: { status: { name: STATUS_PENDING } } });
     promoted.push(task);
   }
   return promoted;
 }
 
 export async function completeTask(env: Env, pageId: string): Promise<void> {
-  const resp = await fetch(`${NOTION_API}/pages/${pageId}`, {
-    method: "PATCH",
-    headers: headers(env.NOTION_TOKEN),
-    body: JSON.stringify({ properties: { Status: { status: { name: STATUS_DONE } } } }),
-  });
+  const resp = await patchNotionPage(env, pageId, { Status: { status: { name: STATUS_DONE } } });
   if (!resp.ok) throw new Error(`completeTask failed: ${resp.status}`);
 }
 
 export async function cancelTask(env: Env, pageId: string): Promise<void> {
-  const resp = await fetch(`${NOTION_API}/pages/${pageId}`, {
-    method: "PATCH",
-    headers: headers(env.NOTION_TOKEN),
-    body: JSON.stringify({ properties: { Status: { status: { name: STATUS_CANCELLED } } } }),
-  });
+  const resp = await patchNotionPage(env, pageId, { Status: { status: { name: STATUS_CANCELLED } } });
   if (!resp.ok) throw new Error(`cancelTask failed: ${resp.status}`);
 }
 
 export async function getTaskStatus(env: Env, pageId: string): Promise<string | null> {
-  const resp = await fetch(`${NOTION_API}/pages/${pageId}`, {
-    headers: headers(env.NOTION_TOKEN),
-  });
-  if (!resp.ok) return null;
-  const page = await resp.json<{ archived?: boolean; properties?: Record<string, unknown> }>();
-  if (page.archived) return null;
-  const statusObj = (page.properties?.["Status"] as Record<string, unknown> | undefined)?.status as { name: string } | undefined;
+  const props = await fetchTaskPage(env, pageId);
+  if (!props) return null;
+  const statusObj = (props["Status"] as Record<string, unknown> | undefined)?.status as { name: string } | undefined;
   return statusObj?.name ?? null;
 }
 
@@ -396,13 +404,8 @@ export async function getTaskTitleAndDue(
   env: Env,
   pageId: string,
 ): Promise<{ title: string; due: string | null } | null> {
-  const resp = await fetch(`${NOTION_API}/pages/${pageId}`, {
-    headers: headers(env.NOTION_TOKEN),
-  });
-  if (!resp.ok) return null;
-  const page = await resp.json<{ archived?: boolean; properties?: Record<string, unknown> }>();
-  if (page.archived) return null;
-  const props = (page.properties ?? {}) as Record<string, unknown>;
+  const props = await fetchTaskPage(env, pageId);
+  if (!props) return null;
   const titleArr = ((props["タイトル"] as Record<string, unknown> | undefined)?.title as Array<{ text: { content: string } }> | undefined) ?? [];
   const title = titleArr[0]?.text.content ?? "";
   const dueObj = (props["Due"] as Record<string, unknown> | undefined)?.date as { start: string } | undefined;
@@ -410,11 +413,7 @@ export async function getTaskTitleAndDue(
 }
 
 export async function updateTaskDue(env: Env, pageId: string, due: string): Promise<void> {
-  const resp = await fetch(`${NOTION_API}/pages/${pageId}`, {
-    method: "PATCH",
-    headers: headers(env.NOTION_TOKEN),
-    body: JSON.stringify({ properties: { Due: { date: { start: due } } } }),
-  });
+  const resp = await patchNotionPage(env, pageId, { Due: { date: { start: due } } });
   if (!resp.ok) throw new Error(`updateTaskDue failed: ${resp.status}`);
 }
 
@@ -426,8 +425,6 @@ export async function updateTaskFromReply(
   due: string | null,
   bodyText?: string,
 ): Promise<void> {
-  const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
-
   const pageResp = await fetch(`${NOTION_API}/pages/${pageId}`, {
     headers: headers(env.NOTION_TOKEN),
   });
@@ -443,7 +440,7 @@ export async function updateTaskFromReply(
 
   const updates: Record<string, unknown> = {};
 
-  if ((priorityOrder[priority] ?? 1) < (priorityOrder[currentPriority] ?? 1)) {
+  if ((PRIORITY_ORDER[priority] ?? 1) < (PRIORITY_ORDER[currentPriority] ?? 1)) {
     updates["Priority"] = { select: { name: priority } };
   }
 
@@ -455,11 +452,7 @@ export async function updateTaskFromReply(
   }
 
   if (Object.keys(updates).length) {
-    await fetch(`${NOTION_API}/pages/${pageId}`, {
-      method: "PATCH",
-      headers: headers(env.NOTION_TOKEN),
-      body: JSON.stringify({ properties: updates }),
-    });
+    await patchNotionPage(env, pageId, updates);
   }
 
   const bodyBlocks = buildEmailBodyBlocks(bodyText ?? "", "📧 返信メール");
