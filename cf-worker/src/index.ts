@@ -5,6 +5,7 @@ import { sendDailyBriefing, sendCostReport, sendEmailDigest } from "./handlers/b
 import { sendBacklogPromotionNotice, sendEscalationNotice, sendStaleTasksNotice } from "./handlers/escalation.js";
 import { handleTelegramWebhook } from "./handlers/telegram.js";
 import { handleAlert } from "./handlers/alert.js";
+import { handleHomeArrival } from "./handlers/home-arrival.js";
 import { sendMessage } from "./clients/telegram.js";
 
 // 無料プランの Cron 上限（5個）に合わせて5ジョブに統合
@@ -68,6 +69,27 @@ export default {
         console.error("Alert error:", err);
       }
       return new Response("OK");
+    }
+
+    // iPhone ショートカット（帰宅Wi-Fi接続時）から呼ばれる帰宅トリガー。Bearer トークンで認証。
+    if (url.pathname === "/home-arrival" && req.method === "GET") {
+      const auth = req.headers.get("Authorization");
+      if (!env.ALERT_TOKEN || auth !== `Bearer ${env.ALERT_TOKEN}`) {
+        return new Response("Unauthorized", { status: 401 });
+      }
+      try {
+        const notifications = await handleHomeArrival(env);
+        return new Response(JSON.stringify({ notifications }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      } catch (err) {
+        console.error("home-arrival error:", err);
+        return new Response(JSON.stringify({ notifications: [] }), {
+          status: 500,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
     }
 
     return new Response("ambient-agent", { status: 200 });
