@@ -200,6 +200,54 @@ export async function analyzeImage(env: Env, imageData: ArrayBuffer, mediaType: 
   }
 }
 
+const HOME_ARRIVAL_PROMPT = `あなたは帰宅時のタスク通知を選ぶアシスタントです。
+
+ユーザーが帰宅しました。以下のタスク一覧から、今この瞬間に通知すべきタスクを最大5件選んでください。
+
+## 選定基準
+- 期限切れ・今日・明日期限のタスクを優先する
+- 夕方〜夜の帰宅に関連する行動（子ども関連・買い物・家事・連絡）を優先する
+- 優先度 high のタスクは必ず含める（多すぎる場合は最重要のみ）
+- 仕事中にしかできないタスク（会議準備・業務連絡 等）は夜間帰宅時は除外する
+
+## 出力フォーマット（JSON のみ、説明文不要）
+
+\`\`\`json
+[
+  {"title": "通知タイトル（簡潔に20文字以内）", "priority": "high | medium | low"},
+  ...
+]
+\`\`\`
+
+タスクが0件の場合は \`[]\` を返す。`;
+
+export interface HomeArrivalNotification {
+  title: string;
+  priority: "high" | "medium" | "low";
+}
+
+export async function selectHomeArrivalNotifications(
+  env: Env,
+  tasks: Array<{ title: string; priority: string; due: string | null; status: string }>,
+  currentJstDatetime: string,
+): Promise<HomeArrivalNotification[]> {
+  const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" });
+  const taskList = tasks
+    .map((t) => `- [${t.priority}] ${t.title} (期限: ${t.due ?? "未定"}, ステータス: ${t.status})`)
+    .join("\n");
+
+  const userContent = `現在時刻: ${currentJstDatetime} (JST)\n今日の日付: ${today}\n\n## タスク一覧\n${taskList}`;
+  const text = await callClaude(env, "home_arrival", HOME_ARRIVAL_PROMPT, userContent, 512);
+
+  const match = text.match(/\[[\s\S]*\]/);
+  if (!match) return [];
+  try {
+    return JSON.parse(match[0]) as HomeArrivalNotification[];
+  } catch {
+    return [];
+  }
+}
+
 export async function summarizeDay(
   env: Env,
   calendarEvents: Array<{ summary: string; start: string }>,
