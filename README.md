@@ -26,9 +26,7 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 | メソッド・パス | 用途 | 認証 |
 |---|---|---|
 | `POST /webhook` | Telegram Update 受信（コマンド・メッセージ） | Telegram |
-| `POST /alert` | home server 監視層（Uptime Kuma / Beszel）の死活・リソースアラート受信 → Telegram 通知 | `Authorization: Bearer <ALERT_TOKEN>` |
-
-`/alert` が受け付ける正規化 JSON: `{ "source", "status", "title", "detail" }`（Uptime Kuma ネイティブ payload もフォールバック対応）。Phase 1 は整形して即通知のみ。重複排除・重大度判定・復旧提案は後続で追加予定。
+| `GET /home-arrival` | iPhone ショートカット（帰宅 Wi-Fi 接続時）から呼び出し、Notion オープンタスクを Claude が選定して Telegram 通知 | `Authorization: Bearer <ALERT_TOKEN>` |
 
 ## スケジュール
 
@@ -112,11 +110,11 @@ ambient-agent/
 │   │   │   ├── notion.ts         # Notion API
 │   │   │   └── telegram.ts       # Telegram Bot API
 │   │   ├── handlers/             # ジョブ・コマンドハンドラー
-│   │   │   ├── alert.ts          # home server 監視アラート受信 → Telegram 通知
 │   │   │   ├── briefing.ts       # 日次ブリーフィング・コストレポート
 │   │   │   ├── calendar.ts       # カレンダー同期・期限通知
 │   │   │   ├── escalation.ts     # 優先度昇格・停滞タスク通知
 │   │   │   ├── gmail.ts          # Gmail 処理・ブロックリスト学習
+│   │   │   ├── home-arrival.ts   # 帰宅トリガー → Notion タスク選定 → Telegram 通知
 │   │   │   ├── task-formatter.ts # タスク一覧フォーマット
 │   │   │   └── telegram.ts       # Webhook コマンドルーティング
 │   │   └── storage/              # D1・KV アクセス層
@@ -196,7 +194,7 @@ npm run secrets:push
 | `NOTION_TASKS_DB_ID` | タスク DB の URL 末尾 32 文字 |
 | `TELEGRAM_BOT_TOKEN` | [@BotFather](https://t.me/BotFather) |
 | `TELEGRAM_CHAT_ID` | `getUpdates` API の `chat.id` |
-| `ALERT_TOKEN` | `POST /alert` 認証用の任意の長い乱数（home server 監視層と共有） |
+| `ALERT_TOKEN` | `GET /home-arrival` 認証用の任意の長い乱数 |
 | `GOOGLE_CLIENT_ID` | Google Cloud Console → 認証情報 |
 | `GOOGLE_CLIENT_SECRET` | 同上 |
 | `GOOGLE_REFRESH_TOKEN` | `data/token.json` の `refresh_token` |
