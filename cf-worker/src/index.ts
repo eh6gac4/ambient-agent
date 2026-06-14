@@ -6,6 +6,7 @@ import { sendBacklogPromotionNotice, sendEscalationNotice, sendStaleTasksNotice 
 import { handleTelegramWebhook } from "./handlers/telegram.js";
 import { handleHomeArrival } from "./handlers/home-arrival.js";
 import { sendMessage } from "./clients/telegram.js";
+import { isHoliday } from "./utils/holiday.js";
 
 // 無料プランの Cron 上限（5個）に合わせて5ジョブに統合
 async function hourlyGmail(env: Env): Promise<void> {
@@ -40,6 +41,14 @@ const CRON_JOBS: Record<string, (env: Env) => Promise<void>> = {
   "0 4 * * *": sendTaskReminder,       // 13:00 JST
   "0 0 * * 1": sendStaleTasksNotice,   // 月 09:00 JST
 };
+
+// 休日（土日・祝日）にスキップするジョブ。hourlyGmail はサイレント処理なので除外。
+const SKIP_ON_HOLIDAY = new Set([
+  "50 22 * * *",
+  "0 23 * * *",
+  "0 4 * * *",
+  "0 0 * * 1",
+]);
 
 export default {
   async fetch(req: Request, env: Env): Promise<Response> {
@@ -83,6 +92,11 @@ export default {
     const job = CRON_JOBS[event.cron];
     if (!job) {
       console.warn("Unknown cron:", event.cron);
+      return;
+    }
+
+    if (SKIP_ON_HOLIDAY.has(event.cron) && await isHoliday()) {
+      console.log("Holiday: skipping job", event.cron);
       return;
     }
 

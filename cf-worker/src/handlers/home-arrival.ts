@@ -2,6 +2,7 @@ import type { Env } from "../types.js";
 import { getOpenTasks } from "../clients/notion.js";
 import { selectHomeArrivalNotifications, type HomeArrivalNotification } from "../clients/anthropic.js";
 import { sendMessage } from "../clients/telegram.js";
+import { isHoliday } from "../utils/holiday.js";
 
 function buildTelegramMessage(notifications: HomeArrivalNotification[]): string {
   const priorityIcon: Record<string, string> = { high: "🔴", medium: "🟡", low: "🟢" };
@@ -10,6 +11,8 @@ function buildTelegramMessage(notifications: HomeArrivalNotification[]): string 
 }
 
 export async function handleHomeArrival(env: Env): Promise<HomeArrivalNotification[]> {
+  if (await isHoliday()) return [];
+
   const tasks = await getOpenTasks(env);
   if (tasks.length === 0) return [];
 
