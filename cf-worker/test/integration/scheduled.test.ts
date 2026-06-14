@@ -4,6 +4,10 @@ import { createMockEnv } from "../helpers/mocks.js";
 // Import the default export (Worker) from index.ts
 import worker from "../../src/index.js";
 
+vi.mock("../../src/utils/holiday.js", () => ({
+  isHoliday: vi.fn().mockResolvedValue(false),
+}));
+
 // Mock all job handlers
 vi.mock("../../src/handlers/gmail.js", () => ({
   checkGmail: vi.fn().mockResolvedValue(undefined),
@@ -119,6 +123,67 @@ describe("scheduled handler - cron dispatch", () => {
 
     await worker.scheduled(makeScheduledEvent("0 0 1 1 *"), env);
     expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining("Unknown cron"), "0 0 1 1 *");
+  });
+});
+
+describe("scheduled handler - holiday skip", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("skips morningBriefing on holiday", async () => {
+    const env = createMockEnv();
+    const { isHoliday } = await import("../../src/utils/holiday.js");
+    const { sendDailyBriefing } = await import("../../src/handlers/briefing.js");
+
+    (isHoliday as ReturnType<typeof vi.fn>).mockResolvedValueOnce(true);
+
+    await worker.scheduled(makeScheduledEvent("0 23 * * *"), env);
+    expect(sendDailyBriefing).not.toHaveBeenCalled();
+  });
+
+  it("skips morningPrep on holiday", async () => {
+    const env = createMockEnv();
+    const { isHoliday } = await import("../../src/utils/holiday.js");
+    const { sendEscalationNotice } = await import("../../src/handlers/escalation.js");
+
+    (isHoliday as ReturnType<typeof vi.fn>).mockResolvedValueOnce(true);
+
+    await worker.scheduled(makeScheduledEvent("50 22 * * *"), env);
+    expect(sendEscalationNotice).not.toHaveBeenCalled();
+  });
+
+  it("skips sendTaskReminder on holiday", async () => {
+    const env = createMockEnv();
+    const { isHoliday } = await import("../../src/utils/holiday.js");
+    const { sendTaskReminder } = await import("../../src/handlers/calendar.js");
+
+    (isHoliday as ReturnType<typeof vi.fn>).mockResolvedValueOnce(true);
+
+    await worker.scheduled(makeScheduledEvent("0 4 * * *"), env);
+    expect(sendTaskReminder).not.toHaveBeenCalled();
+  });
+
+  it("skips sendStaleTasksNotice on holiday", async () => {
+    const env = createMockEnv();
+    const { isHoliday } = await import("../../src/utils/holiday.js");
+    const { sendStaleTasksNotice } = await import("../../src/handlers/escalation.js");
+
+    (isHoliday as ReturnType<typeof vi.fn>).mockResolvedValueOnce(true);
+
+    await worker.scheduled(makeScheduledEvent("0 0 * * 1"), env);
+    expect(sendStaleTasksNotice).not.toHaveBeenCalled();
+  });
+
+  it("still runs hourlyGmail on holiday (silent background job)", async () => {
+    const env = createMockEnv();
+    const { isHoliday } = await import("../../src/utils/holiday.js");
+    const { checkGmail } = await import("../../src/handlers/gmail.js");
+
+    (isHoliday as ReturnType<typeof vi.fn>).mockResolvedValueOnce(true);
+
+    await worker.scheduled(makeScheduledEvent("30 22-23,0-12 * * *"), env);
+    expect(checkGmail).toHaveBeenCalledWith(env, { silent: true });
   });
 });
 

@@ -2,6 +2,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { handleHomeArrival } from "../../../src/handlers/home-arrival.js";
 import { createMockEnv, sampleTasks } from "../../helpers/mocks.js";
 
+vi.mock("../../../src/utils/holiday.js", () => ({
+  isHoliday: vi.fn().mockResolvedValue(false),
+}));
+
 vi.mock("../../../src/clients/notion.js", () => ({
   getOpenTasks: vi.fn(),
 }));
@@ -68,6 +72,20 @@ describe("handleHomeArrival", () => {
 
     const result = await handleHomeArrival(env);
     expect(result).toEqual([]);
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("returns empty array on holiday without calling any downstream", async () => {
+    const env = createMockEnv();
+    const { isHoliday } = await import("../../../src/utils/holiday.js");
+    const { getOpenTasks } = await import("../../../src/clients/notion.js");
+    const { sendMessage } = await import("../../../src/clients/telegram.js");
+
+    (isHoliday as ReturnType<typeof vi.fn>).mockResolvedValueOnce(true);
+
+    const result = await handleHomeArrival(env);
+    expect(result).toEqual([]);
+    expect(getOpenTasks).not.toHaveBeenCalled();
     expect(sendMessage).not.toHaveBeenCalled();
   });
 

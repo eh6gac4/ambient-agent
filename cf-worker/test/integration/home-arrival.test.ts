@@ -2,6 +2,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import worker from "../../src/index.js";
 import { createMockEnv, sampleTasks } from "../helpers/mocks.js";
 
+vi.mock("../../src/utils/holiday.js", () => ({
+  isHoliday: vi.fn().mockResolvedValue(false),
+}));
+
 vi.mock("../../src/clients/notion.js", () => ({
   getOpenTasks: vi.fn(),
 }));
