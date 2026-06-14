@@ -4,6 +4,7 @@ import { getOpenTasks } from "../clients/notion.js";
 import { sendMessage, escapeMd } from "../clients/telegram.js";
 import { formatTaskList, fmtDue } from "./task-formatter.js";
 import { getCalendarSync, setCalendarSync, deleteCalendarSync, getAllCalendarSync } from "../storage/d1.js";
+import { jstNow } from "../utils/jst.js";
 
 export async function syncCalendar(env: Env): Promise<void> {
   const tasks = await getOpenTasks(env);
@@ -102,7 +103,7 @@ export async function deleteCalendarEventForTask(env: Env, pageId: string): Prom
 
 export async function sendDueSoonNotice(env: Env): Promise<void> {
   const tasks = await getOpenTasks(env);
-  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
+  const now = jstNow();
   const today = now.toISOString().slice(0, 10);
   const tomorrow = new Date(now);
   tomorrow.setDate(tomorrow.getDate() + 1);

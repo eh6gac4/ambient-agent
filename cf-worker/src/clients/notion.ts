@@ -1,4 +1,5 @@
 import type { Env, Task, TaskInput, ExtractedTask } from "../types.js";
+import { toDateStr } from "../utils/jst.js";
 
 const NOTION_API = "https://api.notion.com/v1";
 const NOTION_VERSION = "2022-06-28";
@@ -303,10 +304,10 @@ export async function getOpenTasks(env: Env): Promise<Task[]> {
 export async function escalatePriorityTasks(env: Env): Promise<Task[]> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  const todayStr = today.toISOString().slice(0, 10);
+  const todayStr = toDateStr(today);
   const deadline = new Date(today);
   deadline.setDate(deadline.getDate() + 3);
-  const deadlineStr = deadline.toISOString().slice(0, 10);
+  const deadlineStr = toDateStr(deadline);
 
   const statusFilters = [STATUS_PENDING, ...STATUS_IN_PROGRESS_GROUP].map((s) => ({
     property: "Status",
@@ -341,7 +342,7 @@ export async function promoteBacklogTasks(env: Env): Promise<Task[]> {
   const today = new Date();
   const deadline = new Date(today);
   deadline.setDate(deadline.getDate() + 3);
-  const deadlineStr = deadline.toISOString().slice(0, 10);
+  const deadlineStr = toDateStr(deadline);
 
   const result = await queryDB(env, {
     and: [

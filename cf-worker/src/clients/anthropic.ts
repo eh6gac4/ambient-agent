@@ -1,5 +1,6 @@
 import type { Env, ExtractedTask, EmailAnalysis } from "../types.js";
 import { recordUsage } from "../storage/kv.js";
+import { jstDateStr } from "../utils/jst.js";
 
 const MODEL = "claude-haiku-4-5-20251001";
 const API_URL = "https://api.anthropic.com/v1/messages";
@@ -231,7 +232,7 @@ export async function selectHomeArrivalNotifications(
   tasks: Array<{ title: string; priority: string; due: string | null; status: string }>,
   currentJstDatetime: string,
 ): Promise<HomeArrivalNotification[]> {
-  const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" });
+  const today = jstDateStr();
   const taskList = tasks
     .map((t) => `- [${t.priority}] ${t.title} (期限: ${t.due ?? "未定"}, ステータス: ${t.status})`)
     .join("\n");
@@ -275,7 +276,7 @@ export async function selectOfficeLeaveNotifications(
   tasks: Array<{ title: string; priority: string; due: string | null; status: string }>,
   currentJstDatetime: string,
 ): Promise<HomeArrivalNotification[]> {
-  const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" });
+  const today = jstDateStr();
   const taskList = tasks
     .map((t) => `- [${t.priority}] ${t.title} (期限: ${t.due ?? "未定"}, ステータス: ${t.status})`)
     .join("\n");

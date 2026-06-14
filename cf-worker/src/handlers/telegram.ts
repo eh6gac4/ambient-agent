@@ -7,6 +7,8 @@ import { getTaskCache, setTaskCache, getNoTaskSenders, addNoTaskSender, removeNo
 import { deleteCalendarEventForTask, syncTaskCalendarEventSafe } from "./calendar.js";
 import { formatTaskList, sortTasks } from "./task-formatter.js";
 import { sendDailyBriefing } from "./briefing.js";
+import { bestPriorityTask } from "../utils/task.js";
+import { jstNow } from "../utils/jst.js";
 
 const URL_PATTERN = /https?:\/\/\S+/;
 const OPERATING_START_HOUR = 8;
@@ -21,7 +23,7 @@ export function taskLink(pageId: string): string {
 }
 
 function getJstHour(): number {
-  return new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" })).getHours();
+  return jstNow().getHours();
 }
 
 function extractTextFromHtml(html: string): string {
@@ -227,9 +229,8 @@ async function handlePhoto(env: Env, message: Record<string, unknown>): Promise<
 
   const subtaskTitles = tasks.map((t) => t.title);
   const dues = tasks.map((t) => t.due).filter((d): d is string => Boolean(d)).sort();
-  const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
   const best: Pick<ExtractedTask, "priority" | "icon"> = tasks.length
-    ? tasks.reduce((a, b) => ((priorityOrder[a.priority] ?? 1) <= (priorityOrder[b.priority] ?? 1) ? a : b))
+    ? bestPriorityTask(tasks)
     : { priority: "medium", icon: FALLBACK_ICON.photo };
   const title = (summary || tasks[0]?.title || "📷 画像メモ").slice(0, 200);
 

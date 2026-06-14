@@ -1,5 +1,6 @@
 import type { Env, CalendarEvent } from "../types.js";
 import { getAccessToken } from "./google-auth.js";
+import { jstNow } from "../utils/jst.js";
 
 const BASE = "https://www.googleapis.com/calendar/v3/calendars/primary";
 
@@ -10,7 +11,7 @@ function authHeader(token: string): Record<string, string> {
 export async function getTodaysEvents(env: Env): Promise<CalendarEvent[]> {
   const token = await getAccessToken(env);
 
-  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
+  const now = jstNow();
   const start = new Date(now);
   start.setHours(0, 0, 0, 0);
   const end = new Date(now);

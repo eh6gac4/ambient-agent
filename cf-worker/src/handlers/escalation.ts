@@ -2,6 +2,7 @@ import type { Env } from "../types.js";
 import { getOpenTasks, escalatePriorityTasks, promoteBacklogTasks } from "../clients/notion.js";
 import { sendMessage, escapeMd } from "../clients/telegram.js";
 import { fmtDue } from "./task-formatter.js";
+import { jstNow } from "../utils/jst.js";
 
 const STALE_DAYS = 14;
 
@@ -29,7 +30,7 @@ export async function sendBacklogPromotionNotice(env: Env): Promise<void> {
 
 export async function sendStaleTasksNotice(env: Env): Promise<void> {
   const tasks = await getOpenTasks(env);
-  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
+  const now = jstNow();
   const cutoff = new Date(now);
   cutoff.setDate(cutoff.getDate() - STALE_DAYS);
   const cutoffStr = cutoff.toISOString().slice(0, 10);

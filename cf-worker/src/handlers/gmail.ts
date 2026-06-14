@@ -5,6 +5,7 @@ import { addTask, updateTaskFromReply, getTaskStatus, getTaskTitleAndDue } from 
 import { sendMessage, escapeMd } from "../clients/telegram.js";
 import { taskLink } from "./telegram.js";
 import { syncTaskCalendarEventSafe } from "./calendar.js";
+import { bestPriorityTask } from "../utils/task.js";
 import {
   getThreadMapEntry,
   setThreadMapEntry,
@@ -65,10 +66,7 @@ export async function checkGmail(env: Env, options: CheckGmailOptions = {}): Pro
       const taskTitle = pickTaskTitle(analysis, subject);
 
       if (tasks.length) {
-        const priorityOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
-        const best = tasks.reduce((a, b) =>
-          (priorityOrder[a.priority] ?? 1) <= (priorityOrder[b.priority] ?? 1) ? a : b,
-        );
+        const best = bestPriorityTask(tasks);
         const dues = tasks.map((t) => t.due).filter((d): d is string => Boolean(d)).sort();
         const subtaskTitles = tasks.map((t) => t.title);
 
