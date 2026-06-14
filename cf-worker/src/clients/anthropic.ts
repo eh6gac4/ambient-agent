@@ -248,6 +248,50 @@ export async function selectHomeArrivalNotifications(
   }
 }
 
+const OFFICE_LEAVE_PROMPT = `あなたは退社時のタスク通知を選ぶアシスタントです。
+
+ユーザーが会社を出ました。以下のタスク一覧から、今この瞬間に通知すべきタスクを最大5件選んでください。
+
+## 選定基準
+- 今日中・明日期限のタスクを優先する
+- 帰宅途中にできること（買い物・立ち寄り・連絡）を優先する
+- 業務時間内に残してきた未完了の重要タスク（翌朝一番に着手すべきもの）を含める
+- 家に帰ってからでないとできないタスク（家事・家族関連）は除外する
+- 優先度 high のタスクは必ず含める（多すぎる場合は最重要のみ）
+
+## 出力フォーマット（JSON のみ、説明文不要）
+
+\`\`\`json
+[
+  {"title": "通知タイトル（簡潔に20文字以内）", "priority": "high | medium | low"},
+  ...
+]
+\`\`\`
+
+タスクが0件の場合は \`[]\` を返す。`;
+
+export async function selectOfficeLeaveNotifications(
+  env: Env,
+  tasks: Array<{ title: string; priority: string; due: string | null; status: string }>,
+  currentJstDatetime: string,
+): Promise<HomeArrivalNotification[]> {
+  const today = new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" });
+  const taskList = tasks
+    .map((t) => `- [${t.priority}] ${t.title} (期限: ${t.due ?? "未定"}, ステータス: ${t.status})`)
+    .join("\n");
+
+  const userContent = `現在時刻: ${currentJstDatetime} (JST)\n今日の日付: ${today}\n\n## タスク一覧\n${taskList}`;
+  const text = await callClaude(env, "office_leave", OFFICE_LEAVE_PROMPT, userContent, 512);
+
+  const match = text.match(/\[[\s\S]*\]/);
+  if (!match) return [];
+  try {
+    return JSON.parse(match[0]) as HomeArrivalNotification[];
+  } catch {
+    return [];
+  }
+}
+
 export async function summarizeDay(
   env: Env,
   calendarEvents: Array<{ summary: string; start: string }>,

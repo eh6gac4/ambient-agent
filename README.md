@@ -27,6 +27,7 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 |---|---|---|
 | `POST /webhook` | Telegram Update 受信（コマンド・メッセージ） | Telegram |
 | `GET /home-arrival` | iPhone ショートカット（帰宅 Wi-Fi 接続時）から呼び出し、Notion オープンタスクを Claude が選定して Telegram 通知 | `Authorization: Bearer <ALERT_TOKEN>` |
+| `GET /office-leave` | iPhone ショートカット（会社 Wi-Fi 切断時）から呼び出し、帰宅途中・翌朝に向けたタスクを Claude が選定して Telegram 通知 | `Authorization: Bearer <ALERT_TOKEN>` |
 
 ## スケジュール
 
@@ -39,7 +40,7 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 | 08:00 | morning_briefing | ①日次ブリーフィング → ②APIコストレポート → ③期限間近通知 → ④メール処理サマリ | あり |
 | 月 09:00 | stale_tasks | 14日以上未更新タスクを通知 | あり |
 
-> **休日スキップ**: 土日および日本の祝日（`holidays-jp.github.io` API 参照）は通知系ジョブを実行しない。帰宅通知（`/home-arrival`）も同様にスキップ。
+> **休日スキップ**: 土日および日本の祝日（`holidays-jp.github.io` API 参照）は通知系ジョブを実行しない。帰宅通知（`/home-arrival`）・退社通知（`/office-leave`）も同様にスキップ。
 
 **hourly_gmail の詳細:**
 - 未読メールを要約・タスク抽出し Notion に登録（返信スレッドは既存タスクを更新）
@@ -116,6 +117,7 @@ ambient-agent/
 │   │   │   ├── escalation.ts     # 優先度昇格・停滞タスク通知
 │   │   │   ├── gmail.ts          # Gmail 処理・ブロックリスト学習
 │   │   │   ├── home-arrival.ts   # 帰宅トリガー → Notion タスク選定 → Telegram 通知
+│   │   │   ├── office-leave.ts   # 退社トリガー → Notion タスク選定 → Telegram 通知
 │   │   │   ├── task-formatter.ts # タスク一覧フォーマット
 │   │   │   └── telegram.ts       # Webhook コマンドルーティング
 │   │   └── storage/              # D1・KV アクセス層
