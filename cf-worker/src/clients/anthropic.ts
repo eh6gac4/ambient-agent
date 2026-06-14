@@ -99,33 +99,40 @@ async function callClaude(
   return data.content[0]?.text ?? "";
 }
 
-function extractJsonList(text: string): ExtractedTask[] {
+/** LLM 応答テキストから最初の JSON 配列を取り出す。見つからない/パース失敗時は空配列。 */
+function extractJsonArray<T>(text: string): T[] {
   const match = text.match(/\[[\s\S]*\]/);
   if (!match) return [];
   try {
-    return JSON.parse(match[0]) as ExtractedTask[];
+    return JSON.parse(match[0]) as T[];
   } catch {
     return [];
   }
 }
 
+/** LLM 応答テキストから最初の JSON オブジェクトを取り出す。見つからない/パース失敗時は null。 */
+function extractJsonObject<T>(text: string): T | null {
+  const match = text.match(/\{[\s\S]*\}/);
+  if (!match) return null;
+  try {
+    return JSON.parse(match[0]) as T;
+  } catch {
+    return null;
+  }
+}
+
 export async function extractTasksFromText(env: Env, label: string, subject: string, body: string): Promise<ExtractedTask[]> {
   const text = await callClaude(env, label, EXTRACT_TASKS_PROMPT, `件名: ${subject}\n\n本文:\n${body}`);
-  return extractJsonList(text);
+  return extractJsonArray<ExtractedTask>(text);
 }
 
 export async function analyzeEmail(env: Env, subject: string, body: string): Promise<EmailAnalysis> {
   const text = await callClaude(env, "analyze_email", ANALYZE_EMAIL_PROMPT, `件名: ${subject}\n\n本文:\n${body.slice(0, 3000)}`);
-  const match = text.match(/\{[\s\S]*\}/);
-  if (!match) return { summary: text.trim(), tasks: [] };
-  try {
-    const result = JSON.parse(match[0]) as EmailAnalysis;
-    result.tasks ??= [];
-    result.summary ??= "";
-    return result;
-  } catch {
-    return { summary: text.trim(), tasks: [] };
-  }
+  const result = extractJsonObject<EmailAnalysis>(text);
+  if (!result) return { summary: text.trim(), tasks: [] };
+  result.tasks ??= [];
+  result.summary ??= "";
+  return result;
 }
 
 /** Notion ページのタイトル候補。LLM が task_title を返さなければ件名にフォールバック。 */
@@ -136,7 +143,7 @@ export function pickTaskTitle(analysis: EmailAnalysis, subject: string): string 
 
 export async function extractTasksFromUrlContent(env: Env, url: string, content: string): Promise<ExtractedTask[]> {
   const text = await callClaude(env, "extract_tasks_url", EXTRACT_TASKS_PROMPT, `件名: ${url}\n\n本文:\n${content.slice(0, 3000)}`);
-  return extractJsonList(text);
+  return extractJsonArray<ExtractedTask>(text);
 }
 
 function imageToBase64(imageData: ArrayBuffer): string {
@@ -152,7 +159,7 @@ export async function extractTasksFromImage(env: Env, imageData: ArrayBuffer, me
     { type: "text", text: "この画像からアクションが必要なタスクを抽出してください。" },
   ];
   const text = await callClaude(env, "extract_tasks_image", EXTRACT_TASKS_PROMPT, userContent);
-  return extractJsonList(text);
+  return extractJsonArray<ExtractedTask>(text);
 }
 
 const ANALYZE_IMAGE_PROMPT = `あなたは画像からタスクを分析するアシスタントです。
@@ -189,16 +196,11 @@ export async function analyzeImage(env: Env, imageData: ArrayBuffer, mediaType: 
     { type: "text", text: "この画像を分析してください。" },
   ];
   const text = await callClaude(env, "analyze_image", ANALYZE_IMAGE_PROMPT, userContent);
-  const match = text.match(/\{[\s\S]*\}/);
-  if (!match) return { summary: text.trim(), tasks: [] };
-  try {
-    const result = JSON.parse(match[0]) as EmailAnalysis;
-    result.tasks ??= [];
-    result.summary ??= "";
-    return result;
-  } catch {
-    return { summary: text.trim(), tasks: [] };
-  }
+  const result = extractJsonObject<EmailAnalysis>(text);
+  if (!result) return { summary: text.trim(), tasks: [] };
+  result.tasks ??= [];
+  result.summary ??= "";
+  return result;
 }
 
 const HOME_ARRIVAL_PROMPT = `あなたは帰宅時のタスク通知を選ぶアシスタントです。
@@ -227,8 +229,11 @@ export interface HomeArrivalNotification {
   priority: "high" | "medium" | "low";
 }
 
-export async function selectHomeArrivalNotifications(
+/** 帰宅/退社など「現在地を離れた」タイミングのタスク通知を LLM に選ばせる共通処理。 */
+async function selectNotifications(
   env: Env,
+  job: string,
+  prompt: string,
   tasks: Array<{ title: string; priority: string; due: string | null; status: string }>,
   currentJstDatetime: string,
 ): Promise<HomeArrivalNotification[]> {
@@ -238,15 +243,16 @@ export async function selectHomeArrivalNotifications(
     .join("\n");
 
   const userContent = `現在時刻: ${currentJstDatetime} (JST)\n今日の日付: ${today}\n\n## タスク一覧\n${taskList}`;
-  const text = await callClaude(env, "home_arrival", HOME_ARRIVAL_PROMPT, userContent, 512);
+  const text = await callClaude(env, job, prompt, userContent, 512);
+  return extractJsonArray<HomeArrivalNotification>(text);
+}
 
-  const match = text.match(/\[[\s\S]*\]/);
-  if (!match) return [];
-  try {
-    return JSON.parse(match[0]) as HomeArrivalNotification[];
-  } catch {
-    return [];
-  }
+export async function selectHomeArrivalNotifications(
+  env: Env,
+  tasks: Array<{ title: string; priority: string; due: string | null; status: string }>,
+  currentJstDatetime: string,
+): Promise<HomeArrivalNotification[]> {
+  return selectNotifications(env, "home_arrival", HOME_ARRIVAL_PROMPT, tasks, currentJstDatetime);
 }
 
 const OFFICE_LEAVE_PROMPT = `あなたは退社時のタスク通知を選ぶアシスタントです。
@@ -276,21 +282,7 @@ export async function selectOfficeLeaveNotifications(
   tasks: Array<{ title: string; priority: string; due: string | null; status: string }>,
   currentJstDatetime: string,
 ): Promise<HomeArrivalNotification[]> {
-  const today = jstDateStr();
-  const taskList = tasks
-    .map((t) => `- [${t.priority}] ${t.title} (期限: ${t.due ?? "未定"}, ステータス: ${t.status})`)
-    .join("\n");
-
-  const userContent = `現在時刻: ${currentJstDatetime} (JST)\n今日の日付: ${today}\n\n## タスク一覧\n${taskList}`;
-  const text = await callClaude(env, "office_leave", OFFICE_LEAVE_PROMPT, userContent, 512);
-
-  const match = text.match(/\[[\s\S]*\]/);
-  if (!match) return [];
-  try {
-    return JSON.parse(match[0]) as HomeArrivalNotification[];
-  } catch {
-    return [];
-  }
+  return selectNotifications(env, "office_leave", OFFICE_LEAVE_PROMPT, tasks, currentJstDatetime);
 }
 
 export async function summarizeDay(
