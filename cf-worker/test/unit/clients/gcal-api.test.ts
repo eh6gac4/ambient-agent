@@ -9,6 +9,7 @@ import { createMockEnv } from "../../helpers/mocks.js";
 
 vi.mock("../../../src/clients/google-auth.js", () => ({
   getAccessToken: vi.fn().mockResolvedValue("test-access-token"),
+  authHeader: (token: string) => ({ Authorization: `Bearer ${token}` }),
 }));
 
 type FetchCall = { url: string; init?: RequestInit };

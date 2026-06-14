@@ -1,12 +1,8 @@
 import type { Env, CalendarEvent } from "../types.js";
-import { getAccessToken } from "./google-auth.js";
+import { getAccessToken, authHeader } from "./google-auth.js";
 import { jstNow } from "../utils/jst.js";
 
 const BASE = "https://www.googleapis.com/calendar/v3/calendars/primary";
-
-function authHeader(token: string): Record<string, string> {
-  return { Authorization: `Bearer ${token}` };
-}
 
 export async function getTodaysEvents(env: Env): Promise<CalendarEvent[]> {
   const token = await getAccessToken(env);
