@@ -4,6 +4,8 @@ import { getOpenTasks } from "../clients/notion.js";
 import { summarizeDay } from "../clients/anthropic.js";
 import { sendMessage, escapeMd } from "../clients/telegram.js";
 import { getDailyUsage, takeEmailDigest } from "../storage/kv.js";
+import { PRIORITY_ICON } from "../utils/task.js";
+import { jstNow, toDateStr } from "../utils/jst.js";
 
 const PRICE_INPUT_PER_M = 0.8;
 const PRICE_OUTPUT_PER_M = 4.0;
@@ -47,8 +49,7 @@ function formatEventsSection(events: CalendarEvent[]): string {
 
 function formatOverdueSection(overdue: Task[]): string {
   if (!overdue.length) return "";
-  const icon = { high: "🔴", medium: "🟡", low: "🟢" } as const;
-  const lines = overdue.map((t) => `• ${icon[t.priority]} ${escapeMd(t.title)} (${formatDueShort(t.due)})`);
+  const lines = overdue.map((t) => `• ${PRIORITY_ICON[t.priority]} ${escapeMd(t.title)} (${formatDueShort(t.due)})`);
   return `*⚠️ 期限切れ (${overdue.length}件)*\n${lines.join("\n")}`;
 }
 
@@ -73,9 +74,7 @@ function formatTasksSection(tasks: Task[]): string {
 export async function sendDailyBriefing(env: Env): Promise<void> {
   const [events, tasks] = await Promise.all([getTodaysEvents(env), getOpenTasks(env)]);
 
-  const todayStr = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }))
-    .toISOString()
-    .slice(0, 10);
+  const todayStr = toDateStr(jstNow());
   const overdue = tasks.filter((t) => t.due && t.due.slice(0, 10) < todayStr);
   const openTasks = tasks.filter((t) => !overdue.includes(t));
 
@@ -94,7 +93,7 @@ export async function sendDailyBriefing(env: Env): Promise<void> {
 }
 
 export async function sendCostReport(env: Env): Promise<void> {
-  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
+  const now = jstNow();
   const yesterday = new Date(now);
   yesterday.setDate(yesterday.getDate() - 1);
   const yesterdayStr = yesterday.toISOString().slice(0, 10);

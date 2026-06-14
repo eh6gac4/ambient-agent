@@ -116,14 +116,19 @@ ambient-agent/
 │   │   │   ├── calendar.ts       # カレンダー同期・期限通知
 │   │   │   ├── escalation.ts     # 優先度昇格・停滞タスク通知
 │   │   │   ├── gmail.ts          # Gmail 処理・ブロックリスト学習
-│   │   │   ├── home-arrival.ts   # 帰宅トリガー → Notion タスク選定 → Telegram 通知
-│   │   │   ├── office-leave.ts   # 退社トリガー → Notion タスク選定 → Telegram 通知
+│   │   │   ├── home-arrival.ts   # 帰宅トリガー（共通ランナーの薄いラッパ）
+│   │   │   ├── office-leave.ts   # 退社トリガー（共通ランナーの薄いラッパ）
+│   │   │   ├── notification-trigger.ts # 帰宅/退社 共通の通知フロー
 │   │   │   ├── task-formatter.ts # タスク一覧フォーマット
 │   │   │   └── telegram.ts       # Webhook コマンドルーティング
-│   │   └── storage/              # D1・KV アクセス層
-│   │       ├── d1.ts             # D1 CRUD ヘルパー
-│   │       └── kv.ts             # KV ヘルパー
-│   ├── test/                     # Vitest テスト（144件）
+│   │   ├── storage/              # D1・KV アクセス層
+│   │   │   ├── d1.ts             # D1 CRUD ヘルパー
+│   │   │   └── kv.ts             # KV ヘルパー
+│   │   └── utils/                # 共通ユーティリティ
+│   │       ├── holiday.ts        # 土日・祝日判定（JST）
+│   │       ├── jst.ts            # JST 日時ヘルパー（jstNow/jstDateStr/toDateStr 等）
+│   │       └── task.ts           # 優先度定数・最優先タスク選択
+│   ├── test/                     # Vitest テスト（196件）
 │   ├── migrations/               # D1 スキーマ
 │   ├── scripts/
 │   │   ├── push-secrets.mjs       # Worker Secrets 一括登録

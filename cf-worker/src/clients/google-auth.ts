@@ -7,6 +7,11 @@ interface TokenCache {
   expiresAt: number;
 }
 
+/** Google API 用の Bearer 認可ヘッダを組み立てる。 */
+export function authHeader(token: string): Record<string, string> {
+  return { Authorization: `Bearer ${token}` };
+}
+
 export async function getAccessToken(env: Env): Promise<string> {
   const cached = await env.AGENT_KV.get<TokenCache>(TOKEN_KV_KEY, "json");
   if (cached && cached.expiresAt > Date.now() + 60_000) {

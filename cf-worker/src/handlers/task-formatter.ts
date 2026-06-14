@@ -1,10 +1,10 @@
 import type { Task } from "../types.js";
 import { escapeMd } from "../clients/telegram.js";
+import { PRIORITY_ORDER, PRIORITY_ICON } from "../utils/task.js";
+import { jstNow } from "../utils/jst.js";
 
 const TASK_APP_URL = "https://todo.eh6gac4.work";
 
-const PRIORITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
-const PRIORITY_LABELS: Record<string, string> = { high: "🔴", medium: "🟡", low: "🟢" };
 const STATUS_ORDER: Record<string, number> = { 未着手: 0, 進行中: 1, 確認中: 2, 一時中断: 3 };
 const STATUS_LABELS: Record<string, string> = {
   未着手: "📋 未着手",
@@ -20,7 +20,7 @@ export function fmtDue(d: string | null): string {
   const due = new Date(d.slice(0, 10) + "T00:00:00+09:00");
   if (isNaN(due.getTime())) return d;
 
-  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
+  const now = jstNow();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const delta = Math.round((due.getTime() - today.getTime()) / 86400000);
 
@@ -67,7 +67,7 @@ export function formatTaskList(tasks: Task[], numbered = false): string {
       lines.push(`\n*${STATUS_LABELS[t.status] ?? t.status}*`);
     }
     const due = t.due ? `（${fmtDue(t.due)}）` : "";
-    const icon = PRIORITY_LABELS[t.priority] ?? "";
+    const icon = PRIORITY_ICON[t.priority] ?? "";
     const prefix = numbered ? `${i + 1}. ` : "• ";
     // escapeMd は \ * _ ` [ を処理する。リンクテキスト内は ] も閉じ括弧扱いになるため追加でエスケープ。
     const safeTitle = escapeMd(t.title);
