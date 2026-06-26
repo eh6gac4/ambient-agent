@@ -1,4 +1,4 @@
-import type { Env, Task, UsageEntry } from "../types.js";
+import type { Env, Task, UsageEntry, Region } from "../types.js";
 
 // Telegram
 export async function getTelegramOffset(env: Env): Promise<number> {
@@ -84,4 +84,28 @@ export async function recordUsage(env: Env, job: string, inputTokens: number, ou
 
 export async function getDailyUsage(env: Env, dateStr: string): Promise<UsageEntry[]> {
   return (await env.AGENT_KV.get<UsageEntry[]>(`usage:${dateStr}`, "json")) ?? [];
+}
+
+// Geofence
+const REGIONS_KEY = "geofence:regions";
+
+export async function getRegions(env: Env): Promise<Region[]> {
+  return (await env.AGENT_KV.get<Region[]>(REGIONS_KEY, "json")) ?? [];
+}
+
+export async function getGeofenceState(
+  env: Env,
+  regionId: string,
+): Promise<"inside" | "outside" | null> {
+  const val = await env.AGENT_KV.get(`geofence:state:${regionId}`);
+  if (val === "inside" || val === "outside") return val;
+  return null;
+}
+
+export async function setGeofenceState(
+  env: Env,
+  regionId: string,
+  state: "inside" | "outside",
+): Promise<void> {
+  await env.AGENT_KV.put(`geofence:state:${regionId}`, state);
 }

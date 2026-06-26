@@ -6,6 +6,7 @@ import { sendBacklogPromotionNotice, sendEscalationNotice, sendStaleTasksNotice 
 import { handleTelegramWebhook } from "./handlers/telegram.js";
 import { handleHomeArrival } from "./handlers/home-arrival.js";
 import { handleOfficeLeave } from "./handlers/office-leave.js";
+import { handleOwnTracksLocation } from "./handlers/location.js";
 import { sendMessage } from "./clients/telegram.js";
 import { isHoliday } from "./utils/holiday.js";
 
@@ -103,6 +104,22 @@ export default {
           headers: { "Content-Type": "application/json" },
         });
       }
+    }
+
+    // OwnTracks → マネージドMQTT(EMQX Cloud 等) → Webhook で呼ばれる位置情報受信エンドポイント。
+    // Bearer トークンで認証。ブローカー側の再送ループを避けるため常に 200 を返す。
+    if (url.pathname === "/owntracks" && req.method === "POST") {
+      const auth = req.headers.get("Authorization");
+      if (!env.OWNTRACKS_TOKEN || auth !== `Bearer ${env.OWNTRACKS_TOKEN}`) {
+        return new Response("Unauthorized", { status: 401 });
+      }
+      try {
+        const body = await req.json();
+        await handleOwnTracksLocation(env, body);
+      } catch (err) {
+        console.error("owntracks error:", err);
+      }
+      return new Response("OK");
     }
 
     return new Response("ambient-agent", { status: 200 });

@@ -26,7 +26,8 @@ database_id = "ba5c15ff-8e0e-4b86-b020-f1c4cb5975a3"
 # NOTION_TASKS_DB_ID
 # TELEGRAM_BOT_TOKEN
 # TELEGRAM_CHAT_ID
-# ALERT_TOKEN          # POST /alert 認証用の共有シークレット
+# ALERT_TOKEN          # GET /home-arrival /office-leave 認証用の共有シークレット
+# OWNTRACKS_TOKEN      # POST /owntracks (OwnTracks Webhook) 認証用の共有シークレット
 # GOOGLE_CLIENT_ID
 # GOOGLE_CLIENT_SECRET
 # GOOGLE_REFRESH_TOKEN

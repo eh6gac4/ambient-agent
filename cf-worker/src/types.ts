@@ -7,6 +7,7 @@ export interface Env {
   TELEGRAM_BOT_TOKEN: string;
   TELEGRAM_CHAT_ID: string;
   ALERT_TOKEN: string;
+  OWNTRACKS_TOKEN: string;
   GOOGLE_CLIENT_ID: string;
   GOOGLE_CLIENT_SECRET: string;
   GOOGLE_REFRESH_TOKEN: string;
@@ -18,6 +19,37 @@ export interface Env {
   GMAIL_TASK_LABEL?: string;
   GMAIL_ACCOUNT_INDEX?: string;
   NOTION_SUBITEM_PARENT_PROP?: string;
+}
+
+// ─── Geofence ────────────────────────────────────────────────────────────────
+
+/** アクション指定: 文字列(パラメータなし)またはオブジェクト形式。 */
+export type GeofenceActionSpec =
+  | string
+  | ({ action: string } & Record<string, unknown>);
+
+/** ジオフェンスリージョンの定義。KV `geofence:regions` に JSON 配列で保存。 */
+export interface Region {
+  /** 一意な識別子 (例: "home", "office", "gym") */
+  id: string;
+  /** 緯度 */
+  lat: number;
+  /** 経度 */
+  lon: number;
+  /** 判定半径 (メートル) */
+  radius_m: number;
+  /** 圏内に入ったときに実行するアクション */
+  onEnter?: GeofenceActionSpec;
+  /** 圏外に出たときに実行するアクション */
+  onLeave?: GeofenceActionSpec;
+}
+
+/** ジオフェンスアクション実行時のコンテキスト。 */
+export interface GeofenceContext {
+  regionId: string;
+  transition: "enter" | "leave";
+  params: Record<string, unknown>;
+  location: { lat: number; lon: number; tst: number };
 }
 
 export interface Task {
