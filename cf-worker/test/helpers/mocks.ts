@@ -91,6 +91,7 @@ export function createMockEnv(overrides: Partial<Env> = {}): Env {
     GOOGLE_CLIENT_SECRET: "test-client-secret",
     GOOGLE_REFRESH_TOKEN: "test-refresh-token",
     ALERT_TOKEN: "test-alert-token",
+    OWNTRACKS_TOKEN: "test-owntracks-token",
     OPERATING_START_HOUR: "8",
     OPERATING_END_HOUR: "21",
     ...overrides,

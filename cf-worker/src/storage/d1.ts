@@ -109,3 +109,31 @@ export async function cleanOldProcessed(env: Env): Promise<void> {
     .bind(cutoff)
     .run();
 }
+
+// location_history
+const LOCATION_RETENTION_DAYS = 90;
+
+export interface LocationRecord {
+  tst: number;
+  lat: number;
+  lon: number;
+  acc?: number | null;
+  device?: string | null;
+}
+
+export async function insertLocation(env: Env, record: LocationRecord): Promise<void> {
+  await env.AGENT_DB.prepare(
+    "INSERT INTO location_history (tst, lat, lon, acc, device) VALUES (?, ?, ?, ?, ?)",
+  )
+    .bind(record.tst, record.lat, record.lon, record.acc ?? null, record.device ?? null)
+    .run();
+}
+
+export async function cleanOldLocations(env: Env): Promise<void> {
+  const cutoff = Math.floor(Date.now() / 1000) - LOCATION_RETENTION_DAYS * 86400;
+  await env.AGENT_DB.prepare(
+    "DELETE FROM location_history WHERE tst < ?",
+  )
+    .bind(cutoff)
+    .run();
+}
