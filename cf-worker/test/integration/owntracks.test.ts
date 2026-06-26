@@ -175,6 +175,37 @@ describe("POST /owntracks", () => {
     expect((sendMessage as ReturnType<typeof vi.fn>).mock.calls.length).toBe(callCountAfterEnter);
   });
 
+  it("同一状態が続く場合は KV へ書き込まない（write 最適化）", async () => {
+    const env = createMockEnv();
+    await env.AGENT_KV.put("geofence:regions", JSON.stringify([HOME_REGION]));
+
+    const putSpy = vi.spyOn(env.AGENT_KV, "put");
+
+    // 1通目（圏外）: 初回なので geofence:state:home への書き込みが発生する
+    await worker.fetch(
+      ownTracksRequest(locationPayload(OUTSIDE_HOME.lat, OUTSIDE_HOME.lon), env.OWNTRACKS_TOKEN),
+      env,
+    );
+    const writesAfterFirst = putSpy.mock.calls.filter((c) =>
+      String(c[0]).startsWith("geofence:state:"),
+    ).length;
+    expect(writesAfterFirst).toBe(1); // 初回は必ず書く
+
+    // 2通目・3通目（同じく圏外）: 状態変化なし → 書き込みなし
+    await worker.fetch(
+      ownTracksRequest(locationPayload(OUTSIDE_HOME.lat, OUTSIDE_HOME.lon), env.OWNTRACKS_TOKEN),
+      env,
+    );
+    await worker.fetch(
+      ownTracksRequest(locationPayload(OUTSIDE_HOME.lat, OUTSIDE_HOME.lon), env.OWNTRACKS_TOKEN),
+      env,
+    );
+    const writesAfterRepeat = putSpy.mock.calls.filter((c) =>
+      String(c[0]).startsWith("geofence:state:"),
+    ).length;
+    expect(writesAfterRepeat).toBe(1); // 増えていない
+  });
+
   it("gym リージョンの telegram_notify がカスタム文言で送られる", async () => {
     const { sendMessage } = await import("../../src/clients/telegram.js");
 

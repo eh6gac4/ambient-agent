@@ -57,8 +57,11 @@ export async function handleOwnTracksLocation(
       const prev = await getGeofenceState(env, region.id);
       const transition = detectTransition(prev, current);
 
-      // 状態を更新（遷移有無に関わらず最新状態を保持）
-      await setGeofenceState(env, region.id, current);
+      // 状態が変化した時だけ KV へ書き込む（KV 書き込み無料枠の節約）
+      // null（初回）→ "inside"/"outside" も current !== prev として必ず1回保存される
+      if (current !== prev) {
+        await setGeofenceState(env, region.id, current);
+      }
 
       if (!transition) return;
 
