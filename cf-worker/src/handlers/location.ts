@@ -65,6 +65,18 @@ export async function handleOwnTracksLocation(
 
       if (!transition) return;
 
+      console.log(
+        JSON.stringify({
+          event: "geofence_transition",
+          regionId: region.id,
+          transition,
+          distanceM: Math.round(distanceM),
+          lat,
+          lon,
+          tst,
+        }),
+      );
+
       const ctx = { regionId: region.id, transition, location: { lat, lon, tst } };
       const spec = transition === "enter" ? region.onEnter : region.onLeave;
 

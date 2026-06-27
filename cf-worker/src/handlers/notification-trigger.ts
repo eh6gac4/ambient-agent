@@ -27,14 +27,23 @@ export async function runNotificationTrigger(
   select: SelectFn,
   header: string,
 ): Promise<HomeArrivalNotification[]> {
-  if (await isHoliday()) return [];
+  if (await isHoliday()) {
+    console.log(JSON.stringify({ event: "notification_trigger", header, result: "skipped_holiday" }));
+    return [];
+  }
 
   const tasks = await getOpenTasks(env);
-  if (tasks.length === 0) return [];
+  if (tasks.length === 0) {
+    console.log(JSON.stringify({ event: "notification_trigger", header, result: "skipped_no_tasks" }));
+    return [];
+  }
 
   const notifications = await select(env, tasks, jstDateTimeStr());
   if (notifications.length > 0) {
+    console.log(JSON.stringify({ event: "notification_trigger", header, result: "sent", count: notifications.length }));
     await sendMessage(env, buildTelegramMessage(header, notifications));
+  } else {
+    console.log(JSON.stringify({ event: "notification_trigger", header, result: "skipped_no_selection" }));
   }
 
   return notifications;
