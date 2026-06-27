@@ -10,6 +10,21 @@ cd cf-worker && npx wrangler deploy
 cd cf-worker && npx wrangler tail
 ```
 
+## 本番状態のデバッグ（read-only）
+
+```bash
+# ジオフェンス定義・状態（KV）
+npx wrangler kv key get geofence:regions --binding=AGENT_KV --remote
+npx wrangler kv key get geofence:state:home --binding=AGENT_KV --remote
+
+# 位置履歴（D1: binding=AGENT_DB, table=location_history）
+npx wrangler d1 execute AGENT_DB --remote --json \
+  --command "SELECT datetime(tst,'unixepoch','+9 hours') jst, lat, lon FROM location_history ORDER BY tst DESC LIMIT 20;"
+
+# Worker ログ（observability 有効。event=geofence_transition / notification_trigger）
+npx wrangler tail
+```
+
 ## Git ルール
 
 - コード変更後はブランチを切り、PR を作成して master にマージする。
