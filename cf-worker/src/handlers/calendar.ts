@@ -101,8 +101,7 @@ export async function deleteCalendarEventForTask(env: Env, pageId: string): Prom
   await deleteCalendarSync(env, pageId);
 }
 
-export async function sendDueSoonNotice(env: Env): Promise<void> {
-  const tasks = await getOpenTasks(env);
+export function getDueSoonNoticeText(tasks: Task[]): string | null {
   const now = jstNow();
   const today = now.toISOString().slice(0, 10);
   const tomorrow = new Date(now);
@@ -112,7 +111,7 @@ export async function sendDueSoonNotice(env: Env): Promise<void> {
   const dueToday = tasks.filter((t) => t.due && t.due.slice(0, 10) === today);
   const dueTomorrow = tasks.filter((t) => t.due && t.due.slice(0, 10) === tomorrowStr);
 
-  if (!dueToday.length && !dueTomorrow.length) return;
+  if (!dueToday.length && !dueTomorrow.length) return null;
 
   const sections: string[] = [];
   if (dueToday.length) {
@@ -125,7 +124,7 @@ export async function sendDueSoonNotice(env: Env): Promise<void> {
       `*📅 明日期限 (${dueTomorrow.length}件)*\n` + dueTomorrow.map((t) => `• ${escapeMd(t.title)}`).join("\n"),
     );
   }
-  await sendMessage(env, "*⏰ 期限間近タスク*\n\n" + sections.join("\n\n"));
+  return "*⏰ 期限間近タスク*\n\n" + sections.join("\n\n");
 }
 
 export async function sendTaskReminder(env: Env): Promise<void> {

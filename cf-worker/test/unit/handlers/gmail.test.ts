@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { checkGmail, learnFromCancelled } from "../../../src/handlers/gmail.js";
 import { createMockEnv } from "../../helpers/mocks.js";
-import gmailFixtures from "../../fixtures/gmail-messages.json" assert { type: "json" };
+import gmailFixtures from "../../fixtures/gmail-messages.json" with { type: "json" };
 
 vi.mock("../../../src/clients/gmail-api.js", () => ({
   listAllMessages: vi.fn(),

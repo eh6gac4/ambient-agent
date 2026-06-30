@@ -6,26 +6,20 @@ import { jstNow } from "../utils/jst.js";
 
 const STALE_DAYS = 14;
 
-export async function sendEscalationNotice(env: Env): Promise<void> {
+export async function getEscalationNoticeText(env: Env): Promise<string | null> {
   const escalated = await escalatePriorityTasks(env);
-  if (!escalated.length) return;
+  if (!escalated.length) return null;
 
   const lines = escalated.map((t) => `• ${escapeMd(t.title)}（期限: ${fmtDue(t.due)}）`);
-  await sendMessage(
-    env,
-    `*⬆️ 優先度を high に昇格しました (${escalated.length}件)*\n\n` + lines.join("\n"),
-  );
+  return `*⬆️ 優先度を high に昇格しました (${escalated.length}件)*\n\n` + lines.join("\n");
 }
 
-export async function sendBacklogPromotionNotice(env: Env): Promise<void> {
+export async function getBacklogPromotionNoticeText(env: Env): Promise<string | null> {
   const promoted = await promoteBacklogTasks(env);
-  if (!promoted.length) return;
+  if (!promoted.length) return null;
 
   const lines = promoted.map((t) => `• ${escapeMd(t.title)}（期限: ${fmtDue(t.due)}）`);
-  await sendMessage(
-    env,
-    `*📥 バックログから未着手に昇格しました (${promoted.length}件)*\n\n` + lines.join("\n"),
-  );
+  return `*📥 バックログから未着手に昇格しました (${promoted.length}件)*\n\n` + lines.join("\n");
 }
 
 export async function sendStaleTasksNotice(env: Env): Promise<void> {

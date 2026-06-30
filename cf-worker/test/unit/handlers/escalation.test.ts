@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { sendBacklogPromotionNotice, sendEscalationNotice, sendStaleTasksNotice } from "../../../src/handlers/escalation.js";
+import { getBacklogPromotionNoticeText, getEscalationNoticeText, sendStaleTasksNotice } from "../../../src/handlers/escalation.js";
 import { createMockEnv, sampleTasks } from "../../helpers/mocks.js";
 import type { Task } from "../../../src/types.js";
 
@@ -15,7 +15,7 @@ vi.mock("../../../src/clients/telegram.js", async (importOriginal) => ({
   sendMessage: vi.fn().mockResolvedValue(undefined),
 }));
 
-describe("sendEscalationNotice", () => {
+describe("getEscalationNoticeText", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -29,9 +29,9 @@ describe("sendEscalationNotice", () => {
       { title: "緊急対応", due: "2026-04-27", priority: "high", status: "未着手", lastEdited: null, url: "", pageId: "p1" },
     ]);
 
-    await sendEscalationNotice(env);
-    expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("緊急対応"));
-    expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("high に昇格"));
+    const text = await getEscalationNoticeText(env);
+    expect(text).toContain("緊急対応");
+    expect(text).toContain("high に昇格");
   });
 
   it("does not send when no tasks escalated", async () => {
@@ -41,8 +41,8 @@ describe("sendEscalationNotice", () => {
 
     (escalatePriorityTasks as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
-    await sendEscalationNotice(env);
-    expect(sendMessage).not.toHaveBeenCalled();
+    const text = await getEscalationNoticeText(env);
+    expect(text).toBeNull();
   });
 
   it("escapes Markdown special characters in task titles", async () => {
@@ -54,12 +54,12 @@ describe("sendEscalationNotice", () => {
       { title: "見積_資料 *至急*", due: "2026-04-27", priority: "high", status: "未着手", lastEdited: null, url: "", pageId: "p1" },
     ]);
 
-    await sendEscalationNotice(env);
-    expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("見積\\_資料 \\*至急\\*"));
+    const text = await getEscalationNoticeText(env);
+    expect(text).toContain("見積\\_資料 \\*至急\\*");
   });
 });
 
-describe("sendBacklogPromotionNotice", () => {
+describe("getBacklogPromotionNoticeText", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -73,9 +73,9 @@ describe("sendBacklogPromotionNotice", () => {
       { title: "原稿チェック", due: "2026-05-27", priority: "medium", status: "未着手", lastEdited: null, url: "", pageId: "p1" },
     ]);
 
-    await sendBacklogPromotionNotice(env);
-    expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("原稿チェック"));
-    expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("バックログから未着手に昇格"));
+    const text = await getBacklogPromotionNoticeText(env);
+    expect(text).toContain("原稿チェック");
+    expect(text).toContain("バックログから未着手に昇格");
   });
 
   it("does not send when nothing was promoted", async () => {
@@ -85,8 +85,8 @@ describe("sendBacklogPromotionNotice", () => {
 
     (promoteBacklogTasks as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
-    await sendBacklogPromotionNotice(env);
-    expect(sendMessage).not.toHaveBeenCalled();
+    const text = await getBacklogPromotionNoticeText(env);
+    expect(text).toBeNull();
   });
 });
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { sendDueSoonNotice, syncTaskCalendarEvent, syncCalendar } from "../../../src/handlers/calendar.js";
+import { getDueSoonNoticeText, syncTaskCalendarEvent, syncCalendar } from "../../../src/handlers/calendar.js";
 import { createMockEnv } from "../../helpers/mocks.js";
 import type { Task } from "../../../src/types.js";
 
@@ -27,7 +27,7 @@ vi.mock("../../../src/storage/d1.js", () => ({
   deleteCalendarSync: vi.fn().mockResolvedValue(undefined),
 }));
 
-describe("sendDueSoonNotice", () => {
+describe("getDueSoonNoticeText", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -48,12 +48,11 @@ describe("sendDueSoonNotice", () => {
       { title: "明日期限タスク", due: tomorrowStr, priority: "medium", status: "未着手", lastEdited: null, url: "", pageId: "p2" },
       { title: "来週のタスク", due: "2099-01-01", priority: "low", status: "未着手", lastEdited: null, url: "", pageId: "p3" },
     ];
-    (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue(tasks);
 
-    await sendDueSoonNotice(env);
-    expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("今日期限タスク"));
-    expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("明日期限タスク"));
-    expect(sendMessage).toHaveBeenCalledWith(env, expect.not.stringContaining("来週のタスク"));
+    const text = getDueSoonNoticeText(tasks);
+    expect(text).toContain("今日期限タスク");
+    expect(text).toContain("明日期限タスク");
+    expect(text).not.toContain("来週のタスク");
   });
 
   it("escapes Markdown special characters in task titles", async () => {
@@ -64,12 +63,12 @@ describe("sendDueSoonNotice", () => {
     const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
     const today = now.toISOString().slice(0, 10);
 
-    (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue([
+    const tasks: Task[] = [
       { title: "請求書_確認 *重要*", due: today, priority: "high", status: "未着手", lastEdited: null, url: "", pageId: "p1" },
-    ]);
+    ];
 
-    await sendDueSoonNotice(env);
-    expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("請求書\\_確認 \\*重要\\*"));
+    const text = getDueSoonNoticeText(tasks);
+    expect(text).toContain("請求書\\_確認 \\*重要\\*");
   });
 
   it("does not send when no tasks due soon", async () => {
@@ -77,12 +76,12 @@ describe("sendDueSoonNotice", () => {
     const { getOpenTasks } = await import("../../../src/clients/notion.js");
     const { sendMessage } = await import("../../../src/clients/telegram.js");
 
-    (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue([
+    const tasks: Task[] = [
       { title: "来月のタスク", due: "2099-01-01", priority: "low", status: "未着手", lastEdited: null, url: "", pageId: "p1" },
-    ]);
+    ];
 
-    await sendDueSoonNotice(env);
-    expect(sendMessage).not.toHaveBeenCalled();
+    const text = getDueSoonNoticeText(tasks);
+    expect(text).toBeNull();
   });
 });
 

@@ -9,23 +9,23 @@ describe("fmtDue", () => {
   });
 
   it("returns 今日 for today's date", () => {
-    const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
-    const today = now.toISOString().slice(0, 10);
+    const now = new Date();
+    const today = new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).format(now).replace(/\//g, "-");
     expect(fmtDue(today)).toBe("今日");
   });
 
   it("returns 明日 for tomorrow", () => {
-    const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
-    const tomorrow = new Date(now);
+    const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    expect(fmtDue(tomorrow.toISOString().slice(0, 10))).toBe("明日");
+    const tomorrowStr = new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).format(tomorrow).replace(/\//g, "-");
+    expect(fmtDue(tomorrowStr)).toBe("明日");
   });
 
   it("returns 明後日 for two days from now", () => {
-    const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
-    const dayAfterTomorrow = new Date(now);
+    const dayAfterTomorrow = new Date();
     dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
-    expect(fmtDue(dayAfterTomorrow.toISOString().slice(0, 10))).toBe("明後日");
+    const dayAfterTomorrowStr = new Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo", year: "numeric", month: "2-digit", day: "2-digit" }).format(dayAfterTomorrow).replace(/\//g, "-");
+    expect(fmtDue(dayAfterTomorrowStr)).toBe("明後日");
   });
 
   it("returns formatted date string for far future dates", () => {

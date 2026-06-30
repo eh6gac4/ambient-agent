@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { sendDailyBriefing, sendEmailDigest } from "../../../src/handlers/briefing.js";
+import { sendDailyBriefing, getEmailDigestText } from "../../../src/handlers/briefing.js";
 import { createMockEnv } from "../../helpers/mocks.js";
 
 vi.mock("../../../src/clients/gcal-api.js", () => ({
@@ -8,6 +8,8 @@ vi.mock("../../../src/clients/gcal-api.js", () => ({
 
 vi.mock("../../../src/clients/notion.js", () => ({
   getOpenTasks: vi.fn(),
+  escalatePriorityTasks: vi.fn().mockResolvedValue([]),
+  promoteBacklogTasks: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("../../../src/clients/anthropic.js", () => ({
@@ -15,7 +17,7 @@ vi.mock("../../../src/clients/anthropic.js", () => ({
 }));
 
 vi.mock("../../../src/storage/kv.js", () => ({
-  takeEmailDigest: vi.fn(),
+  takeEmailDigest: vi.fn().mockResolvedValue({ taskLines: [], archivedLines: [] }),
   getDailyUsage: vi.fn(),
 }));
 
@@ -76,7 +78,7 @@ describe("sendDailyBriefing", () => {
   });
 });
 
-describe("sendEmailDigest", () => {
+describe("getEmailDigestText", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -95,18 +97,17 @@ describe("sendEmailDigest", () => {
       archivedLines: [],
     });
 
-    await sendEmailDigest(env);
+    const text = await getEmailDigestText(env);
 
-    expect(sendMessage).toHaveBeenCalledOnce();
-    const sent = (sendMessage as ReturnType<typeof vi.fn>).mock.calls[0][1] as string;
-    expect(sent).toContain("✅ *タスク登録*: 3件");
-    expect(sent).toContain("[🔗 ダッシュボードで確認](https://todo.eh6gac4.work)");
+    expect(text).not.toBeNull();
+    expect(text).toContain("✅ *タスク登録*: 3件");
+    expect(text).toContain("[🔗 ダッシュボードで確認](https://todo.eh6gac4.work)");
     // 個別タスクの件名やサブタスクが含まれていないこと
-    expect(sent).not.toContain("会議の準備");
-    expect(sent).not.toContain("レポート提出");
-    expect(sent).not.toContain("コードレビュー");
+    expect(text).not.toContain("会議の準備");
+    expect(text).not.toContain("レポート提出");
+    expect(text).not.toContain("コードレビュー");
     // アーカイブセクションは出さない
-    expect(sent).not.toContain("アーカイブ済み");
+    expect(text).not.toContain("アーカイブ済み");
   });
 
   it("shows only archive section when no tasks were registered", async () => {
@@ -119,13 +120,12 @@ describe("sendEmailDigest", () => {
       archivedLines: ["• *通知メール*\n  自動通知", "• *ニュースレター*\n  購読しているメルマガ"],
     });
 
-    await sendEmailDigest(env);
+    const text = await getEmailDigestText(env);
 
-    const sent = (sendMessage as ReturnType<typeof vi.fn>).mock.calls[0][1] as string;
-    expect(sent).not.toContain("✅ *タスク登録*");
-    expect(sent).toContain("📦 *アーカイブ済み*");
-    expect(sent).toContain("通知メール");
-    expect(sent).toContain("ニュースレター");
+    expect(text).not.toContain("✅ *タスク登録*");
+    expect(text).toContain("📦 *アーカイブ済み*");
+    expect(text).toContain("通知メール");
+    expect(text).toContain("ニュースレター");
   });
 
   it("includes both sections in order when tasks and archives coexist", async () => {
@@ -138,11 +138,10 @@ describe("sendEmailDigest", () => {
       archivedLines: ["• *通知*\n  ..."],
     });
 
-    await sendEmailDigest(env);
+    const text = await getEmailDigestText(env);
 
-    const sent = (sendMessage as ReturnType<typeof vi.fn>).mock.calls[0][1] as string;
-    const taskIdx = sent.indexOf("✅ *タスク登録*: 1件");
-    const archiveIdx = sent.indexOf("📦 *アーカイブ済み*");
+    const taskIdx = text!.indexOf("✅ *タスク登録*: 1件");
+    const archiveIdx = text!.indexOf("📦 *アーカイブ済み*");
     expect(taskIdx).toBeGreaterThan(-1);
     expect(archiveIdx).toBeGreaterThan(taskIdx);
   });
@@ -157,8 +156,8 @@ describe("sendEmailDigest", () => {
       archivedLines: [],
     });
 
-    await sendEmailDigest(env);
+    const text = await getEmailDigestText(env);
 
-    expect(sendMessage).not.toHaveBeenCalled();
+    expect(text).toBeNull();
   });
 });
