@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import worker from "../../src/index.js";
 import { createMockEnv, sampleTasks } from "../helpers/mocks.js";
-import telegramFixtures from "../fixtures/telegram-updates.json" assert { type: "json" };
+import telegramFixtures from "../fixtures/telegram-updates.json" with { type: "json" };
 
 vi.mock("../../src/clients/notion.js", () => ({
   getOpenTasks: vi.fn().mockResolvedValue([]),
@@ -29,14 +29,13 @@ vi.mock("../../src/clients/anthropic.js", () => ({
 vi.mock("../../src/handlers/calendar.js", () => ({
   deleteCalendarEventForTask: vi.fn().mockResolvedValue(undefined),
   syncCalendar: vi.fn().mockResolvedValue(undefined),
-  sendDueSoonNotice: vi.fn().mockResolvedValue(undefined),
   sendTaskReminder: vi.fn().mockResolvedValue(undefined),
   getTodaysEvents: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock("../../src/handlers/briefing.js", () => ({
   sendDailyBriefing: vi.fn().mockResolvedValue(undefined),
-  sendCostReport: vi.fn().mockResolvedValue(undefined),
+  sendWeeklyCostReport: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("../../src/handlers/escalation.js", () => ({

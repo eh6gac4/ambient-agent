@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { handleTelegramWebhook } from "../../../src/handlers/telegram.js";
 import { createMockEnv, sampleTasks } from "../../helpers/mocks.js";
-import telegramFixtures from "../../fixtures/telegram-updates.json" assert { type: "json" };
+import telegramFixtures from "../../fixtures/telegram-updates.json" with { type: "json" };
 
 vi.mock("../../../src/clients/notion.js", () => ({
   getOpenTasks: vi.fn(),

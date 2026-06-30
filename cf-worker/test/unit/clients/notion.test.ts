@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { addTask, addSubtask, getOpenTasks, completeTask, cancelTask, updateTaskDue, escalatePriorityTasks, promoteBacklogTasks, sanitizeEmoji } from "../../../src/clients/notion.js";
 import { createMockEnv } from "../../helpers/mocks.js";
-import notionFixtures from "../../fixtures/notion-tasks.json" assert { type: "json" };
+import notionFixtures from "../../fixtures/notion-tasks.json" with { type: "json" };
 
 describe("addTask", () => {
   beforeEach(() => {

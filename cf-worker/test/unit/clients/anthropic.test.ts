@@ -8,7 +8,7 @@ import {
   selectOfficeLeaveNotifications,
 } from "../../../src/clients/anthropic.js";
 import { createMockEnv } from "../../helpers/mocks.js";
-import claudeFixtures from "../../fixtures/claude-responses.json" assert { type: "json" };
+import claudeFixtures from "../../fixtures/claude-responses.json" with { type: "json" };
 
 describe("analyzeEmail", () => {
   beforeEach(() => {

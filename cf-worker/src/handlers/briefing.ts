@@ -6,6 +6,8 @@ import { sendMessage, escapeMd } from "../clients/telegram.js";
 import { getDailyUsage, takeEmailDigest } from "../storage/kv.js";
 import { PRIORITY_ICON } from "../utils/task.js";
 import { jstNow, toDateStr } from "../utils/jst.js";
+import { getEscalationNoticeText, getBacklogPromotionNoticeText } from "./escalation.js";
+import { getDueSoonNoticeText } from "./calendar.js";
 
 const PRICE_INPUT_PER_M = 0.8;
 const PRICE_OUTPUT_PER_M = 4.0;
@@ -72,6 +74,14 @@ function formatTasksSection(tasks: Task[]): string {
 }
 
 export async function sendDailyBriefing(env: Env): Promise<void> {
+  // 1. Notion/KV updates that we want to notify about
+  const [escalationText, backlogText, emailDigestText] = await Promise.all([
+    getEscalationNoticeText(env),
+    getBacklogPromotionNoticeText(env),
+    getEmailDigestText(env),
+  ]);
+
+  // 2. Fetch the latest state (after escalations)
   const [events, tasks] = await Promise.all([getTodaysEvents(env), getOpenTasks(env)]);
 
   const todayStr = toDateStr(jstNow());
@@ -80,63 +90,72 @@ export async function sendDailyBriefing(env: Env): Promise<void> {
 
   const summary = await summarizeDay(env, events, openTasks, overdue);
   const dateStr = jstDateStr();
+  
+  const dueSoonText = getDueSoonNoticeText(tasks);
 
   const sections = [
     `*📅 日次ブリーフィング ${dateStr}*`,
     escapeMd(summary.trim()),
     formatEventsSection(events),
+    backlogText,
+    escalationText,
+    dueSoonText,
     formatOverdueSection(overdue),
     formatTasksSection(openTasks),
+    emailDigestText,
   ].filter(Boolean);
 
   await sendMessage(env, sections.join("\n\n"));
 }
 
-export async function sendCostReport(env: Env): Promise<void> {
+export async function sendWeeklyCostReport(env: Env): Promise<void> {
   const now = jstNow();
-  const yesterday = new Date(now);
-  yesterday.setDate(yesterday.getDate() - 1);
-  const yesterdayStr = yesterday.toISOString().slice(0, 10);
-
-  const entries = await getDailyUsage(env, yesterdayStr);
-
-  if (!entries.length) {
-    await sendMessage(env, `*💰 コストレポート ${yesterdayStr}*\n\nClaude API の呼び出しはありませんでした。`);
-    return;
-  }
-
   let totalInput = 0;
   let totalOutput = 0;
   const byJob: Record<string, { input: number; output: number; calls: number }> = {};
+  let totalCalls = 0;
 
-  for (const e of entries) {
-    totalInput += e.inputTokens;
-    totalOutput += e.outputTokens;
-    const j = (byJob[e.job] ??= { input: 0, output: 0, calls: 0 });
-    j.input += e.inputTokens;
-    j.output += e.outputTokens;
-    j.calls++;
+  for (let i = 1; i <= 7; i++) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - i);
+    const dStr = d.toISOString().slice(0, 10);
+    const entries = await getDailyUsage(env, dStr);
+    
+    for (const e of entries) {
+      totalInput += e.inputTokens;
+      totalOutput += e.outputTokens;
+      const j = (byJob[e.job] ??= { input: 0, output: 0, calls: 0 });
+      j.input += e.inputTokens;
+      j.output += e.outputTokens;
+      j.calls++;
+      totalCalls++;
+    }
+  }
+
+  if (totalCalls === 0) {
+    await sendMessage(env, `*💰 週間コストレポート*\n\n直近7日間の Claude API の呼び出しはありませんでした。`);
+    return;
   }
 
   const lines = [
-    `*💰 コストレポート ${yesterdayStr}*\n`,
+    `*💰 週間コストレポート*\n`,
     `合計: $${calcCost(totalInput, totalOutput).toFixed(4)} USD`,
-    `API呼び出し: ${entries.length}回`,
+    `API呼び出し: ${totalCalls}回`,
     `入力トークン: ${totalInput.toLocaleString()}`,
     `出力トークン: ${totalOutput.toLocaleString()}`,
     "",
     "*ジョブ別内訳*",
-    ...Object.entries(byJob).map(
-      ([job, s]) => `• \`${job}\`: ${s.calls}回 / $${calcCost(s.input, s.output).toFixed(4)}`,
-    ),
+    ...Object.entries(byJob)
+      .sort((a, b) => b[1].calls - a[1].calls)
+      .map(([job, s]) => `• \`${job}\`: ${s.calls}回 / $${calcCost(s.input, s.output).toFixed(4)}`),
   ];
 
   await sendMessage(env, lines.join("\n"));
 }
 
-export async function sendEmailDigest(env: Env): Promise<void> {
+export async function getEmailDigestText(env: Env): Promise<string | null> {
   const { taskLines, archivedLines } = await takeEmailDigest(env);
-  if (!taskLines.length && !archivedLines.length) return;
+  if (!taskLines.length && !archivedLines.length) return null;
 
   const sections: string[] = [];
   if (taskLines.length) {
@@ -145,5 +164,5 @@ export async function sendEmailDigest(env: Env): Promise<void> {
     );
   }
   if (archivedLines.length) sections.push("📦 *アーカイブ済み*\n" + archivedLines.join("\n"));
-  await sendMessage(env, "*📧 メール処理サマリ*\n\n" + sections.join("\n\n"));
+  return "*📧 メール処理サマリ*\n\n" + sections.join("\n\n");
 }
