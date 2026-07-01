@@ -120,7 +120,9 @@ async function callGemini(
   
   await recordUsage(env, job, inputTokens, outputTokens);
   
-  return data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+  const parts = data.candidates?.[0]?.content?.parts;
+  if (!parts) return "";
+  return parts.map(p => p.text || "").join("");
 }
 
 /** LLM 応答テキストから最初の JSON 配列を取り出す。見つからない/パース失敗時は空配列。 */
@@ -336,5 +338,5 @@ ${overdueText}
 - 期限切れタスクがある場合は必ず触れる
 - 装飾やマークダウン記号は使わず、プレーンな文章のみ`;
 
-  return callGemini(env, "summarize_day", "", [{ text: prompt }], 512);
+  return callGemini(env, "summarize_day", "", [{ text: prompt }], 1024);
 }
