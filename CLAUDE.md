@@ -53,6 +53,7 @@ npx wrangler tail
 - **`data/` を削除しない。** `token.json`・`credentials.json` は Git 管理外で、消えると再認証が必要になる。
 - **Notion API は `data_sources.query` を使う。** `notion_handler.py` の `_query_db()` 参照。
 - **重複通知が届いたら**、Docker コンテナが誤って起動していないか確認する。`docker compose ps` と `ps aux` で確認して重複プロセスを停止する。
+- **テスト等で日本時間（JST）の日付文字列を生成する際**は `new Date().toISOString()` を避け、`Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo" })` を使用する（実行環境のタイムゾーン差異によるバグを防ぐため）。
 
 ## ドキュメント更新ルール
 
