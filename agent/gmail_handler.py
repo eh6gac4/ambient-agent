@@ -1,6 +1,6 @@
 """
 agent/gmail_handler.py
-未読メールを取得し、Claude でタスクを抽出して Notion に登録する。
+未読メールを取得し、Gemini でタスクを抽出して Notion に登録する。
 """
 import base64
 import datetime
@@ -11,7 +11,7 @@ import urllib.parse
 from googleapiclient.discovery import build
 
 from agent.google_auth import get_credentials
-from agent.claude_agent import analyze_email
+from agent.gemini_agent import analyze_email
 from agent.notion_handler import add_task, update_task_from_reply, get_task_status
 from agent.telegram_notifier import send_message
 
@@ -178,7 +178,7 @@ def _save_processed_id(msg_id: str):
 
 
 def notify_unread_emails():
-    """未読メールの件名・送信者を Telegram に通知する（Claude 呼び出しなし）。"""
+    """未読メールの件名・送信者を Telegram に通知する（Gemini 呼び出しなし）。"""
     logger.info("Notifying unread emails...")
     try:
         service = build("gmail", "v1", credentials=get_credentials())

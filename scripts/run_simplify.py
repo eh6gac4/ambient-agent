@@ -25,12 +25,12 @@ MAX_CHARS = 4000  # Telegram メッセージ上限 4096 の余裕分
 TAIL_CHARS = 1500  # stdout/stderr ごとの抜粋上限
 
 _ERROR_PATTERNS: list[tuple[tuple[str, ...], str]] = [
-    (("credit balance", "billing_error"), "💳 Anthropic API クレジット残高不足 (console.anthropic.com でチャージ)"),
-    (("rate_limit", "rate limit", "429"), "⏱️ Anthropic API レート制限"),
-    (("invalid_api_key", "authentication_error", "401"), "🔐 認証エラー (ANTHROPIC_API_KEY を確認)"),
+    (("credit balance", "billing_error"), "💳 Gemini API クレジット残高不足 (aistudio.google.com で確認)"),
+    (("rate_limit", "rate limit", "429"), "⏱️ Gemini API レート制限"),
+    (("invalid_api_key", "authentication_error", "401"), "🔐 認証エラー (GEMINI_API_KEY を確認)"),
     (("messages are required for agent hooks",), "🪝 Agent hook バグ (.claude/settings.local.json の hooks を確認)"),
     (("context_length", "context window", "prompt is too long"), "📏 コンテキスト長超過"),
-    (("overloaded",), "🚧 Anthropic API 過負荷"),
+    (("overloaded",), "🚧 Gemini API 過負荷"),
 ]
 
 

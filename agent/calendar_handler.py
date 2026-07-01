@@ -11,7 +11,7 @@ from googleapiclient.discovery import build
 from agent.config import JST
 from agent.google_auth import get_credentials
 from agent.notion_handler import get_open_tasks, escalate_priority_tasks
-from agent.claude_agent import summarize_day
+from agent.gemini_agent import summarize_day
 from agent.telegram_notifier import send_message
 from agent.task_formatter import format_task_list, fmt_due
 

@@ -13,7 +13,7 @@ vi.mock("../../src/clients/notion.js", () => ({
   getOpenTasks: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock("../../src/clients/anthropic.js", () => ({
+vi.mock("../../src/clients/gemini.js", () => ({
   selectHomeArrivalNotifications: vi.fn().mockResolvedValue([]),
   selectOfficeLeaveNotifications: vi.fn().mockResolvedValue([]),
 }));
@@ -112,7 +112,7 @@ describe("POST /owntracks", () => {
 
   it("圏外→圏内の遷移で home_arrival (handleHomeArrival) が発火する", async () => {
     const { getOpenTasks } = await import("../../src/clients/notion.js");
-    const { selectHomeArrivalNotifications } = await import("../../src/clients/anthropic.js");
+    const { selectHomeArrivalNotifications } = await import("../../src/clients/gemini.js");
     const { sendMessage } = await import("../../src/clients/telegram.js");
 
     (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue([
@@ -143,7 +143,7 @@ describe("POST /owntracks", () => {
 
   it("圏内→圏内では再発火しない", async () => {
     const { getOpenTasks } = await import("../../src/clients/notion.js");
-    const { selectHomeArrivalNotifications } = await import("../../src/clients/anthropic.js");
+    const { selectHomeArrivalNotifications } = await import("../../src/clients/gemini.js");
     const { sendMessage } = await import("../../src/clients/telegram.js");
 
     (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue([

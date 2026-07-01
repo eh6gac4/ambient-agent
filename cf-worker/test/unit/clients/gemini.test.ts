@@ -6,9 +6,9 @@ import {
   pickTaskTitle,
   selectHomeArrivalNotifications,
   selectOfficeLeaveNotifications,
-} from "../../../src/clients/anthropic.js";
+} from "../../../src/clients/gemini.js";
 import { createMockEnv } from "../../helpers/mocks.js";
-import claudeFixtures from "../../fixtures/claude-responses.json" with { type: "json" };
+import geminiFixtures from "../../fixtures/gemini-responses.json" with { type: "json" };
 
 describe("analyzeEmail", () => {
   beforeEach(() => {
@@ -18,7 +18,7 @@ describe("analyzeEmail", () => {
   it("returns summary and tasks from valid response", async () => {
     const env = createMockEnv();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
-      new Response(JSON.stringify(claudeFixtures.analyzeEmailResponse), { status: 200 }),
+      new Response(JSON.stringify(geminiFixtures.analyzeEmailResponse), { status: 200 }),
     ));
 
     const result = await analyzeEmail(env, "プロジェクトの進捗確認", "内容...");
@@ -33,7 +33,7 @@ describe("analyzeEmail", () => {
   it("returns empty tasks array for newsletters", async () => {
     const env = createMockEnv();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
-      new Response(JSON.stringify(claudeFixtures.analyzeEmailNoTasksResponse), { status: 200 }),
+      new Response(JSON.stringify(geminiFixtures.analyzeEmailNoTasksResponse), { status: 200 }),
     ));
 
     const result = await analyzeEmail(env, "ニュースレター", "広告内容...");
@@ -75,7 +75,7 @@ describe("extractTasksFromText", () => {
   it("extracts task list from response", async () => {
     const env = createMockEnv();
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
-      new Response(JSON.stringify(claudeFixtures.extractTasksResponse), { status: 200 }),
+      new Response(JSON.stringify(geminiFixtures.extractTasksResponse), { status: 200 }),
     ));
 
     const tasks = await extractTasksFromText(env, "extract_tasks", "件名", "本文");
@@ -100,16 +100,16 @@ describe("extractTasksFromText", () => {
 });
 
 describe("extractTasksFromUrlContent", () => {
-  it("passes URL as subject to Claude", async () => {
+  it("passes URL as subject to Gemini", async () => {
     const env = createMockEnv();
     const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify(claudeFixtures.extractTasksResponse), { status: 200 }),
+      new Response(JSON.stringify(geminiFixtures.extractTasksResponse), { status: 200 }),
     );
     vi.stubGlobal("fetch", fetchMock);
 
     await extractTasksFromUrlContent(env, "https://example.com/task", "コンテンツ");
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(body.messages[0].content).toContain("https://example.com/task");
+    expect(body.contents[0].parts[0].text).toContain("https://example.com/task");
   });
 });
 
@@ -126,8 +126,8 @@ describe("selectHomeArrivalNotifications / selectOfficeLeaveNotifications", () =
   function stubArrayResponse(arr: unknown) {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({
-        content: [{ type: "text", text: JSON.stringify(arr) }],
-        usage: { input_tokens: 10, output_tokens: 5 },
+        candidates: [{ content: { parts: [{ text: JSON.stringify(arr) }] } }],
+        usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 5 },
       }), { status: 200 }),
     );
     vi.stubGlobal("fetch", fetchMock);
@@ -142,8 +142,8 @@ describe("selectHomeArrivalNotifications / selectOfficeLeaveNotifications", () =
     expect(result).toEqual([{ title: "牛乳を買う", priority: "medium" }]);
 
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(body.system).toContain("帰宅");
-    expect(body.messages[0].content).toContain("2026/06/14 19:00");
+    expect(body.systemInstruction.parts[0].text).toContain("帰宅");
+    expect(body.contents[0].parts[0].text).toContain("2026/06/14 19:00");
   });
 
   it("office leave parses notifications and uses the office prompt", async () => {
@@ -154,7 +154,7 @@ describe("selectHomeArrivalNotifications / selectOfficeLeaveNotifications", () =
     expect(result).toEqual([{ title: "請求書を提出", priority: "high" }]);
 
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(body.system).toContain("退社");
+    expect(body.systemInstruction.parts[0].text).toContain("退社");
   });
 
   it("returns empty array when response has no JSON array", async () => {

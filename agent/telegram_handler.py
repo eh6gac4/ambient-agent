@@ -15,7 +15,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from agent.calendar_handler import send_daily_briefing
-from agent.claude_agent import extract_tasks_from_email, extract_tasks_from_url_content, extract_tasks_from_image
+from agent.gemini_agent import extract_tasks_from_email, extract_tasks_from_url_content, extract_tasks_from_image
 from agent.config import JST, OPERATING_START_HOUR, OPERATING_END_HOUR
 from agent.google_calendar import delete_calendar_event_for_task
 from agent.gmail_handler import get_sender_for_task, add_no_task_sender, remove_no_task_sender, load_no_task_senders

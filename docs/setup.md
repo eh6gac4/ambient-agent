@@ -20,7 +20,7 @@
 |---|---|
 | Telegram 通知 | ✅ 送信成功 |
 | Google Calendar 取得 | ✅ 正常 |
-| Gmail → Claude → Notion タスク登録 | ✅ 正常（未読20件処理、5タスク登録） |
+| Gmail → Gemini → Notion タスク登録 | ✅ 正常（未読20件処理、5タスク登録） |
 
 ## 運用設定
 

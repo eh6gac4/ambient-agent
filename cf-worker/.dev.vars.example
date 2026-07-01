@@ -28,7 +28,7 @@ NOTION_TASKS_DB_ID=00000000000000000000000000000000
 # ------------------------------------------------------------
 # Anthropic / Google: 本番と同じ値で OK
 # ------------------------------------------------------------
-ANTHROPIC_API_KEY=sk-ant-
+GEMINI_API_KEY=your-gemini-key
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 GOOGLE_REFRESH_TOKEN=

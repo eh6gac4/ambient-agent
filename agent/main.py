@@ -58,7 +58,7 @@ def main():
     briefing_hour = int(os.getenv("DAILY_BRIEFING_HOUR", 8))
     pre_briefing_hour = briefing_hour - 1
 
-    # Gmail → Notion タスク抽出（ブリーフィング5分前、まだ未読のメールに Claude を実行）
+    # Gmail → Notion タスク抽出（ブリーフィング5分前、まだ未読のメールに Gemini を実行）
     scheduler.add_job(
         process_unread_emails,
         "cron",

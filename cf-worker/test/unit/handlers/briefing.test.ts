@@ -12,7 +12,7 @@ vi.mock("../../../src/clients/notion.js", () => ({
   promoteBacklogTasks: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock("../../../src/clients/anthropic.js", () => ({
+vi.mock("../../../src/clients/gemini.js", () => ({
   summarizeDay: vi.fn(),
 }));
 
@@ -36,7 +36,7 @@ describe("sendDailyBriefing", () => {
     const env = createMockEnv();
     const { getTodaysEvents } = await import("../../../src/clients/gcal-api.js");
     const { getOpenTasks } = await import("../../../src/clients/notion.js");
-    const { summarizeDay } = await import("../../../src/clients/anthropic.js");
+    const { summarizeDay } = await import("../../../src/clients/gemini.js");
     const { sendMessage } = await import("../../../src/clients/telegram.js");
 
     (getTodaysEvents as ReturnType<typeof vi.fn>).mockResolvedValue([
@@ -50,7 +50,7 @@ describe("sendDailyBriefing", () => {
     await sendDailyBriefing(env);
 
     const sent = (sendMessage as ReturnType<typeof vi.fn>).mock.calls[0][1] as string;
-    // Claude サマリ・予定名・タスクタイトルがすべてエスケープされている
+    // Gemini サマリ・予定名・タスクタイトルがすべてエスケープされている
     expect(sent).toContain("今日は \\*忙しい\\* 一日\\_です");
     expect(sent).toContain("MTG\\_設計 \\*確認\\*");
     expect(sent).toContain("資料\\_作成 \\*急ぎ\\*");
@@ -62,7 +62,7 @@ describe("sendDailyBriefing", () => {
     const env = createMockEnv();
     const { getTodaysEvents } = await import("../../../src/clients/gcal-api.js");
     const { getOpenTasks } = await import("../../../src/clients/notion.js");
-    const { summarizeDay } = await import("../../../src/clients/anthropic.js");
+    const { summarizeDay } = await import("../../../src/clients/gemini.js");
     const { sendMessage } = await import("../../../src/clients/telegram.js");
 
     (getTodaysEvents as ReturnType<typeof vi.fn>).mockResolvedValue([]);

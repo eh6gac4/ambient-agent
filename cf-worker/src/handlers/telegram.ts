@@ -1,7 +1,7 @@
 import type { Env, ExtractedTask } from "../types.js";
 import { sendMessage, getFileUrl } from "../clients/telegram.js";
 import { addTask, getOpenTasks, completeTask, cancelTask, updateTaskDue, uploadImageToNotion } from "../clients/notion.js";
-import { extractTasksFromText, extractTasksFromUrlContent, analyzeImage } from "../clients/anthropic.js";
+import { extractTasksFromText, extractTasksFromUrlContent, analyzeImage } from "../clients/gemini.js";
 import { getSenderForTask } from "../storage/d1.js";
 import { getTaskCache, setTaskCache, getNoTaskSenders, addNoTaskSender, removeNoTaskSender } from "../storage/kv.js";
 import { deleteCalendarEventForTask, syncTaskCalendarEventSafe } from "./calendar.js";

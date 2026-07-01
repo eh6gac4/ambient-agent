@@ -2,8 +2,8 @@ import type { Env, ExtractedTask, EmailAnalysis } from "../types.js";
 import { recordUsage } from "../storage/kv.js";
 import { jstDateStr } from "../utils/jst.js";
 
-const MODEL = "claude-haiku-4-5-20251001";
-const API_URL = "https://api.anthropic.com/v1/messages";
+const MODEL = "gemini-2.0-flash";
+const API_URL_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
 const EXTRACT_TASKS_PROMPT = `あなたはメールからタスクを抽出するアシスタントです。
 
@@ -62,41 +62,65 @@ const ANALYZE_EMAIL_PROMPT = `あなたはメールを分析するアシスタ�
 - icon: タスクの性質（返信・予定・支払い・確認・買い物 等）を最もよく表す絵文字を Unicode 1 文字だけ返す。迷ったら 📋
 - 広告・通知・ニュースレターからはタスクを抽出せず tasks は []`;
 
-interface AnthropicResponse {
-  content: Array<{ type: string; text: string }>;
-  usage: { input_tokens: number; output_tokens: number };
+interface GeminiResponse {
+  candidates?: Array<{
+    content?: {
+      parts: Array<{ text?: string }>;
+    };
+  }>;
+  usageMetadata?: {
+    promptTokenCount: number;
+    candidatesTokenCount: number;
+  };
 }
 
-async function callClaude(
+async function callGemini(
   env: Env,
   job: string,
   system: string,
-  userContent: string | unknown[],
+  userContent: any[],
   maxTokens = 1024,
 ): Promise<string> {
-  const resp = await fetch(API_URL, {
+  const url = `${API_URL_BASE}/${MODEL}:generateContent?key=${env.GEMINI_API_KEY}`;
+  
+  const body: any = {
+    contents: [
+      {
+        role: "user",
+        parts: userContent,
+      },
+    ],
+    generationConfig: {
+      maxOutputTokens: maxTokens,
+    },
+  };
+
+  if (system && system.length > 0) {
+    body.systemInstruction = {
+      parts: [{ text: system }],
+    };
+  }
+
+  const resp = await fetch(url, {
     method: "POST",
     headers: {
-      "x-api-key": env.ANTHROPIC_API_KEY,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
+      "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: maxTokens,
-      system,
-      messages: [{ role: "user", content: userContent }],
-    }),
+    body: JSON.stringify(body),
   });
 
   if (!resp.ok) {
-    const body = await resp.text();
-    throw new Error(`Anthropic API failed: ${resp.status} ${body}`);
+    const errorBody = await resp.text();
+    throw new Error(`Gemini API failed: ${resp.status} ${errorBody}`);
   }
 
-  const data = await resp.json<AnthropicResponse>();
-  await recordUsage(env, job, data.usage.input_tokens, data.usage.output_tokens);
-  return data.content[0]?.text ?? "";
+  const data = await resp.json<GeminiResponse>();
+  const inputTokens = data.usageMetadata?.promptTokenCount ?? 0;
+  const outputTokens = data.usageMetadata?.candidatesTokenCount ?? 0;
+  
+  await recordUsage(env, job, inputTokens, outputTokens);
+  
+  return data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
 }
 
 /** LLM 応答テキストから最初の JSON 配列を取り出す。見つからない/パース失敗時は空配列。 */
@@ -122,12 +146,12 @@ function extractJsonObject<T>(text: string): T | null {
 }
 
 export async function extractTasksFromText(env: Env, label: string, subject: string, body: string): Promise<ExtractedTask[]> {
-  const text = await callClaude(env, label, EXTRACT_TASKS_PROMPT, `件名: ${subject}\n\n本文:\n${body}`);
+  const text = await callGemini(env, label, EXTRACT_TASKS_PROMPT, [{ text: `件名: ${subject}\n\n本文:\n${body}` }]);
   return extractJsonArray<ExtractedTask>(text);
 }
 
 export async function analyzeEmail(env: Env, subject: string, body: string): Promise<EmailAnalysis> {
-  const text = await callClaude(env, "analyze_email", ANALYZE_EMAIL_PROMPT, `件名: ${subject}\n\n本文:\n${body.slice(0, 3000)}`);
+  const text = await callGemini(env, "analyze_email", ANALYZE_EMAIL_PROMPT, [{ text: `件名: ${subject}\n\n本文:\n${body.slice(0, 3000)}` }]);
   const result = extractJsonObject<EmailAnalysis>(text);
   if (!result) return { summary: text.trim(), tasks: [] };
   result.tasks ??= [];
@@ -142,7 +166,7 @@ export function pickTaskTitle(analysis: EmailAnalysis, subject: string): string 
 }
 
 export async function extractTasksFromUrlContent(env: Env, url: string, content: string): Promise<ExtractedTask[]> {
-  const text = await callClaude(env, "extract_tasks_url", EXTRACT_TASKS_PROMPT, `件名: ${url}\n\n本文:\n${content.slice(0, 3000)}`);
+  const text = await callGemini(env, "extract_tasks_url", EXTRACT_TASKS_PROMPT, [{ text: `件名: ${url}\n\n本文:\n${content.slice(0, 3000)}` }]);
   return extractJsonArray<ExtractedTask>(text);
 }
 
@@ -155,10 +179,10 @@ function imageToBase64(imageData: ArrayBuffer): string {
 
 export async function extractTasksFromImage(env: Env, imageData: ArrayBuffer, mediaType: string): Promise<ExtractedTask[]> {
   const userContent = [
-    { type: "image", source: { type: "base64", media_type: mediaType, data: imageToBase64(imageData) } },
-    { type: "text", text: "この画像からアクションが必要なタスクを抽出してください。" },
+    { inlineData: { mimeType: mediaType, data: imageToBase64(imageData) } },
+    { text: "この画像からアクションが必要なタスクを抽出してください。" },
   ];
-  const text = await callClaude(env, "extract_tasks_image", EXTRACT_TASKS_PROMPT, userContent);
+  const text = await callGemini(env, "extract_tasks_image", EXTRACT_TASKS_PROMPT, userContent);
   return extractJsonArray<ExtractedTask>(text);
 }
 
@@ -192,10 +216,10 @@ const ANALYZE_IMAGE_PROMPT = `あなたは画像からタスクを分析する�
 
 export async function analyzeImage(env: Env, imageData: ArrayBuffer, mediaType: string): Promise<EmailAnalysis> {
   const userContent = [
-    { type: "image", source: { type: "base64", media_type: mediaType, data: imageToBase64(imageData) } },
-    { type: "text", text: "この画像を分析してください。" },
+    { inlineData: { mimeType: mediaType, data: imageToBase64(imageData) } },
+    { text: "この画像を分析してください。" },
   ];
-  const text = await callClaude(env, "analyze_image", ANALYZE_IMAGE_PROMPT, userContent);
+  const text = await callGemini(env, "analyze_image", ANALYZE_IMAGE_PROMPT, userContent);
   const result = extractJsonObject<EmailAnalysis>(text);
   if (!result) return { summary: text.trim(), tasks: [] };
   result.tasks ??= [];
@@ -242,8 +266,8 @@ async function selectNotifications(
     .map((t) => `- [${t.priority}] ${t.title} (期限: ${t.due ?? "未定"}, ステータス: ${t.status})`)
     .join("\n");
 
-  const userContent = `現在時刻: ${currentJstDatetime} (JST)\n今日の日付: ${today}\n\n## タスク一覧\n${taskList}`;
-  const text = await callClaude(env, job, prompt, userContent, 512);
+  const userContent = [{ text: `現在時刻: ${currentJstDatetime} (JST)\n今日の日付: ${today}\n\n## タスク一覧\n${taskList}` }];
+  const text = await callGemini(env, job, prompt, userContent, 512);
   return extractJsonArray<HomeArrivalNotification>(text);
 }
 
@@ -312,5 +336,5 @@ ${overdueText}
 - 期限切れタスクがある場合は必ず触れる
 - 装飾やマークダウン記号は使わず、プレーンな文章のみ`;
 
-  return callClaude(env, "summarize_day", "", prompt, 512);
+  return callGemini(env, "summarize_day", "", [{ text: prompt }], 512);
 }

@@ -13,7 +13,7 @@ vi.mock("../../../src/clients/gmail-api.js", () => ({
   getOrCreateLabel: vi.fn().mockResolvedValue("label-id-001"),
 }));
 
-vi.mock("../../../src/clients/anthropic.js", () => ({
+vi.mock("../../../src/clients/gemini.js", () => ({
   analyzeEmail: vi.fn(),
   pickTaskTitle: (analysis: { task_title?: string }, subject: string) => {
     const t = analysis.task_title?.trim();
@@ -60,7 +60,7 @@ describe("checkGmail", () => {
   it("creates a new task for new thread", async () => {
     const env = createMockEnv();
     const { listAllMessages, getMessage, parseMessage } = await import("../../../src/clients/gmail-api.js");
-    const { analyzeEmail } = await import("../../../src/clients/anthropic.js");
+    const { analyzeEmail } = await import("../../../src/clients/gemini.js");
     const { addTask } = await import("../../../src/clients/notion.js");
     const { getThreadMapEntry } = await import("../../../src/storage/d1.js");
 
@@ -99,7 +99,7 @@ describe("checkGmail", () => {
   it("falls back to email subject when LLM omits task_title", async () => {
     const env = createMockEnv();
     const { listAllMessages, getMessage, parseMessage } = await import("../../../src/clients/gmail-api.js");
-    const { analyzeEmail } = await import("../../../src/clients/anthropic.js");
+    const { analyzeEmail } = await import("../../../src/clients/gemini.js");
     const { addTask } = await import("../../../src/clients/notion.js");
     const { getThreadMapEntry } = await import("../../../src/storage/d1.js");
 
@@ -131,7 +131,7 @@ describe("checkGmail", () => {
   it("passes the LLM-extracted icon through to addTask", async () => {
     const env = createMockEnv();
     const { listAllMessages, getMessage, parseMessage } = await import("../../../src/clients/gmail-api.js");
-    const { analyzeEmail } = await import("../../../src/clients/anthropic.js");
+    const { analyzeEmail } = await import("../../../src/clients/gemini.js");
     const { addTask } = await import("../../../src/clients/notion.js");
     const { getThreadMapEntry } = await import("../../../src/storage/d1.js");
 
@@ -163,7 +163,7 @@ describe("checkGmail", () => {
   it("updates existing task for reply email (same threadId)", async () => {
     const env = createMockEnv();
     const { listAllMessages, getMessage, parseMessage } = await import("../../../src/clients/gmail-api.js");
-    const { analyzeEmail } = await import("../../../src/clients/anthropic.js");
+    const { analyzeEmail } = await import("../../../src/clients/gemini.js");
     const { addTask, updateTaskFromReply } = await import("../../../src/clients/notion.js");
     const { getThreadMapEntry } = await import("../../../src/storage/d1.js");
 
@@ -197,7 +197,7 @@ describe("checkGmail", () => {
   it("syncs calendar with updated due after a reply email shortens the due date", async () => {
     const env = createMockEnv();
     const { listAllMessages, getMessage, parseMessage } = await import("../../../src/clients/gmail-api.js");
-    const { analyzeEmail } = await import("../../../src/clients/anthropic.js");
+    const { analyzeEmail } = await import("../../../src/clients/gemini.js");
     const { getTaskTitleAndDue } = await import("../../../src/clients/notion.js");
     const { getThreadMapEntry } = await import("../../../src/storage/d1.js");
     const { syncTaskCalendarEventSafe } = await import("../../../src/handlers/calendar.js");
@@ -234,7 +234,7 @@ describe("checkGmail", () => {
     await env.AGENT_KV.put("no_task_senders", "spam@example.com");
 
     const { listAllMessages, getMessage, parseMessage } = await import("../../../src/clients/gmail-api.js");
-    const { analyzeEmail } = await import("../../../src/clients/anthropic.js");
+    const { analyzeEmail } = await import("../../../src/clients/gemini.js");
     const { addTask } = await import("../../../src/clients/notion.js");
 
     (listAllMessages as ReturnType<typeof vi.fn>).mockResolvedValue([{ id: "msg-spam", threadId: "thread-spam" }]);
@@ -256,7 +256,7 @@ describe("checkGmail", () => {
     const env = createMockEnv();
     const { listAllMessages } = await import("../../../src/clients/gmail-api.js");
     const { isProcessed } = await import("../../../src/storage/d1.js");
-    const { analyzeEmail } = await import("../../../src/clients/anthropic.js");
+    const { analyzeEmail } = await import("../../../src/clients/gemini.js");
 
     (listAllMessages as ReturnType<typeof vi.fn>).mockResolvedValue([{ id: "msg-already-done", threadId: "t1" }]);
     (isProcessed as ReturnType<typeof vi.fn>).mockResolvedValue(true);
@@ -268,7 +268,7 @@ describe("checkGmail", () => {
   it("skips calendar invite emails", async () => {
     const env = createMockEnv();
     const { listAllMessages, getMessage, isCalendarInvite } = await import("../../../src/clients/gmail-api.js");
-    const { analyzeEmail } = await import("../../../src/clients/anthropic.js");
+    const { analyzeEmail } = await import("../../../src/clients/gemini.js");
 
     (listAllMessages as ReturnType<typeof vi.fn>).mockResolvedValue([{ id: "msg-cal", threadId: "t-cal" }]);
     (getMessage as ReturnType<typeof vi.fn>).mockResolvedValue(gmailFixtures.calendarInvite);
@@ -311,7 +311,7 @@ describe("checkGmail", () => {
   it("continues loop on per-message non-limit errors", async () => {
     const env = createMockEnv();
     const { listAllMessages, getMessage, parseMessage, isCalendarInvite } = await import("../../../src/clients/gmail-api.js");
-    const { analyzeEmail } = await import("../../../src/clients/anthropic.js");
+    const { analyzeEmail } = await import("../../../src/clients/gemini.js");
     const { addTask } = await import("../../../src/clients/notion.js");
     const { getThreadMapEntry, isProcessed } = await import("../../../src/storage/d1.js");
 
@@ -345,7 +345,7 @@ describe("checkGmail", () => {
   it("silent mode accumulates digest to KV and skips Telegram", async () => {
     const env = createMockEnv();
     const { listAllMessages, getMessage, parseMessage, isCalendarInvite } = await import("../../../src/clients/gmail-api.js");
-    const { analyzeEmail } = await import("../../../src/clients/anthropic.js");
+    const { analyzeEmail } = await import("../../../src/clients/gemini.js");
     const { addTask } = await import("../../../src/clients/notion.js");
     const { getThreadMapEntry, isProcessed } = await import("../../../src/storage/d1.js");
     const { sendMessage } = await import("../../../src/clients/telegram.js");

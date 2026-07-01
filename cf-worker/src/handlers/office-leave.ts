@@ -1,5 +1,5 @@
 import type { Env } from "../types.js";
-import { selectOfficeLeaveNotifications, type HomeArrivalNotification } from "../clients/anthropic.js";
+import { selectOfficeLeaveNotifications, type HomeArrivalNotification } from "../clients/gemini.js";
 import { runNotificationTrigger } from "./notification-trigger.js";
 
 export async function handleOfficeLeave(env: Env): Promise<HomeArrivalNotification[]> {

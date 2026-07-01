@@ -1,5 +1,5 @@
 import pytest
-from agent.claude_agent import _extract_json_list
+from agent.gemini_agent import _extract_json_list
 
 
 class TestExtractJsonList:

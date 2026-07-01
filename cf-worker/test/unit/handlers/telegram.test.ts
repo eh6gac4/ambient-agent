@@ -32,7 +32,7 @@ vi.mock("../../../src/handlers/briefing.js", () => ({
   sendCostReport: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock("../../../src/clients/anthropic.js", () => ({
+vi.mock("../../../src/clients/gemini.js", () => ({
   extractTasksFromText: vi.fn().mockResolvedValue([{ title: "テストタスク", due: null, priority: "medium" }]),
   extractTasksFromUrlContent: vi.fn().mockResolvedValue([]),
   analyzeImage: vi.fn().mockResolvedValue({ summary: "", tasks: [] }),
@@ -102,7 +102,7 @@ describe("handleTelegramWebhook", () => {
   it("photo message: consolidates all extracted tasks into ONE Notion task with image attached", async () => {
     const env = createMockEnv({ OPERATING_START_HOUR: "0", OPERATING_END_HOUR: "24" });
     const { addTask, uploadImageToNotion } = await import("../../../src/clients/notion.js");
-    const { analyzeImage } = await import("../../../src/clients/anthropic.js");
+    const { analyzeImage } = await import("../../../src/clients/gemini.js");
     const { getFileUrl } = await import("../../../src/clients/telegram.js");
 
     (getFileUrl as ReturnType<typeof vi.fn>).mockResolvedValue("https://api.telegram.org/file/bot/photo.jpg");
@@ -154,7 +154,7 @@ describe("handleTelegramWebhook", () => {
 
   it("text message: immediately syncs a dated task to the calendar", async () => {
     const env = createMockEnv({ OPERATING_START_HOUR: "0", OPERATING_END_HOUR: "24" });
-    const { extractTasksFromText } = await import("../../../src/clients/anthropic.js");
+    const { extractTasksFromText } = await import("../../../src/clients/gemini.js");
     const { addTask } = await import("../../../src/clients/notion.js");
     const { syncTaskCalendarEventSafe } = await import("../../../src/handlers/calendar.js");
 

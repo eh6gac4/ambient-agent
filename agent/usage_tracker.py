@@ -1,6 +1,6 @@
 """
 agent/usage_tracker.py
-Claude API のトークン使用量を記録・集計する。
+Gemini API のトークン使用量を記録・集計する。
 """
 import json
 import logging
@@ -11,9 +11,9 @@ logger = logging.getLogger(__name__)
 
 _LOG_FILE = "data/usage_log.jsonl"
 
-# claude-haiku-4 の料金 (USD per 1M tokens)
-_PRICE_INPUT_PER_M = 0.8
-_PRICE_OUTPUT_PER_M = 4.0
+# Gemini 1.5 Flash の料金 (USD per 1M tokens)
+_PRICE_INPUT_PER_M = 0.075
+_PRICE_OUTPUT_PER_M = 0.30
 
 
 def _calc_cost(input_tokens: int, output_tokens: int) -> float:
@@ -86,7 +86,7 @@ def send_cost_report():
     summary = get_daily_summary(yesterday)
 
     if summary["call_count"] == 0:
-        send_message(f"*💰 コストレポート {yesterday}*\n\nClaude API の呼び出しはありませんでした。")
+        send_message(f"*💰 コストレポート {yesterday}*\n\nGemini API の呼び出しはありませんでした。")
         return
 
     lines = [f"*💰 コストレポート {yesterday}*\n"]

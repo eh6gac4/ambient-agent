@@ -9,7 +9,7 @@ export default defineWorkersConfig({
         miniflare: {
           // Provide placeholder values for secrets in tests
           bindings: {
-            ANTHROPIC_API_KEY: "test-anthropic-key",
+            GEMINI_API_KEY: "test-gemini-key",
             NOTION_TOKEN: "test-notion-token",
             NOTION_TASKS_DB_ID: "test-db-id",
             TELEGRAM_BOT_TOKEN: "test-bot-token",

@@ -21,7 +21,7 @@ database_name = "ambient-agent-db"
 database_id = "ba5c15ff-8e0e-4b86-b020-f1c4cb5975a3"
 
 # secrets (set via: wrangler secret put SECRET_NAME)
-# ANTHROPIC_API_KEY
+# GEMINI_API_KEY
 # NOTION_TOKEN
 # NOTION_TASKS_DB_ID
 # TELEGRAM_BOT_TOKEN

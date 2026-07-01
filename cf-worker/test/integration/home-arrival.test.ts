@@ -10,7 +10,7 @@ vi.mock("../../src/clients/notion.js", () => ({
   getOpenTasks: vi.fn(),
 }));
 
-vi.mock("../../src/clients/anthropic.js", () => ({
+vi.mock("../../src/clients/gemini.js", () => ({
   selectHomeArrivalNotifications: vi.fn(),
 }));
 
@@ -49,7 +49,7 @@ describe("/home-arrival ingress", () => {
   it("returns notifications JSON when tasks exist", async () => {
     const env = createMockEnv();
     const { getOpenTasks } = await import("../../src/clients/notion.js");
-    const { selectHomeArrivalNotifications } = await import("../../src/clients/anthropic.js");
+    const { selectHomeArrivalNotifications } = await import("../../src/clients/gemini.js");
     const { sendMessage } = await import("../../src/clients/telegram.js");
 
     (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue(sampleTasks());

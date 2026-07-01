@@ -82,7 +82,7 @@ export function createMockEnv(overrides: Partial<Env> = {}): Env {
   return {
     AGENT_KV: createMockKV(),
     AGENT_DB: createMockD1(),
-    ANTHROPIC_API_KEY: "test-anthropic-key",
+    GEMINI_API_KEY: "test-gemini-key",
     NOTION_TOKEN: "test-notion-token",
     NOTION_TASKS_DB_ID: "test-db-id",
     TELEGRAM_BOT_TOKEN: "test-bot-token",

@@ -1,6 +1,6 @@
 import type { Env } from "../types.js";
 import { listAllMessages, getMessage, parseMessage, isCalendarInvite, archiveMessage, addLabel, getOrCreateLabel } from "../clients/gmail-api.js";
-import { analyzeEmail, pickTaskTitle } from "../clients/anthropic.js";
+import { analyzeEmail, pickTaskTitle } from "../clients/gemini.js";
 import { addTask, updateTaskFromReply, getTaskStatus, getTaskTitleAndDue } from "../clients/notion.js";
 import { sendMessage, escapeMd } from "../clients/telegram.js";
 import { taskLink } from "./telegram.js";

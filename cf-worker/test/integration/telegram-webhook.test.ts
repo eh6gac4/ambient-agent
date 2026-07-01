@@ -18,7 +18,7 @@ vi.mock("../../src/clients/telegram.js", () => ({
   escapeMd: (t: string) => t,
 }));
 
-vi.mock("../../src/clients/anthropic.js", () => ({
+vi.mock("../../src/clients/gemini.js", () => ({
   analyzeEmail: vi.fn(),
   extractTasksFromText: vi.fn().mockResolvedValue([]),
   extractTasksFromUrlContent: vi.fn().mockResolvedValue([]),

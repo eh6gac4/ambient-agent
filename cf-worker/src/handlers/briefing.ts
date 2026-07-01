@@ -1,7 +1,7 @@
 import type { Env, CalendarEvent, Task } from "../types.js";
 import { getTodaysEvents } from "../clients/gcal-api.js";
 import { getOpenTasks } from "../clients/notion.js";
-import { summarizeDay } from "../clients/anthropic.js";
+import { summarizeDay } from "../clients/gemini.js";
 import { sendMessage, escapeMd } from "../clients/telegram.js";
 import { getDailyUsage, takeEmailDigest } from "../storage/kv.js";
 import { PRIORITY_ICON } from "../utils/task.js";
@@ -133,7 +133,7 @@ export async function sendWeeklyCostReport(env: Env): Promise<void> {
   }
 
   if (totalCalls === 0) {
-    await sendMessage(env, `*💰 週間コストレポート*\n\n直近7日間の Claude API の呼び出しはありませんでした。`);
+    await sendMessage(env, `*💰 週間コストレポート*\n\n直近7日間の Gemini API の呼び出しはありませんでした。`);
     return;
   }
 

@@ -7,7 +7,7 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 ## アーキテクチャ
 
 ```
-[Telegram] ──webhook──▶ [Cloudflare Worker] ──▶ Notion / Gmail / Calendar / Claude
+[Telegram] ──webhook──▶ [Cloudflare Worker] ──▶ Notion / Gmail / Calendar / Gemini
 [Cron Triggers] ────────▶ [Cloudflare Worker]
                                   │
                           [D1] [KV Namespace]
@@ -26,8 +26,8 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 | メソッド・パス | 用途 | 認証 |
 |---|---|---|
 | `POST /webhook` | Telegram Update 受信（コマンド・メッセージ） | Telegram |
-| `GET /home-arrival` | iPhone ショートカット（帰宅 Wi-Fi 接続時）から呼び出し、Notion オープンタスクを Claude が選定して Telegram 通知 | `Authorization: Bearer <ALERT_TOKEN>` |
-| `GET /office-leave` | iPhone ショートカット（会社 Wi-Fi 切断時）から呼び出し、帰宅途中・翌朝に向けたタスクを Claude が選定して Telegram 通知 | `Authorization: Bearer <ALERT_TOKEN>` |
+| `GET /home-arrival` | iPhone ショートカット（帰宅 Wi-Fi 接続時）から呼び出し、Notion オープンタスクを Gemini が選定して Telegram 通知 | `Authorization: Bearer <ALERT_TOKEN>` |
+| `GET /office-leave` | iPhone ショートカット（会社 Wi-Fi 切断時）から呼び出し、帰宅途中・翌朝に向けたタスクを Gemini が選定して Telegram 通知 | `Authorization: Bearer <ALERT_TOKEN>` |
 | `POST /owntracks` | OwnTracks アプリ → マネージド MQTT(EMQX Cloud 等) → Webhook 経由で位置情報を受信。サーバー側ジオフェンス判定を行い、任意の場所への出入りに応じてアクションを実行 | `Authorization: Bearer <OWNTRACKS_TOKEN>` |
 
 ## スケジュール
@@ -45,7 +45,7 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 
 **hourly_gmail の詳細:**
 - 未読メールを要約・タスク抽出し Notion に登録（返信スレッドは既存タスクを更新）
-- Notion ページのタイトルは Claude が生成する「誰から何の用件か分かる短文」を使う（メール件名そのままは避ける）
+- Notion ページのタイトルは Gemini が生成する「誰から何の用件か分かる短文」を使う（メール件名そのままは避ける）
 - Telegram 通知はせず、結果を `email_digest:pending` (KV) に追記
 - Workers の subrequest 上限（無料プラン 50/呼び出し）に達したら break、未処理分は次回 cron に持ち越し
 - 個別メール処理エラーは log して続行
@@ -80,8 +80,8 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 | `/blocklist` | ブロック中の送信者一覧 |
 | `/unblock <メール>` | 送信者のブロックを解除 |
 | URL 送信 | ページ内容を取得してタスクを抽出し Notion に登録 |
-| テキスト・転送メッセージ送信 | Claude でタスク抽出して Notion に登録 |
-| 画像送信 | Claude Vision で要約・タスク抽出 → 親タスクを Notion 登録、各アクションは Notion DB のサブアイテムとして個別登録、画像をページ本文に添付 |
+| テキスト・転送メッセージ送信 | Gemini でタスク抽出して Notion に登録 |
+| 画像送信 | Gemini Vision で要約・タスク抽出 → 親タスクを Notion 登録、各アクションは Notion DB のサブアイテムとして個別登録、画像をページ本文に添付 |
 
 ## Notion DB 必須プロパティ
 
@@ -95,7 +95,7 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 | SourceURL | URL | メール元タスクの Gmail リンク |
 | 親アイテム | リレーション（同DB・自己） | Notion の「サブアイテム」機能で自動生成される双方向リレーション。プロパティ名が異なる場合は環境変数 `NOTION_SUBITEM_PARENT_PROP` で上書き可能 |
 
-**サブタスク化:** メール／画像からタスクを生成する際、Claude が抽出した各アクションは親ページ本文内のチェックボックスではなく **DB のサブアイテム（独立した子ページ）** として作成され、それぞれ Due / Priority / アイコンを個別に持つ。親ページはメール件名・本文を保持。
+**サブタスク化:** メール／画像からタスクを生成する際、Gemini が抽出した各アクションは親ページ本文内のチェックボックスではなく **DB のサブアイテム（独立した子ページ）** として作成され、それぞれ Due / Priority / アイコンを個別に持つ。親ページはメール件名・本文を保持。
 
 ## ファイル構成
 
@@ -106,7 +106,7 @@ ambient-agent/
 │   │   ├── index.ts              # Worker エントリ（fetch + scheduled）
 │   │   ├── types.ts              # 共通型定義
 │   │   ├── clients/              # 外部 API クライアント
-│   │   │   ├── anthropic.ts      # Claude API
+│   │   │   ├── gemini.ts      # Gemini API
 │   │   │   ├── gcal-api.ts       # Google Calendar REST API
 │   │   │   ├── gmail-api.ts      # Gmail REST API
 │   │   │   ├── google-auth.ts    # OAuth2 トークンリフレッシュ
@@ -204,7 +204,7 @@ npm run secrets:push
 
 | Secret | 取得先 |
 |---|---|
-| `ANTHROPIC_API_KEY` | [Anthropic Console](https://console.anthropic.com/settings/keys) |
+| `GEMINI_API_KEY` | [Google AI Studio](https://aistudio.google.com/app/apikey) |
 | `NOTION_TOKEN` | Notion インテグレーションの Internal Secret |
 | `NOTION_TASKS_DB_ID` | タスク DB の URL 末尾 32 文字 |
 | `TELEGRAM_BOT_TOKEN` | [@BotFather](https://t.me/BotFather) |
@@ -341,7 +341,7 @@ npx dotenv -e .env.local -- wrangler tail --format=pretty
 
 ### ローカル dev 環境
 
-本番にデプロイせず、ローカルで Telegram / cron を含めた挙動を検証できる。D1・KV は wrangler dev のローカルエミュレーションで本番と完全分離。Notion は dummy（dev 専用 DB を作っても可）、Gmail / Calendar / Anthropic は本番と同じ認証情報を流用する。
+本番にデプロイせず、ローカルで Telegram / cron を含めた挙動を検証できる。D1・KV は wrangler dev のローカルエミュレーションで本番と完全分離。Notion は dummy（dev 専用 DB を作っても可）、Gmail / Calendar / Google は本番と同じ認証情報を流用する。
 
 公開 URL には Cloudflare Named Tunnel（`dev-bot.eh6gac4.work`）を使い、connector token は API から都度取得するためローカル保存しない。
 
@@ -356,7 +356,7 @@ npx dotenv -e .env.local -- wrangler tail --format=pretty
    ```bash
    cp .dev.vars.example .dev.vars
    # TELEGRAM_BOT_TOKEN を dev bot の値に
-   # Notion は dummy のまま、Anthropic / Google は .env.local と同じ値を入れる
+   # Notion は dummy のまま、Google / Google は .env.local と同じ値を入れる
    ```
 5. **Tunnel + DNS をセットアップ** (idempotent):
    ```bash
