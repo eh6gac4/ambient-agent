@@ -11,7 +11,7 @@ from google.genai import types
 from agent.usage_tracker import record_usage
 
 _client = genai.Client(api_key=os.getenv("GEMINI_API_KEY", "dummy_key_for_test"))
-MODEL = "gemini-2.0-flash"
+MODEL = "gemini-3.5-flash"
 _EXTRACT_TASKS_PROMPT: str | None = None
 _ANALYZE_EMAIL_PROMPT: str | None = None
 

@@ -2,7 +2,7 @@ import type { Env, ExtractedTask, EmailAnalysis } from "../types.js";
 import { recordUsage } from "../storage/kv.js";
 import { jstDateStr } from "../utils/jst.js";
 
-const MODEL = "gemini-2.0-flash";
+const MODEL = "gemini-3.5-flash";
 const API_URL_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 
 const EXTRACT_TASKS_PROMPT = `あなたはメールからタスクを抽出するアシスタントです。
