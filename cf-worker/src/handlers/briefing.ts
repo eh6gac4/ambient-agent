@@ -9,8 +9,8 @@ import { jstNow, toDateStr } from "../utils/jst.js";
 import { getEscalationNoticeText, getBacklogPromotionNoticeText } from "./escalation.js";
 import { getDueSoonNoticeText } from "./calendar.js";
 
-const PRICE_INPUT_PER_M = 0.8;
-const PRICE_OUTPUT_PER_M = 4.0;
+const PRICE_INPUT_PER_M = 0.0; // Gemini API (generativelanguage.googleapis.com) は無料枠のため実質0円
+const PRICE_OUTPUT_PER_M = 0.0;
 
 function calcCost(inputTokens: number, outputTokens: number): number {
   return (inputTokens / 1_000_000) * PRICE_INPUT_PER_M + (outputTokens / 1_000_000) * PRICE_OUTPUT_PER_M;
