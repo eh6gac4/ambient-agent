@@ -57,6 +57,7 @@ export interface Task {
   due: string | null;
   priority: "high" | "medium" | "low";
   status: string;
+  location: string | null;
   lastEdited: string | null;
   url: string;
   pageId: string;
@@ -90,6 +91,7 @@ export interface UsageEntry {
   job: string;
   inputTokens: number;
   outputTokens: number;
+  response?: string;
 }
 
 export interface CalendarEvent {

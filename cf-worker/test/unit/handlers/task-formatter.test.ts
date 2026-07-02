@@ -36,9 +36,9 @@ describe("fmtDue", () => {
 describe("sortTasks", () => {
   it("sorts by status → priority → due date", () => {
     const tasks: Task[] = [
-      { title: "C", due: "2026-05-01", priority: "low", status: "未着手", lastEdited: null, url: "", pageId: "c" },
-      { title: "A", due: "2026-04-25", priority: "high", status: "未着手", lastEdited: null, url: "", pageId: "a" },
-      { title: "B", due: "2026-04-30", priority: "medium", status: "進行中", lastEdited: null, url: "", pageId: "b" },
+      { title: "C", due: "2026-05-01", priority: "low", status: "未着手", location: null, lastEdited: null, url: "", pageId: "c" },
+      { title: "A", due: "2026-04-25", priority: "high", status: "未着手", location: null, lastEdited: null, url: "", pageId: "a" },
+      { title: "B", due: "2026-04-30", priority: "medium", status: "進行中", location: null, lastEdited: null, url: "", pageId: "b" },
     ];
 
     const sorted = sortTasks(tasks);
@@ -50,8 +50,8 @@ describe("sortTasks", () => {
 
   it("sorts tasks without due date after tasks with due date", () => {
     const tasks: Task[] = [
-      { title: "No Due", due: null, priority: "high", status: "未着手", lastEdited: null, url: "", pageId: "x" },
-      { title: "Has Due", due: "2026-04-20", priority: "high", status: "未着手", lastEdited: null, url: "", pageId: "y" },
+      { title: "No Due", due: null, priority: "high", status: "未着手", location: null, lastEdited: null, url: "", pageId: "x" },
+      { title: "Has Due", due: "2026-04-20", priority: "high", status: "未着手", location: null, lastEdited: null, url: "", pageId: "y" },
     ];
 
     const sorted = sortTasks(tasks);
@@ -89,7 +89,7 @@ describe("formatTaskList", () => {
 
   it("falls back to plain title when pageId is empty", () => {
     const tasks: Task[] = [
-      { title: "リンクなし", due: null, priority: "medium", status: "未着手", lastEdited: null, url: "", pageId: "" },
+      { title: "リンクなし", due: null, priority: "medium", status: "未着手", location: null, lastEdited: null, url: "", pageId: "" },
     ];
     const result = formatTaskList(tasks);
     expect(result).toContain("リンクなし");
@@ -98,7 +98,7 @@ describe("formatTaskList", () => {
 
   it("escapes ] in title within link text", () => {
     const tasks: Task[] = [
-      { title: "タスク[1]", due: null, priority: "medium", status: "未着手", lastEdited: null, url: "https://notion.so/p", pageId: "abc123" },
+      { title: "タスク[1]", due: null, priority: "medium", status: "未着手", location: null, lastEdited: null, url: "https://notion.so/p", pageId: "abc123" },
     ];
     const result = formatTaskList(tasks);
     expect(result).toContain("[タスク\\[1\\]](https://todo.eh6gac4.work/?task=abc123)");
@@ -106,7 +106,7 @@ describe("formatTaskList", () => {
 
   it("escapes *, _ and ` in title within link text", () => {
     const tasks: Task[] = [
-      { title: "見積_資料 *至急*", due: null, priority: "high", status: "未着手", lastEdited: null, url: "https://notion.so/p", pageId: "abc123" },
+      { title: "見積_資料 *至急*", due: null, priority: "high", status: "未着手", location: null, lastEdited: null, url: "https://notion.so/p", pageId: "abc123" },
     ];
     const result = formatTaskList(tasks);
     expect(result).toContain("[見積\\_資料 \\*至急\\*](https://todo.eh6gac4.work/?task=abc123)");
@@ -114,7 +114,7 @@ describe("formatTaskList", () => {
 
   it("escapes special characters in plain title when pageId is empty", () => {
     const tasks: Task[] = [
-      { title: "メモ_確認", due: null, priority: "medium", status: "未着手", lastEdited: null, url: "", pageId: "" },
+      { title: "メモ_確認", due: null, priority: "medium", status: "未着手", location: null, lastEdited: null, url: "", pageId: "" },
     ];
     const result = formatTaskList(tasks);
     expect(result).toContain("メモ\\_確認");

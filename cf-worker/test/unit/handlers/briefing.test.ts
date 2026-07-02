@@ -43,7 +43,7 @@ describe("sendDailyBriefing", () => {
       { summary: "MTG_設計 *確認*", start: "2099-01-01T10:00:00+09:00" },
     ]);
     (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue([
-      { title: "資料_作成 *急ぎ*", due: null, priority: "high", status: "未着手", lastEdited: null, url: "", pageId: "p1" },
+      { title: "資料_作成 *急ぎ*", due: null, priority: "high", status: "未着手", location: null, lastEdited: null, url: "", pageId: "p1" },
     ]);
     (summarizeDay as ReturnType<typeof vi.fn>).mockResolvedValue("今日は *忙しい* 一日_です");
 
@@ -67,7 +67,7 @@ describe("sendDailyBriefing", () => {
 
     (getTodaysEvents as ReturnType<typeof vi.fn>).mockResolvedValue([]);
     (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue([
-      { title: "期限切れ_タスク", due: "2000-01-01", priority: "high", status: "未着手", lastEdited: null, url: "", pageId: "p1" },
+      { title: "期限切れ_タスク", due: "2000-01-01", priority: "high", status: "未着手", location: null, lastEdited: null, url: "", pageId: "p1" },
     ]);
     (summarizeDay as ReturnType<typeof vi.fn>).mockResolvedValue("プレーンな要約");
 

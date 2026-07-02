@@ -1,6 +1,7 @@
 import type { Env, GeofenceContext, GeofenceActionSpec } from "../types.js";
 import { handleHomeArrival } from "./home-arrival.js";
 import { handleOfficeLeave } from "./office-leave.js";
+import { handleLocationTrigger } from "./location-trigger.js";
 import { sendMessage } from "../clients/telegram.js";
 
 type GeofenceAction = (env: Env, ctx: GeofenceContext) => Promise<void>;
@@ -18,6 +19,15 @@ const ACTIONS: Record<string, GeofenceAction> = {
   /** 退社通知（既存フローを再利用）。 */
   office_leave: async (env) => {
     await handleOfficeLeave(env);
+  },
+
+  /** 
+   * 場所に基づくタスク通知。
+   * 指定した locationName または regionId が、タスクの Location プロパティと
+   * 一致する未完了タスクがあれば通知する。
+   */
+  location_trigger: async (env, ctx) => {
+    await handleLocationTrigger(env, ctx);
   },
 
   /**

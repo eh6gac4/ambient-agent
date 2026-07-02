@@ -163,6 +163,9 @@ function parseTaskPage(page: Record<string, unknown>): Task {
   const statusObj = (props["Status"] as Record<string, unknown> | undefined)?.status as { name: string } | undefined;
   const status = statusObj?.name ?? STATUS_PENDING;
 
+  const locationObj = (props["Location"] as Record<string, unknown> | undefined)?.select as { name: string } | undefined;
+  const location = locationObj?.name ?? null;
+
   const lastEdited = typeof page.last_edited_time === "string" ? page.last_edited_time.slice(0, 10) : null;
 
   return {
@@ -170,6 +173,7 @@ function parseTaskPage(page: Record<string, unknown>): Task {
     due,
     priority,
     status,
+    location,
     lastEdited,
     url: (page.url as string) ?? "",
     pageId: (page.id as string) ?? "",
