@@ -74,11 +74,11 @@ export async function takeEmailDigest(env: Env): Promise<EmailDigest> {
 }
 
 // Usage tracking
-export async function recordUsage(env: Env, job: string, inputTokens: number, outputTokens: number): Promise<void> {
+export async function recordUsage(env: Env, job: string, inputTokens: number, outputTokens: number, response?: string): Promise<void> {
   const dateStr = new Date().toISOString().slice(0, 10);
   const key = `usage:${dateStr}`;
   const existing = (await env.AGENT_KV.get<UsageEntry[]>(key, "json")) ?? [];
-  existing.push({ date: dateStr, job, inputTokens, outputTokens });
+  existing.push({ date: dateStr, job, inputTokens, outputTokens, response });
   await env.AGENT_KV.put(key, JSON.stringify(existing), { expirationTtl: 30 * 86400 });
 }
 

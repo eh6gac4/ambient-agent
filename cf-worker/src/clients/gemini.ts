@@ -118,11 +118,12 @@ async function callGemini(
   const inputTokens = data.usageMetadata?.promptTokenCount ?? 0;
   const outputTokens = data.usageMetadata?.candidatesTokenCount ?? 0;
   
-  await recordUsage(env, job, inputTokens, outputTokens);
-  
   const parts = data.candidates?.[0]?.content?.parts;
-  if (!parts) return "";
-  return parts.map(p => p.text || "").join("");
+  const responseText = parts ? parts.map(p => p.text || "").join("") : "";
+
+  await recordUsage(env, job, inputTokens, outputTokens, responseText);
+  
+  return responseText;
 }
 
 /** LLM 応答テキストから最初の JSON 配列を取り出す。見つからない/パース失敗時は空配列。 */

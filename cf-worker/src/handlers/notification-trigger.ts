@@ -8,7 +8,7 @@ import { PRIORITY_ICON } from "../utils/task.js";
 
 type SelectFn = (
   env: Env,
-  tasks: Array<{ title: string; priority: string; due: string | null; status: string }>,
+  tasks: Array<{ title: string; priority: string; due: string | null; status: string; location: string | null }>,
   currentJstDatetime: string,
 ) => Promise<HomeArrivalNotification[]>;
 

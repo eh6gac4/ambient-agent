@@ -44,9 +44,9 @@ describe("getDueSoonNoticeText", () => {
     const tomorrowStr = tomorrow.toISOString().slice(0, 10);
 
     const tasks: Task[] = [
-      { title: "今日期限タスク", due: today, priority: "high", status: "未着手", lastEdited: null, url: "", pageId: "p1" },
-      { title: "明日期限タスク", due: tomorrowStr, priority: "medium", status: "未着手", lastEdited: null, url: "", pageId: "p2" },
-      { title: "来週のタスク", due: "2099-01-01", priority: "low", status: "未着手", lastEdited: null, url: "", pageId: "p3" },
+      { title: "今日期限タスク", due: today, priority: "high", status: "未着手", location: null, lastEdited: null, url: "", pageId: "p1" },
+      { title: "明日期限タスク", due: tomorrowStr, priority: "medium", status: "未着手", location: null, lastEdited: null, url: "", pageId: "p2" },
+      { title: "来週のタスク", due: "2099-01-01", priority: "low", status: "未着手", location: null, lastEdited: null, url: "", pageId: "p3" },
     ];
 
     const text = getDueSoonNoticeText(tasks);
@@ -64,7 +64,7 @@ describe("getDueSoonNoticeText", () => {
     const today = now.toISOString().slice(0, 10);
 
     const tasks: Task[] = [
-      { title: "請求書_確認 *重要*", due: today, priority: "high", status: "未着手", lastEdited: null, url: "", pageId: "p1" },
+      { title: "請求書_確認 *重要*", due: today, priority: "high", status: "未着手", location: null, lastEdited: null, url: "", pageId: "p1" },
     ];
 
     const text = getDueSoonNoticeText(tasks);
@@ -77,7 +77,7 @@ describe("getDueSoonNoticeText", () => {
     const { sendMessage } = await import("../../../src/clients/telegram.js");
 
     const tasks: Task[] = [
-      { title: "来月のタスク", due: "2099-01-01", priority: "low", status: "未着手", lastEdited: null, url: "", pageId: "p1" },
+      { title: "来月のタスク", due: "2099-01-01", priority: "low", status: "未着手", location: null, lastEdited: null, url: "", pageId: "p1" },
     ];
 
     const text = getDueSoonNoticeText(tasks);
@@ -194,7 +194,7 @@ describe("syncCalendar (delegates to syncTaskCalendarEvent)", () => {
     (getAllCalendarSync as ReturnType<typeof vi.fn>).mockResolvedValue(new Map());
     (getCalendarSync as ReturnType<typeof vi.fn>).mockResolvedValue(null);
     (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue([
-      { title: "予定タスク", due: "2099-06-01T10:00:00", priority: "medium", status: "未着手", lastEdited: null, url: "", pageId: "p1" },
+      { title: "予定タスク", due: "2099-06-01T10:00:00", priority: "medium", status: "未着手", location: null, lastEdited: null, url: "", pageId: "p1" },
     ]);
 
     await syncCalendar(env);

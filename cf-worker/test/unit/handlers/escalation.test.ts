@@ -26,7 +26,7 @@ describe("getEscalationNoticeText", () => {
     const { sendMessage } = await import("../../../src/clients/telegram.js");
 
     (escalatePriorityTasks as ReturnType<typeof vi.fn>).mockResolvedValue([
-      { title: "緊急対応", due: "2026-04-27", priority: "high", status: "未着手", lastEdited: null, url: "", pageId: "p1" },
+      { title: "緊急対応", due: "2026-04-27", priority: "high", status: "未着手", location: null, lastEdited: null, url: "", pageId: "p1" },
     ]);
 
     const text = await getEscalationNoticeText(env);
@@ -51,7 +51,7 @@ describe("getEscalationNoticeText", () => {
     const { sendMessage } = await import("../../../src/clients/telegram.js");
 
     (escalatePriorityTasks as ReturnType<typeof vi.fn>).mockResolvedValue([
-      { title: "見積_資料 *至急*", due: "2026-04-27", priority: "high", status: "未着手", lastEdited: null, url: "", pageId: "p1" },
+      { title: "見積_資料 *至急*", due: "2026-04-27", priority: "high", status: "未着手", location: null, lastEdited: null, url: "", pageId: "p1" },
     ]);
 
     const text = await getEscalationNoticeText(env);
@@ -70,7 +70,7 @@ describe("getBacklogPromotionNoticeText", () => {
     const { sendMessage } = await import("../../../src/clients/telegram.js");
 
     (promoteBacklogTasks as ReturnType<typeof vi.fn>).mockResolvedValue([
-      { title: "原稿チェック", due: "2026-05-27", priority: "medium", status: "未着手", lastEdited: null, url: "", pageId: "p1" },
+      { title: "原稿チェック", due: "2026-05-27", priority: "medium", status: "未着手", location: null, lastEdited: null, url: "", pageId: "p1" },
     ]);
 
     const text = await getBacklogPromotionNoticeText(env);
@@ -114,7 +114,7 @@ describe("sendStaleTasksNotice", () => {
 
     // All tasks updated recently (future date ensures they're never stale)
     const freshTasks: Task[] = [
-      { title: "新しいタスク", due: null, priority: "medium", status: "未着手", lastEdited: "2099-01-01", url: "", pageId: "p1" },
+      { title: "新しいタスク", due: null, priority: "medium", status: "未着手", location: null, lastEdited: "2099-01-01", url: "", pageId: "p1" },
     ];
     (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue(freshTasks);
     (sendMessage as ReturnType<typeof vi.fn>).mockReset().mockResolvedValue(undefined);
