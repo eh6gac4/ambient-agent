@@ -137,3 +137,16 @@ export async function cleanOldLocations(env: Env): Promise<void> {
     .bind(cutoff)
     .run();
 }
+
+// app_logs
+export async function insertAppLog(env: Env, level: string, message: string, data?: any): Promise<void> {
+  try {
+    await env.AGENT_DB.prepare(
+      "INSERT INTO app_logs (level, message, data) VALUES (?, ?, ?)"
+    )
+      .bind(level, message, data ? JSON.stringify(data) : null)
+      .run();
+  } catch (err) {
+    console.error("insertAppLog failed:", err);
+  }
+}

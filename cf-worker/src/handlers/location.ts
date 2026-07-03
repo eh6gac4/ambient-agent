@@ -1,7 +1,8 @@
 import type { Env } from "../types.js";
 import { haversineMeters, isInside, detectTransition } from "../utils/geofence.js";
+import { withRetry } from "../utils/retry.js";
 import { getRegions, getGeofenceState, setGeofenceState } from "../storage/kv.js";
-import { insertLocation } from "../storage/d1.js";
+import { insertLocation, insertAppLog } from "../storage/d1.js";
 import { runGeofenceAction } from "./geofence-actions.js";
 
 /** OwnTracks の location ペイロード（最小限の型定義）。 */
@@ -49,6 +50,7 @@ export async function handleOwnTracksLocation(
 
   // 2. 各リージョンに対してジオフェンス判定
   const regions = await getRegions(env);
+  await insertAppLog(env, "info", "handleOwnTracksLocation: getRegions result", { regionsCount: regions.length, regions });
 
   await Promise.all(
     regions.map(async (region) => {
@@ -56,11 +58,22 @@ export async function handleOwnTracksLocation(
       const current = isInside(distanceM, region.radius_m) ? "inside" : "outside";
       const prev = await getGeofenceState(env, region.id);
       const transition = detectTransition(prev, current);
+      
+      await insertAppLog(env, "info", `geofence eval for ${region.id}`, { distanceM, current, prev, transition });
 
       // 状態が変化した時だけ KV へ書き込む（KV 書き込み無料枠の節約）
       // null（初回）→ "inside"/"outside" も current !== prev として必ず1回保存される
       if (current !== prev) {
-        await setGeofenceState(env, region.id, current);
+        await insertAppLog(env, "info", `setting state for ${region.id}`, { current });
+        try {
+          await withRetry(() => setGeofenceState(env, region.id, current));
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          await insertAppLog(env, "error", `failed to set state for ${region.id}`, { error: errMsg });
+          console.error(`owntracks: failed to set geofence state for ${region.id}`, err);
+          // If we fail to save state, we still proceed with action to not miss notifications,
+          // but next time it might trigger again.
+        }
       }
 
       if (!transition) return;
@@ -81,8 +94,11 @@ export async function handleOwnTracksLocation(
       const spec = transition === "enter" ? region.onEnter : region.onLeave;
 
       try {
-        await runGeofenceAction(env, spec, ctx);
+        await insertAppLog(env, "info", `running action for ${region.id}`, { spec, transition });
+        await withRetry(() => runGeofenceAction(env, spec, ctx), 2);
       } catch (err) {
+        const errMsg = err instanceof Error ? err.message : String(err);
+        await insertAppLog(env, "error", `action failed for ${region.id}`, { error: errMsg, transition });
         console.error(`owntracks: action failed for region "${region.id}" (${transition}):`, err);
       }
     }),
