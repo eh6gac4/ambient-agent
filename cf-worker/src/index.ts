@@ -9,6 +9,7 @@ import { handleOfficeLeave } from "./handlers/office-leave.js";
 import { handleOwnTracksLocation } from "./handlers/location.js";
 import { sendMessage } from "./clients/telegram.js";
 import { isHoliday } from "./utils/holiday.js";
+import { cleanOldProcessed, cleanOldLocations, cleanOldAppLogs } from "./storage/d1.js";
 
 // 無料プランの Cron 上限（5個）に合わせて5ジョブに統合
 async function hourlyGmail(env: Env): Promise<void> {
@@ -25,6 +26,14 @@ async function hourlyGmail(env: Env): Promise<void> {
 async function morningPrep(env: Env): Promise<void> {
   await learnFromCancelled(env);
   await syncCalendar(env);
+
+  try {
+    await cleanOldProcessed(env);
+    await cleanOldLocations(env);
+    await cleanOldAppLogs(env);
+  } catch (err) {
+    console.error("morningPrep: cleanup failed", err);
+  }
 }
 
 async function morningBriefing(env: Env): Promise<void> {

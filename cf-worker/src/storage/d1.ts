@@ -150,3 +150,13 @@ export async function insertAppLog(env: Env, level: string, message: string, dat
     console.error("insertAppLog failed:", err);
   }
 }
+
+const APP_LOG_RETENTION_DAYS = 7;
+
+export async function cleanOldAppLogs(env: Env): Promise<void> {
+  await env.AGENT_DB.prepare(
+    "DELETE FROM app_logs WHERE timestamp < datetime('now', 'localtime', ?)"
+  )
+    .bind(`-${APP_LOG_RETENTION_DAYS} days`)
+    .run();
+}
