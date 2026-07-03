@@ -9,8 +9,8 @@ import { jstNow, toDateStr } from "../utils/jst.js";
 import { getEscalationNoticeText, getBacklogPromotionNoticeText } from "./escalation.js";
 import { getDueSoonNoticeText } from "./calendar.js";
 
-const PRICE_INPUT_PER_M = 0.075;
-const PRICE_OUTPUT_PER_M = 0.3;
+const PRICE_INPUT_PER_M = 1.5;
+const PRICE_OUTPUT_PER_M = 9.0;
 
 function calcCost(inputTokens: number, outputTokens: number): number {
   return (inputTokens / 1_000_000) * PRICE_INPUT_PER_M + (outputTokens / 1_000_000) * PRICE_OUTPUT_PER_M;
