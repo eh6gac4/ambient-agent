@@ -9,8 +9,8 @@ import { jstNow, toDateStr } from "../utils/jst.js";
 import { getEscalationNoticeText, getBacklogPromotionNoticeText } from "./escalation.js";
 import { getDueSoonNoticeText } from "./calendar.js";
 
-const PRICE_INPUT_PER_M = 0.8;
-const PRICE_OUTPUT_PER_M = 4.0;
+const PRICE_INPUT_PER_M = 0.075;
+const PRICE_OUTPUT_PER_M = 0.3;
 
 function calcCost(inputTokens: number, outputTokens: number): number {
   return (inputTokens / 1_000_000) * PRICE_INPUT_PER_M + (outputTokens / 1_000_000) * PRICE_OUTPUT_PER_M;
@@ -112,7 +112,8 @@ export async function sendWeeklyCostReport(env: Env): Promise<void> {
   const now = jstNow();
   let totalInput = 0;
   let totalOutput = 0;
-  const byJob: Record<string, { input: number; output: number; calls: number }> = {};
+  let totalCost = 0;
+  const byJob: Record<string, { input: number; output: number; calls: number; cost: number }> = {};
   let totalCalls = 0;
 
   for (let i = 1; i <= 7; i++) {
@@ -121,14 +122,23 @@ export async function sendWeeklyCostReport(env: Env): Promise<void> {
     const dStr = d.toISOString().slice(0, 10);
     const entries = await getDailyUsage(env, dStr);
     
+    // 無料枠の判定 (1500リクエスト/日 以下なら無料)
+    const isFree = entries.length <= 1500;
+
     for (const e of entries) {
       totalInput += e.inputTokens;
       totalOutput += e.outputTokens;
-      const j = (byJob[e.job] ??= { input: 0, output: 0, calls: 0 });
+      const j = (byJob[e.job] ??= { input: 0, output: 0, calls: 0, cost: 0 });
       j.input += e.inputTokens;
       j.output += e.outputTokens;
       j.calls++;
       totalCalls++;
+
+      if (!isFree) {
+        const c = calcCost(e.inputTokens, e.outputTokens);
+        totalCost += c;
+        j.cost += c;
+      }
     }
   }
 
@@ -137,9 +147,11 @@ export async function sendWeeklyCostReport(env: Env): Promise<void> {
     return;
   }
 
+  const isAllFree = totalCost === 0;
+
   const lines = [
     `*💰 週間コストレポート*\n`,
-    `合計: $${calcCost(totalInput, totalOutput).toFixed(4)} USD`,
+    `合計: ${isAllFree ? "無料枠内 ($0)" : `$${totalCost.toFixed(4)} USD`}`,
     `API呼び出し: ${totalCalls}回`,
     `入力トークン: ${totalInput.toLocaleString()}`,
     `出力トークン: ${totalOutput.toLocaleString()}`,
@@ -147,7 +159,10 @@ export async function sendWeeklyCostReport(env: Env): Promise<void> {
     "*ジョブ別内訳*",
     ...Object.entries(byJob)
       .sort((a, b) => b[1].calls - a[1].calls)
-      .map(([job, s]) => `• \`${job}\`: ${s.calls}回 / $${calcCost(s.input, s.output).toFixed(4)}`),
+      .map(([job, s]) => {
+        const costStr = s.cost > 0 ? `$${s.cost.toFixed(4)}` : "$0";
+        return `• \`${job}\`: ${s.calls}回 / ${costStr}`;
+      }),
   ];
 
   await sendMessage(env, lines.join("\n"));
