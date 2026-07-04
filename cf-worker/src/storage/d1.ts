@@ -140,6 +140,13 @@ export async function cleanOldLocations(env: Env): Promise<void> {
 
 // app_logs
 export async function insertAppLog(env: Env, level: string, message: string, data?: any): Promise<void> {
+  // Cloudflare Logpush (Workers Trace Events) 向けに標準出力にも出す
+  if (level === "error") {
+    console.error(`[${level}] ${message}`, data ? JSON.stringify(data) : "");
+  } else {
+    console.info(`[${level}] ${message}`, data ? JSON.stringify(data) : "");
+  }
+
   try {
     await env.AGENT_DB.prepare(
       "INSERT INTO app_logs (level, message, data) VALUES (?, ?, ?)"
