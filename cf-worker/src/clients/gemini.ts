@@ -343,3 +343,17 @@ ${overdueText}
 
   return callGemini(env, "summarize_day", "", [{ text: prompt }], 1024);
 }
+
+const ANALYZE_ERROR_PROMPT = `あなたはシステムのデバッグを支援するAIアシスタントです。
+提供されたエラーログとコンテキストから、エラーの根本原因を推測し、対応方法を提案してください。
+
+## 出力ルール
+- 原因: （簡潔な説明）
+- 提案: （具体的な解決策や確認すべきこと）
+- 全体で200文字程度のプレーンテキスト（Markdown可）で短く返信してください。`;
+
+export async function analyzeError(env: Env, context: string, errorMessage: string): Promise<string> {
+  const prompt = `コンテキスト: ${context}\n\nエラー内容:\n${errorMessage.slice(0, 2000)}`;
+  return callGemini(env, "analyze_error", ANALYZE_ERROR_PROMPT, [{ text: prompt }], 512);
+}
+
