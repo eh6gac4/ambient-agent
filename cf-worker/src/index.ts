@@ -10,6 +10,7 @@ import { handleOwnTracksLocation } from "./handlers/location.js";
 import { sendMessage } from "./clients/telegram.js";
 import { isHoliday } from "./utils/holiday.js";
 import { cleanOldProcessed, cleanOldLocations, cleanOldAppLogs } from "./storage/d1.js";
+import { reportError } from "./handlers/error-handler.js";
 
 // 無料プランの Cron 上限（5個）に合わせて5ジョブに統合
 async function hourlyGmail(env: Env): Promise<void> {
@@ -19,7 +20,7 @@ async function hourlyGmail(env: Env): Promise<void> {
   try {
     await syncCalendar(env);
   } catch (err) {
-    console.error("hourlyGmail: syncCalendar failed:", err);
+    await reportError(env, "hourlyGmail: syncCalendar", err);
   }
 }
 
@@ -32,7 +33,7 @@ async function morningPrep(env: Env): Promise<void> {
     await cleanOldLocations(env);
     await cleanOldAppLogs(env);
   } catch (err) {
-    console.error("morningPrep: cleanup failed", err);
+    await reportError(env, "morningPrep: cleanup", err);
   }
 }
 
@@ -65,7 +66,7 @@ export default {
         const body = await req.json();
         await handleTelegramWebhook(env, body);
       } catch (err) {
-        console.error("Webhook error:", err);
+        await reportError(env, "Webhook", err);
       }
       return new Response("OK");
     }
@@ -83,7 +84,7 @@ export default {
           headers: { "Content-Type": "application/json" },
         });
       } catch (err) {
-        console.error("home-arrival error:", err);
+        await reportError(env, "home-arrival", err);
         return new Response(JSON.stringify({ notifications: [] }), {
           status: 500,
           headers: { "Content-Type": "application/json" },
@@ -104,7 +105,7 @@ export default {
           headers: { "Content-Type": "application/json" },
         });
       } catch (err) {
-        console.error("office-leave error:", err);
+        await reportError(env, "office-leave", err);
         return new Response(JSON.stringify({ notifications: [] }), {
           status: 500,
           headers: { "Content-Type": "application/json" },
@@ -123,7 +124,7 @@ export default {
         const body = (await req.json()) as any;
         await handleOwnTracksLocation(env, body);
       } catch (err) {
-        console.error("owntracks error:", err);
+        await reportError(env, "owntracks", err);
       }
       return new Response("OK");
     }
@@ -147,13 +148,7 @@ export default {
       await job(env);
     } catch (err) {
       const jobName = Object.entries(CRON_JOBS).find(([, fn]) => fn === job)?.[0] ?? event.cron;
-      const msg = `⚠️ *Ambient Agent エラー*\nJob: \`${jobName}\`\n\`\`\`\n${err}\n\`\`\``;
-      console.error(msg, err);
-      try {
-        await sendMessage(env, msg);
-      } catch {
-        // ignore notification failure
-      }
+      await reportError(env, `Scheduled Job: ${jobName}`, err);
     }
   },
 };
