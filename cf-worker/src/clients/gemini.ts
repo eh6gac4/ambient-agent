@@ -158,7 +158,16 @@ export async function extractTasksFromText(env: Env, label: string, subject: str
 export async function analyzeEmail(env: Env, subject: string, body: string): Promise<EmailAnalysis> {
   const text = await callGemini(env, "analyze_email", ANALYZE_EMAIL_PROMPT, [{ text: `件名: ${subject}\n\n本文:\n${body.slice(0, 3000)}` }], 1024, "application/json");
   const result = extractJsonObject<EmailAnalysis>(text);
-  if (!result) return { summary: text.trim(), tasks: [] };
+  if (!result) {
+    let fallback = text.trim();
+    const summaryMatch = text.match(/"summary"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)("?)/);
+    if (summaryMatch) {
+      fallback = summaryMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
+    } else {
+      fallback = fallback.replace(/```(?:json)?\n?/gi, '').replace(/[\{\}]/g, '').trim();
+    }
+    return { summary: fallback, tasks: [] };
+  }
   result.tasks ??= [];
   result.summary ??= "";
   return result;
@@ -226,7 +235,16 @@ export async function analyzeImage(env: Env, imageData: ArrayBuffer, mediaType: 
   ];
   const text = await callGemini(env, "analyze_image", ANALYZE_IMAGE_PROMPT, userContent, 1024, "application/json");
   const result = extractJsonObject<EmailAnalysis>(text);
-  if (!result) return { summary: text.trim(), tasks: [] };
+  if (!result) {
+    let fallback = text.trim();
+    const summaryMatch = text.match(/"summary"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)("?)/);
+    if (summaryMatch) {
+      fallback = summaryMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
+    } else {
+      fallback = fallback.replace(/```(?:json)?\n?/gi, '').replace(/[\{\}]/g, '').trim();
+    }
+    return { summary: fallback, tasks: [] };
+  }
   result.tasks ??= [];
   result.summary ??= "";
   return result;
