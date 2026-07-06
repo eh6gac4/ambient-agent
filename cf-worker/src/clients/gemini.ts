@@ -80,6 +80,7 @@ async function callGemini(
   system: string,
   userContent: any[],
   maxTokens = 1024,
+  responseMimeType?: string,
 ): Promise<string> {
   const url = `${API_URL_BASE}/${MODEL}:generateContent?key=${env.GEMINI_API_KEY}`;
   
@@ -92,6 +93,7 @@ async function callGemini(
     ],
     generationConfig: {
       maxOutputTokens: maxTokens,
+      ...(responseMimeType ? { responseMimeType } : {}),
     },
   };
 
@@ -149,12 +151,12 @@ function extractJsonObject<T>(text: string): T | null {
 }
 
 export async function extractTasksFromText(env: Env, label: string, subject: string, body: string): Promise<ExtractedTask[]> {
-  const text = await callGemini(env, label, EXTRACT_TASKS_PROMPT, [{ text: `件名: ${subject}\n\n本文:\n${body}` }]);
+  const text = await callGemini(env, label, EXTRACT_TASKS_PROMPT, [{ text: `件名: ${subject}\n\n本文:\n${body}` }], 1024, "application/json");
   return extractJsonArray<ExtractedTask>(text);
 }
 
 export async function analyzeEmail(env: Env, subject: string, body: string): Promise<EmailAnalysis> {
-  const text = await callGemini(env, "analyze_email", ANALYZE_EMAIL_PROMPT, [{ text: `件名: ${subject}\n\n本文:\n${body.slice(0, 3000)}` }]);
+  const text = await callGemini(env, "analyze_email", ANALYZE_EMAIL_PROMPT, [{ text: `件名: ${subject}\n\n本文:\n${body.slice(0, 3000)}` }], 1024, "application/json");
   const result = extractJsonObject<EmailAnalysis>(text);
   if (!result) return { summary: text.trim(), tasks: [] };
   result.tasks ??= [];
@@ -169,7 +171,7 @@ export function pickTaskTitle(analysis: EmailAnalysis, subject: string): string 
 }
 
 export async function extractTasksFromUrlContent(env: Env, url: string, content: string): Promise<ExtractedTask[]> {
-  const text = await callGemini(env, "extract_tasks_url", EXTRACT_TASKS_PROMPT, [{ text: `件名: ${url}\n\n本文:\n${content.slice(0, 3000)}` }]);
+  const text = await callGemini(env, "extract_tasks_url", EXTRACT_TASKS_PROMPT, [{ text: `件名: ${url}\n\n本文:\n${content.slice(0, 3000)}` }], 1024, "application/json");
   return extractJsonArray<ExtractedTask>(text);
 }
 
@@ -185,7 +187,7 @@ export async function extractTasksFromImage(env: Env, imageData: ArrayBuffer, me
     { inlineData: { mimeType: mediaType, data: imageToBase64(imageData) } },
     { text: "この画像からアクションが必要なタスクを抽出してください。" },
   ];
-  const text = await callGemini(env, "extract_tasks_image", EXTRACT_TASKS_PROMPT, userContent);
+  const text = await callGemini(env, "extract_tasks_image", EXTRACT_TASKS_PROMPT, userContent, 1024, "application/json");
   return extractJsonArray<ExtractedTask>(text);
 }
 
@@ -222,7 +224,7 @@ export async function analyzeImage(env: Env, imageData: ArrayBuffer, mediaType: 
     { inlineData: { mimeType: mediaType, data: imageToBase64(imageData) } },
     { text: "この画像を分析してください。" },
   ];
-  const text = await callGemini(env, "analyze_image", ANALYZE_IMAGE_PROMPT, userContent);
+  const text = await callGemini(env, "analyze_image", ANALYZE_IMAGE_PROMPT, userContent, 1024, "application/json");
   const result = extractJsonObject<EmailAnalysis>(text);
   if (!result) return { summary: text.trim(), tasks: [] };
   result.tasks ??= [];
@@ -270,7 +272,7 @@ async function selectNotifications(
     .join("\n");
 
   const userContent = [{ text: `現在時刻: ${currentJstDatetime} (JST)\n今日の日付: ${today}\n\n## タスク一覧\n${taskList}` }];
-  const text = await callGemini(env, job, prompt, userContent, 512);
+  const text = await callGemini(env, job, prompt, userContent, 512, "application/json");
   return extractJsonArray<HomeArrivalNotification>(text);
 }
 
