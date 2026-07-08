@@ -10,9 +10,9 @@ const EXTRACT_TASKS_PROMPT = `あなたはメールからタスクを抽出す�
 以下のメールを読み、アクションが必要な項目を JSON 配列で返してください。
 タスクが存在しない場合は空配列 \`[]\` を返してください。
 
-## 出力フォーマット（JSON のみ、説明文不要）
+## 出力フォーマット
+Markdownのコードブロック（\`\`\`json）を使わず、直接JSON配列のみを出力してください。説明文は一切不要です。
 
-\`\`\`json
 [
   {
     "title": "タスクのタイトル（簡潔に）",
@@ -22,7 +22,6 @@ const EXTRACT_TASKS_PROMPT = `あなたはメールからタスクを抽出す�
     "source": "Gmail"
   }
 ]
-\`\`\`
 
 ## 判断基準
 - 返信・確認・提出・対応などのアクション動詞を含む文をタスクとして抽出する
@@ -35,9 +34,9 @@ const ANALYZE_EMAIL_PROMPT = `あなたはメールを分析するアシスタ�
 
 以下のメールを読み、タスク一覧で使うタイトル・要約・アクションが必要なタスクを JSON で返してください。
 
-## 出力フォーマット（JSON のみ、説明文不要）
+## 出力フォーマット
+Markdownのコードブロック（\`\`\`json）を使わず、直接JSONオブジェクトのみを出力してください。説明文は一切不要です。
 
-\`\`\`json
 {
   "task_title": "タスク一覧に並べたとき一目で内容が分かる短いタイトル（日本語・20文字程度）",
   "summary": "メールの内容を1〜2文で要約（日本語）",
@@ -51,7 +50,6 @@ const ANALYZE_EMAIL_PROMPT = `あなたはメールを分析するアシスタ�
     }
   ]
 }
-\`\`\`
 
 ## 判断基準
 - task_title: メール件名そのままにせず、誰から何の用件かが分かる短文にする。例「件名: 【重要なお知らせ】請求書発行のご連絡」→ task_title: 「ACME社4月分請求書の支払い」。社名・人物名が分かれば含めると良い。広告・通知でタスクが無い場合は「{送信元}からのお知らせ」程度で良い
@@ -130,7 +128,8 @@ async function callGemini(
 
 /** LLM 応答テキストから最初の JSON 配列を取り出す。見つからない/パース失敗時は空配列。 */
 function extractJsonArray<T>(text: string): T[] {
-  const match = text.match(/\[[\s\S]*\]/);
+  const cleaned = text.replace(/```(?:json)?\n?/gi, '').trim();
+  const match = cleaned.match(/\[[\s\S]*\]/);
   if (!match) return [];
   try {
     return JSON.parse(match[0]) as T[];
@@ -141,7 +140,8 @@ function extractJsonArray<T>(text: string): T[] {
 
 /** LLM 応答テキストから最初の JSON オブジェクトを取り出す。見つからない/パース失敗時は null。 */
 function extractJsonObject<T>(text: string): T | null {
-  const match = text.match(/\{[\s\S]*\}/);
+  const cleaned = text.replace(/```(?:json)?\n?/gi, '').trim();
+  const match = cleaned.match(/\{[\s\S]*\}/);
   if (!match) return null;
   try {
     return JSON.parse(match[0]) as T;
@@ -204,9 +204,9 @@ const ANALYZE_IMAGE_PROMPT = `あなたは画像からタスクを分析する�
 
 画像（レシート・ホワイトボード・メモ・スクリーンショット等）を読み、要約と実行が必要なタスクを JSON で返してください。
 
-## 出力フォーマット（JSON のみ、説明文不要）
+## 出力フォーマット
+Markdownのコードブロック（\`\`\`json）を使わず、直接JSONオブジェクトのみを出力してください。説明文は一切不要です。
 
-\`\`\`json
 {
   "summary": "画像の内容を1文で要約（タスクのタイトルとして使う）",
   "tasks": [
@@ -219,7 +219,6 @@ const ANALYZE_IMAGE_PROMPT = `あなたは画像からタスクを分析する�
     }
   ]
 }
-\`\`\`
 
 ## 判断基準
 - summary: 「何の画像か / なぜ撮ったと考えられるか」を1文に。タスク登録時のタイトルになるので具体的に
@@ -260,14 +259,12 @@ const HOME_ARRIVAL_PROMPT = `あなたは帰宅時のタスク通知を選ぶア
 - 優先度 high のタスクは必ず含める（多すぎる場合は最重要のみ）
 - 仕事中にしかできないタスク（会議準備・業務連絡 等）は夜間帰宅時は除外する
 
-## 出力フォーマット（JSON のみ、説明文不要）
+## 出力フォーマット
+Markdownのコードブロック（\`\`\`json）を使わず、直接JSON配列のみを出力してください。説明文は一切不要です。
 
-\`\`\`json
 [
-  {"title": "通知タイトル（簡潔に20文字以内）", "priority": "high | medium | low"},
-  ...
+  {"title": "通知タイトル（簡潔に20文字以内）", "priority": "high | medium | low"}
 ]
-\`\`\`
 
 タスクが0件の場合は \`[]\` を返す。`;
 
@@ -313,14 +310,12 @@ const OFFICE_LEAVE_PROMPT = `あなたは退社時のタスク通知を選ぶア
 - 家に帰ってからでないとできないタスク（家事・家族関連）は除外する
 - 優先度 high のタスクは必ず含める（多すぎる場合は最重要のみ）
 
-## 出力フォーマット（JSON のみ、説明文不要）
+## 出力フォーマット
+Markdownのコードブロック（\`\`\`json）を使わず、直接JSON配列のみを出力してください。説明文は一切不要です。
 
-\`\`\`json
 [
-  {"title": "通知タイトル（簡潔に20文字以内）", "priority": "high | medium | low"},
-  ...
+  {"title": "通知タイトル（簡潔に20文字以内）", "priority": "high | medium | low"}
 ]
-\`\`\`
 
 タスクが0件の場合は \`[]\` を返す。`;
 
