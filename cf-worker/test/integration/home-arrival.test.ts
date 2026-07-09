@@ -75,7 +75,7 @@ describe("/home-arrival ingress", () => {
     expect(resp.status).toBe(200);
     const body = await resp.json<{ notifications: unknown[] }>();
     expect(body.notifications).toHaveLength(0);
-    expect(sendMessage).not.toHaveBeenCalled();
+    expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("該当するタスクはありません"));
   });
 
   it("returns 500 with empty notifications when handler throws", async () => {

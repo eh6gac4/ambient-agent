@@ -34,7 +34,8 @@ export async function runNotificationTrigger(
 
   const tasks = await getOpenTasks(env);
   if (tasks.length === 0) {
-    console.log(JSON.stringify({ event: "notification_trigger", header, result: "skipped_no_tasks" }));
+    console.log(JSON.stringify({ event: "notification_trigger", header, result: "sent_empty_no_tasks" }));
+    await sendMessage(env, `${header}\n\n該当するタスクはありません。お疲れ様でした！`);
     return [];
   }
 
@@ -43,7 +44,8 @@ export async function runNotificationTrigger(
     console.log(JSON.stringify({ event: "notification_trigger", header, result: "sent", count: notifications.length }));
     await sendMessage(env, buildTelegramMessage(header, notifications));
   } else {
-    console.log(JSON.stringify({ event: "notification_trigger", header, result: "skipped_no_selection" }));
+    console.log(JSON.stringify({ event: "notification_trigger", header, result: "sent_empty_no_selection" }));
+    await sendMessage(env, `${header}\n\n該当するタスクはありません。お疲れ様でした！`);
   }
 
   return notifications;
