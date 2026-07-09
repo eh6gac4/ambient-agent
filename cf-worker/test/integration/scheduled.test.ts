@@ -54,20 +54,20 @@ describe("scheduled handler - cron dispatch", () => {
     vi.clearAllMocks();
   });
 
-  it("dispatches learnFromCancelled for 50 22 * * *", async () => {
+  it("dispatches learnFromCancelled for 20 20 * * *", async () => {
     const env = createMockEnv();
     const { learnFromCancelled } = await import("../../src/handlers/gmail.js");
 
-    await worker.scheduled(makeScheduledEvent("50 22 * * *"), env);
+    await worker.scheduled(makeScheduledEvent("20 20 * * *"), env);
     expect(learnFromCancelled).toHaveBeenCalledWith(env);
   });
 
-  it("50 22 * * * (morning_prep) runs learnFromCancelled and calendar (no gmail)", async () => {
+  it("20 20 * * * (morning_prep) runs learnFromCancelled and calendar (no gmail)", async () => {
     const env = createMockEnv();
-    const { checkGmail } = await import("../../src/handlers/gmail.js");
+    const { checkGmail, learnFromCancelled } = await import("../../src/handlers/gmail.js");
     const { syncCalendar } = await import("../../src/handlers/calendar.js");
 
-    await worker.scheduled(makeScheduledEvent("50 22 * * *"), env);
+    await worker.scheduled(makeScheduledEvent("20 20 * * *"), env);
     expect(checkGmail).not.toHaveBeenCalled();
     expect(syncCalendar).toHaveBeenCalledWith(env);
   });
@@ -82,11 +82,11 @@ describe("scheduled handler - cron dispatch", () => {
     expect(syncCalendar).toHaveBeenCalledWith(env);
   });
 
-  it("0 23 * * * (morning_briefing) runs briefing", async () => {
+  it("30 20 * * * (morning_briefing) runs briefing", async () => {
     const env = createMockEnv();
     const { sendDailyBriefing } = await import("../../src/handlers/briefing.js");
 
-    await worker.scheduled(makeScheduledEvent("0 23 * * *"), env);
+    await worker.scheduled(makeScheduledEvent("30 20 * * *"), env);
     expect(sendDailyBriefing).toHaveBeenCalledWith(env);
   });
 
@@ -105,7 +105,7 @@ describe("scheduled handler - cron dispatch", () => {
 
     (syncCalendar as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("API timeout"));
 
-    await worker.scheduled(makeScheduledEvent("50 22 * * *"), env);
+    await worker.scheduled(makeScheduledEvent("20 20 * * *"), env);
     expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("エラー"));
   });
 
