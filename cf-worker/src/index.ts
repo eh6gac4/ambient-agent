@@ -43,17 +43,17 @@ async function morningBriefing(env: Env): Promise<void> {
 
 const CRON_JOBS: Record<string, (env: Env) => Promise<void>> = {
   "30 22-23,0-12 * * *": hourlyGmail,  // 毎時30分 (JST 07:30-21:30): silent gmail batch
-  "50 22 * * *": morningPrep,          // 07:50 JST: learn→calendar
-  "0 23 * * *": morningBriefing,       // 08:00 JST: briefing (events/tasks/escalations/digest)
-  "0 23 * * 0": sendWeeklyCostReport,  // 月 08:00 JST: cost report
+  "20 20 * * *": morningPrep,          // 05:20 JST: learn→calendar
+  "30 20 * * *": morningBriefing,       // 05:30 JST: briefing (events/tasks/escalations/digest)
+  "30 20 * * 0": sendWeeklyCostReport,  // 月 05:30 JST: cost report
   "0 0 * * 1": sendStaleTasksNotice,   // 月 09:00 JST
 };
 
 // 休日（土日・祝日）にスキップするジョブ。hourlyGmail はサイレント処理なので除外。
 const SKIP_ON_HOLIDAY = new Set([
-  "50 22 * * *",
-  "0 23 * * *",
-  "0 23 * * 0",
+  "20 20 * * *",
+  "30 20 * * *",
+  "30 20 * * 0",
   "0 0 * * 1",
 ]);
 
