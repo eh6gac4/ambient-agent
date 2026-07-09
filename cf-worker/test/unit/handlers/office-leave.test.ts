@@ -72,7 +72,7 @@ describe("handleOfficeLeave", () => {
 
     const result = await handleOfficeLeave(env);
     expect(result).toEqual([]);
-    expect(sendMessage).not.toHaveBeenCalled();
+    expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("該当するタスクはありません"));
   });
 
   it("returns empty array on holiday without calling any downstream", async () => {
