@@ -17,8 +17,8 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 | コンポーネント | 用途 |
 |---|---|
 | Cloudflare Workers | メイン実行環境（TypeScript） |
-| Cloudflare D1 | スレッドマップ・カレンダー同期・処理済みメッセージ管理 |
-| Cloudflare KV | Telegram オフセット・タスクキャッシュ・ブロックリスト |
+| Cloudflare D1 | スレッドマップ・カレンダー同期・処理済みメッセージ管理（`AGENT_DB`）および 買い物リストDB（`GROCERY_DB`） |
+| Cloudflare KV | Telegram オフセット・タスクキャッシュ・ブロックリスト・位置情報ステート |
 | Cloudflare Cron Triggers | 定期ジョブのスケジューリング（5ジョブ） |
 
 ## HTTP エンドポイント
@@ -28,7 +28,7 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 | `POST /webhook` | Telegram Update 受信（コマンド・メッセージ） | Telegram |
 | `GET /home-arrival` | iPhone ショートカット（帰宅 Wi-Fi 接続時）から呼び出し、Notion オープンタスクを Gemini が選定して Telegram 通知 | `Authorization: Bearer <ALERT_TOKEN>` |
 | `GET /office-leave` | iPhone ショートカット（会社 Wi-Fi 切断時）から呼び出し、帰宅途中・翌朝に向けたタスクを Gemini が選定して Telegram 通知 | `Authorization: Bearer <ALERT_TOKEN>` |
-| `POST /owntracks` | OwnTracks アプリ → マネージド MQTT(EMQX Cloud 等) → Webhook 経由で位置情報を受信。サーバー側ジオフェンス判定を行い、任意の場所への出入りに応じてアクションを実行 | `Authorization: Bearer <OWNTRACKS_TOKEN>` |
+| `POST /owntracks` | OwnTracks アプリ → マネージド MQTT(EMQX Cloud 等) → Webhook 経由で位置情報を受信。サーバー側ジオフェンス判定に加え、Mapboxを用いた周辺POIでのタスク・買い物提案を自動実行 | `Authorization: Bearer <OWNTRACKS_TOKEN>` |
 
 ## スケジュール
 
@@ -214,6 +214,7 @@ npm run secrets:push
 | `TELEGRAM_CHAT_ID` | `getUpdates` API の `chat.id` |
 | `ALERT_TOKEN` | `GET /home-arrival` / `GET /office-leave` 認証用の任意の長い乱数 |
 | `OWNTRACKS_TOKEN` | `POST /owntracks` (OwnTracks Webhook) 認証用の任意の長い乱数 |
+| `MAPBOX_ACCESS_TOKEN` | Mapbox の Reverse Geocoding 用 API トークン |
 | `GOOGLE_CLIENT_ID` | Google Cloud Console → 認証情報 |
 | `GOOGLE_CLIENT_SECRET` | 同上 |
 | `GOOGLE_REFRESH_TOKEN` | `data/token.json` の `refresh_token` |
@@ -320,6 +321,17 @@ npx dotenv -e .env.local -- wrangler kv key put \
 | `telegram_notify` | 任意テキストを Telegram に送信 | `message`: 送信文字列（省略時は `{regionId} {transition}`） |
 
 新しいアクションは `src/handlers/geofence-actions.ts` の `ACTIONS` に関数を追加するだけで利用可能。
+
+#### 5. 周辺施設（POI）に基づくタスク・買い物提案
+
+ジオフェンスによる出入り判定とは別に、街中での移動データから周辺施設（スーパーや薬局など）を割り出し、コンテキストに合わせたタスクを自動提案します。
+
+1. **立ち止まり判定**: OwnTracksからのデータで移動速度が「5 km/h 未満」の場合。
+2. **間引き処理**: 前回APIを呼び出した場所から「200m以上」離れている場合のみ処理。
+3. **Mapbox連携**: MapboxのReverse Geocoding API (`types=poi`) を呼び出し、周辺の店や施設名（POI）を取得。
+4. **買い物リスト連携**: 同じCloudflare上の別アプリである「買い物リスト（grocery-list-db）」から未完了アイテムを取得（`GROCERY_DB` D1バインディング経由）。
+5. **Geminiによる判定**: 取得したPOI名・カテゴリをもとに、未完了のNotionタスクと買い物リストのアイテムをGeminiに渡し、今いる場所でできそうなタスクがあればTelegramへ通知します。
+
 
 ## CI/CD
 
