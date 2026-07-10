@@ -4,6 +4,10 @@ import { withRetry } from "../utils/retry.js";
 import { getRegions, getGeofenceState, setGeofenceState } from "../storage/kv.js";
 import { insertLocation, insertAppLog } from "../storage/d1.js";
 import { runGeofenceAction } from "./geofence-actions.js";
+import { getMapboxPoi } from "../clients/mapbox.js";
+import { getOpenTasks } from "../clients/notion.js";
+import { selectPoiTasks } from "../clients/gemini.js";
+import { sendMessage } from "../clients/telegram.js";
 
 /** OwnTracks の location ペイロード（最小限の型定義）。 */
 interface OwnTracksPayload {
@@ -12,6 +16,7 @@ interface OwnTracksPayload {
   lon?: number;
   tst?: number;
   acc?: number;
+  vel?: number; // 速度 (km/h)
   /** トピック `owntracks/<user>/<device>` の device 部分。ブローカー側で埋める想定。 */
   topic?: string;
 }
@@ -103,4 +108,53 @@ export async function handleOwnTracksLocation(
       }
     }),
   );
+
+  // 3. Mapbox POI ベースのタスク提案 (停止時のみ)
+  // vel が 0 〜 5 km/h であれば、ほぼ停止しているとみなす
+  if (payload.vel != null && payload.vel < 5) {
+    const poiKey = device ? `poi_check_${device}` : `poi_check_default`;
+    const lastCheckStr = await env.AGENT_KV.get(poiKey);
+    let shouldCheck = false;
+    
+    if (lastCheckStr) {
+      try {
+        const lastCheck = JSON.parse(lastCheckStr);
+        const dist = haversineMeters(lat, lon, lastCheck.lat, lastCheck.lon);
+        // 前回チェックした地点から200m以上離れて停止したら再チェック
+        if (dist > 200) {
+          shouldCheck = true;
+        }
+      } catch (e) {
+        shouldCheck = true;
+      }
+    } else {
+      shouldCheck = true;
+    }
+
+    if (shouldCheck) {
+      // 連続で呼ばれないよう、即座に位置を記録
+      await env.AGENT_KV.put(poiKey, JSON.stringify({ lat, lon, tst }));
+
+      // Mapbox で周辺の施設を取得
+      const poi = await getMapboxPoi(env, lat, lon);
+      if (poi && poi.name) {
+        await insertAppLog(env, "info", `Mapbox POI detected for ${device || "unknown"}`, { poi });
+        
+        // Notion から未完了タスクを取得
+        const openTasks = await getOpenTasks(env);
+
+        // Gemini にタスクの関連性を判定させる
+        const relatedTasks = await selectPoiTasks(env, openTasks, poi.name, poi.category);
+
+        if (relatedTasks.length > 0) {
+          const lines = [`📍 **${poi.name}** 付近にいるみたいやね！\nここでできそうなタスクがあるで：\n`];
+          for (const rt of relatedTasks) {
+            lines.push(`- ${rt.title}\n  (_${rt.reason}_)`);
+          }
+          await sendMessage(env, lines.join("\n"));
+          await insertAppLog(env, "info", "Sent POI task suggestion", { poi, relatedTasks });
+        }
+      }
+    }
+  }
 }

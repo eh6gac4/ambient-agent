@@ -23,6 +23,7 @@ export interface Env {
   GITHUB_REPO?: string;
   QUIET_HOURS_START?: string;
   QUIET_HOURS_END?: string;
+  MAPBOX_ACCESS_TOKEN?: string;
 }
 
 // ─── Geofence ────────────────────────────────────────────────────────────────

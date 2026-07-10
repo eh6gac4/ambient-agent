@@ -1,4 +1,4 @@
-import type { Env, ExtractedTask, EmailAnalysis } from "../types.js";
+import type { Env, ExtractedTask, EmailAnalysis, Task } from "../types.js";
 import { recordUsage } from "../storage/kv.js";
 import { jstDateStr } from "../utils/jst.js";
 
@@ -370,3 +370,38 @@ export async function analyzeError(env: Env, context: string, errorMessage: stri
   return callGemini(env, "analyze_error", ANALYZE_ERROR_PROMPT, [{ text: prompt }], 512);
 }
 
+
+const SELECT_POI_TASKS_PROMPT = `あなたはタスク管理アシスタントです。
+ユーザーが特定の施設・場所に滞在しています。
+現在の未完了タスクリストの中から、**その場所で実行可能・関連性の高いタスク**を選別してください。
+
+【現在の場所】
+名前: {POI_NAME}
+カテゴリ: {POI_CATEGORY}
+
+【タスク一覧】
+{TASKS_JSON}
+
+## 出力フォーマット
+Markdownのコードブロック（\`\`\`json）を使わず、直接JSON配列のみを出力してください。
+関連タスクがない場合は空配列 \`[]\` を出力してください。
+各タスクについて、なぜその場所で実行可能かを示す簡単な理由（reason）も付与してください。
+
+[
+  {
+    "title": "タスクのタイトル",
+    "reason": "この場所で実行できる理由（例: ここは薬局なので、洗剤を購入できるため）"
+  }
+]
+`;
+
+export async function selectPoiTasks(env: Env, tasks: Task[], poiName: string, poiCategory: string): Promise<{ title: string; reason: string }[]> {
+  if (tasks.length === 0) return [];
+  const prompt = SELECT_POI_TASKS_PROMPT
+    .replace("{POI_NAME}", poiName)
+    .replace("{POI_CATEGORY}", poiCategory)
+    .replace("{TASKS_JSON}", JSON.stringify(tasks.map(t => ({ title: t.title, status: t.status, priority: t.priority })), null, 2));
+
+  const text = await callGemini(env, "select_poi_tasks", prompt, [{ text: "関連タスクを抽出してください。" }], 1024, "application/json");
+  return extractJsonArray<{ title: string; reason: string }>(text);
+}
