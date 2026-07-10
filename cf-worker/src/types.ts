@@ -21,6 +21,8 @@ export interface Env {
   NOTION_SUBITEM_PARENT_PROP?: string;
   GITHUB_PAT?: string;
   GITHUB_REPO?: string;
+  QUIET_HOURS_START?: string;
+  QUIET_HOURS_END?: string;
 }
 
 // ─── Geofence ────────────────────────────────────────────────────────────────

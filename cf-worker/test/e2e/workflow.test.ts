@@ -1,0 +1,293 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import worker from "../../src/index.js";
+import { createMockEnv } from "../helpers/mocks.js";
+import { runNotificationTrigger } from "../../src/handlers/notification-trigger.js";
+
+// Mock external clients to isolate integration pathways
+vi.mock("../../src/clients/gcal-api.js", () => ({
+  getTodaysEvents: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock("../../src/clients/notion.js", () => ({
+  getOpenTasks: vi.fn(),
+  escalatePriorityTasks: vi.fn().mockResolvedValue([]),
+  promoteBacklogTasks: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock("../../src/clients/gemini.js", () => ({
+  selectHomeArrivalNotifications: vi.fn(),
+  selectOfficeLeaveNotifications: vi.fn(),
+  summarizeDay: vi.fn().mockResolvedValue("E2E Gemini Summary"),
+}));
+
+vi.mock("../../src/clients/telegram.js", () => ({
+  sendMessage: vi.fn().mockResolvedValue(undefined),
+  escapeMd: (t: string) => t.replace(/[_*[\]()~`>#+\-=|{}.!]/g, "\\$&"),
+  getFileUrl: vi.fn(),
+}));
+
+function makeScheduledEvent(cron: string): ScheduledEvent {
+  return {
+    cron,
+    scheduledTime: Date.now(),
+    type: "scheduled",
+    waitUntil: vi.fn(),
+    noRetry: vi.fn(),
+  } as unknown as ScheduledEvent;
+}
+
+function mockHolidaysApi(holidays: Record<string, string>) {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockImplementation((url: string) => {
+      if (url.includes("holidays-jp.github.io")) {
+        return Promise.resolve(
+          new Response(JSON.stringify(holidays), {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          })
+        );
+      }
+      return Promise.resolve(new Response("", { status: 404 }));
+    })
+  );
+}
+
+function mockDateNow(ms: number) {
+  vi.spyOn(Date, "now").mockReturnValue(ms);
+}
+
+describe("E2E Workflow - Early Morning Briefing Skip Logic", () => {
+  const env = createMockEnv();
+
+  // JST 05:30 = UTC 20:30
+  // Weekday: 2026-06-15 (Monday) 05:30 JST => UTC 2026-06-14 20:30:00
+  const WEEKDAY_UTC_MS = Date.UTC(2026, 5, 14, 20, 30, 0);
+
+  // Weekend: 2026-06-14 (Sunday) 05:30 JST => UTC 2026-06-13 20:30:00
+  const SUNDAY_UTC_MS = Date.UTC(2026, 5, 13, 20, 30, 0);
+
+  // Holiday: 2026-01-01 (Thursday, 元日) 05:30 JST => UTC 2025-12-31 20:30:00
+  const HOLIDAY_UTC_MS = Date.UTC(2025, 11, 31, 20, 30, 0);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it("triggers morning briefing on a weekday morning (JST 05:30) when not a holiday", async () => {
+    mockDateNow(WEEKDAY_UTC_MS);
+    mockHolidaysApi({ "2026-01-01": "元日" }); // Not a holiday on 2026-06-15
+
+    const { getOpenTasks } = await import("../../src/clients/notion.js");
+    const { sendMessage } = await import("../../src/clients/telegram.js");
+
+    (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+    await worker.scheduled(makeScheduledEvent("30 20 * * *"), env);
+
+    // Briefing runs, sending Telegram messages
+    expect(sendMessage).toHaveBeenCalled();
+  });
+
+  it("skips morning briefing on a weekend (Sunday JST 05:30)", async () => {
+    mockDateNow(SUNDAY_UTC_MS);
+    mockHolidaysApi({ "2026-01-01": "元日" });
+
+    const { sendMessage } = await import("../../src/clients/telegram.js");
+
+    await worker.scheduled(makeScheduledEvent("30 20 * * *"), env);
+
+    // Briefing is skipped because it's Sunday
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+
+  it("skips morning briefing on a weekday JST 05:30 that is a Japanese holiday (元日)", async () => {
+    mockDateNow(HOLIDAY_UTC_MS);
+    mockHolidaysApi({ "2026-01-01": "元日" });
+
+    const { sendMessage } = await import("../../src/clients/telegram.js");
+
+    await worker.scheduled(makeScheduledEvent("30 20 * * *"), env);
+
+    // Briefing is skipped because it's a public holiday
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
+});
+
+describe("E2E Workflow - Location-based Task Filtering", () => {
+  const env = createMockEnv();
+
+  const mockTasks = [
+    { title: "Buy milk", priority: "high", location: "home", due: null, status: "未着手", url: "", pageId: "p1" },
+    { title: "Clean room", priority: "medium", location: "自宅", due: null, status: "未着手", url: "", pageId: "p2" },
+    { title: "Water plants", priority: "low", location: "家", due: null, status: "未着手", url: "", pageId: "p3" },
+    { title: "Write report", priority: "high", location: "office", due: null, status: "未着手", url: "", pageId: "p4" },
+    { title: "Attend meeting", priority: "medium", location: "オフィス", due: null, status: "未着手", url: "", pageId: "p5" },
+    { title: "Clean desk", priority: "low", location: "会社", due: null, status: "未着手", url: "", pageId: "p6" },
+    { title: "Buy coffee", priority: "low", location: "職場", due: null, status: "未着手", url: "", pageId: "p7" },
+    { title: "Read book", priority: "medium", location: null, due: null, status: "未着手", url: "", pageId: "p8" },
+    { title: "Buy groceries", priority: "medium", location: "Home", due: null, status: "未着手", url: "", pageId: "p9" },
+  ];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockHolidaysApi({}); // Not a holiday
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it("handles home-arrival trigger: extracts home tasks, case-insensitive, deduplicates with Gemini", async () => {
+    const { getOpenTasks } = await import("../../src/clients/notion.js");
+    const { selectHomeArrivalNotifications } = await import("../../src/clients/gemini.js");
+    const { sendMessage } = await import("../../src/clients/telegram.js");
+
+    (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue(mockTasks);
+    // Gemini returns one duplicate (Buy groceries) and one new task (Water plants - already in list, and Buy bread - new)
+    (selectHomeArrivalNotifications as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { title: "Buy groceries", priority: "medium" },
+      { title: "Buy bread", priority: "low" },
+    ]);
+
+    const req = new Request("https://example.com/home-arrival", {
+      method: "GET",
+      headers: { Authorization: `Bearer ${env.ALERT_TOKEN}` },
+    });
+
+    const resp = await worker.fetch(req, env);
+    expect(resp.status).toBe(200);
+
+    const body = await resp.json<{ notifications: Array<{ title: string; priority: string }> }>();
+
+    // Expected home arrival notifications:
+    // 1. Buy milk (home)
+    // 2. Clean room (自宅)
+    // 3. Water plants (家)
+    // 4. Buy groceries (Home - case insensitive)
+    // 5. Buy bread (Gemini selected)
+    // Deduplicated: Buy groceries is only listed once.
+    expect(body.notifications).toHaveLength(5);
+    const titles = body.notifications.map((n) => n.title);
+    expect(titles).toContain("Buy milk");
+    expect(titles).toContain("Clean room");
+    expect(titles).toContain("Water plants");
+    expect(titles).toContain("Buy groceries");
+    expect(titles).toContain("Buy bread");
+
+    // Verify Telegram message was sent
+    expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("帰宅通知"));
+    expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("Buy milk"));
+    expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("Buy bread"));
+  });
+
+  it("handles office-leave trigger: extracts office tasks, case-insensitive, deduplicates with Gemini", async () => {
+    const { getOpenTasks } = await import("../../src/clients/notion.js");
+    const { selectOfficeLeaveNotifications } = await import("../../src/clients/gemini.js");
+    const { sendMessage } = await import("../../src/clients/telegram.js");
+
+    (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue(mockTasks);
+    // Gemini returns one duplicate (Write report) and one new task (Submit expense)
+    (selectOfficeLeaveNotifications as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { title: "Write report", priority: "high" },
+      { title: "Submit expense", priority: "medium" },
+    ]);
+
+    const req = new Request("https://example.com/office-leave", {
+      method: "GET",
+      headers: { Authorization: `Bearer ${env.ALERT_TOKEN}` },
+    });
+
+    const resp = await worker.fetch(req, env);
+    expect(resp.status).toBe(200);
+
+    const body = await resp.json<{ notifications: Array<{ title: string; priority: string }> }>();
+
+    // Expected office leave notifications:
+    // 1. Write report (office)
+    // 2. Attend meeting (オフィス)
+    // 3. Clean desk (会社)
+    // 4. Buy coffee (職場)
+    // 5. Submit expense (Gemini selected)
+    // Deduplicated: Write report only listed once.
+    expect(body.notifications).toHaveLength(5);
+    const titles = body.notifications.map((n) => n.title);
+    expect(titles).toContain("Write report");
+    expect(titles).toContain("Attend meeting");
+    expect(titles).toContain("Clean desk");
+    expect(titles).toContain("Buy coffee");
+    expect(titles).toContain("Submit expense");
+
+    // Verify Telegram message was sent
+    expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("退社通知"));
+    expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("Write report"));
+    expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("Submit expense"));
+  });
+
+  it("sends a proper Telegram notification when no tasks are found", async () => {
+    const { getOpenTasks } = await import("../../src/clients/notion.js");
+    const { sendMessage } = await import("../../src/clients/telegram.js");
+
+    (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+
+    const req = new Request("https://example.com/home-arrival", {
+      method: "GET",
+      headers: { Authorization: `Bearer ${env.ALERT_TOKEN}` },
+    });
+
+    const resp = await worker.fetch(req, env);
+    expect(resp.status).toBe(200);
+    const body = await resp.json<{ notifications: unknown[] }>();
+    expect(body.notifications).toHaveLength(0);
+
+    // Verify Telegram notification was sent indicating no tasks
+    expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("該当するタスクはありません"));
+  });
+});
+
+describe("E2E Integration - Separation of Judgment Logic", () => {
+  const env = createMockEnv();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockHolidaysApi({});
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it("runNotificationTrigger coordinates APIs and calls injected selection function", async () => {
+    const { getOpenTasks } = await import("../../src/clients/notion.js");
+    const { sendMessage } = await import("../../src/clients/telegram.js");
+
+    (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue([
+      { title: "Task A", priority: "high", location: null, due: null, status: "未着手", url: "", pageId: "p1" },
+      { title: "Task B", priority: "low", location: null, due: null, status: "未着手", url: "", pageId: "p2" },
+    ]);
+
+    const mockSelect = vi.fn().mockResolvedValue([
+      { title: "Task A", priority: "high" },
+    ]);
+
+    const result = await runNotificationTrigger(env, mockSelect, "⚡ *Custom Trigger*");
+
+    // Assert the injected select function is called with env, tasks list, and date string
+    expect(mockSelect).toHaveBeenCalledWith(env, expect.any(Array), expect.any(String));
+    expect(mockSelect.mock.calls[0][1]).toHaveLength(2);
+
+    // Assert that the result matches the output of the select function
+    expect(result).toEqual([{ title: "Task A", priority: "high" }]);
+
+    // Assert Telegram notification was sent
+    expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("Custom Trigger"));
+    expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("🔴 Task A"));
+  });
+});
