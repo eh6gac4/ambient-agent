@@ -144,36 +144,36 @@ export async function handleOwnTracksLocation(
         const openTasks = await getOpenTasks(env);
 
         // grocery-list から買い物リストの未完了アイテムを取得
-        if (env.GROCERY_API_URL && env.INTERNAL_API_KEY && env.TELEGRAM_CHAT_ID) {
+        if (env.GROCERY_DB && env.TELEGRAM_CHAT_ID) {
           const tgUserId = Number(env.TELEGRAM_CHAT_ID);
           if (!isNaN(tgUserId)) {
             try {
-              const res = await fetch(`${env.GROCERY_API_URL}/api/internal/items?tg_user_id=${tgUserId}`, {
-                headers: { 'Authorization': `Bearer ${env.INTERNAL_API_KEY}` }
-              });
-              if (res.ok) {
-                const groceries = await res.json<any[]>();
-                for (const g of groceries) {
-                  let title = `[買い物: ${g.list_name}] ${g.name}`;
-                  if (g.quantity) title += ` (${g.quantity}${g.unit || ""})`;
-                  title += ` (カテゴリ: ${g.category})`;
-                  
-                  openTasks.push({
-                    title,
-                    status: "Pending",
-                    priority: "medium",
-                    due: null,
-                    location: null,
-                    lastEdited: null,
-                    url: "",
-                    pageId: ""
-                  });
-                }
-              } else {
-                console.error(`Failed to fetch groceries via API: ${res.status} ${await res.text()}`);
+              const { results } = await env.GROCERY_DB.prepare(`
+                SELECT i.name, i.category, i.quantity, i.unit, l.name as list_name
+                FROM items i
+                JOIN list_members lm ON i.list_id = lm.list_id
+                JOIN lists l ON i.list_id = l.id
+                WHERE lm.tg_user_id = ? AND i.checked = 0
+              `).bind(tgUserId).all();
+              
+              for (const g of results as any[]) {
+                let title = `[買い物: ${g.list_name}] ${g.name}`;
+                if (g.quantity) title += ` (${g.quantity}${g.unit || ""})`;
+                title += ` (カテゴリ: ${g.category})`;
+                
+                openTasks.push({
+                  title,
+                  status: "Pending",
+                  priority: "medium",
+                  due: null,
+                  location: null,
+                  lastEdited: null,
+                  url: "",
+                  pageId: ""
+                });
               }
             } catch (err) {
-              console.error("Failed to fetch groceries via API:", err);
+              console.error("Failed to fetch groceries:", err);
             }
           }
         }

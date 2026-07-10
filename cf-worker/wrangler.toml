@@ -20,6 +20,11 @@ binding = "AGENT_DB"
 database_name = "ambient-agent-db"
 database_id = "ba5c15ff-8e0e-4b86-b020-f1c4cb5975a3"
 
+[[d1_databases]]
+binding = "GROCERY_DB"
+database_name = "grocery-list-db"
+database_id = "df6ec9f6-01a4-4f57-a5cb-834f25e179e1"
+
 
 # secrets (set via: wrangler secret put SECRET_NAME)
 # GEMINI_API_KEY
