@@ -6,6 +6,7 @@ import { sendMessage, escapeMd } from "../clients/telegram.js";
 import { getDailyUsage, takeEmailDigest } from "../storage/kv.js";
 import { PRIORITY_ICON } from "../utils/task.js";
 import { jstNow, toDateStr } from "../utils/jst.js";
+import { shouldSendBriefing } from "../utils/notification-policy.js";
 import { getEscalationNoticeText, getBacklogPromotionNoticeText } from "./escalation.js";
 import { getDueSoonNoticeText } from "./calendar.js";
 
@@ -74,6 +75,15 @@ function formatTasksSection(tasks: Task[]): string {
 }
 
 export async function sendDailyBriefing(env: Env): Promise<void> {
+  const now = jstNow();
+  const config = {
+    quietHoursStart: env.QUIET_HOURS_START ? parseInt(env.QUIET_HOURS_START, 10) : undefined,
+    quietHoursEnd: env.QUIET_HOURS_END ? parseInt(env.QUIET_HOURS_END, 10) : undefined,
+  };
+  if (!shouldSendBriefing(now, config)) {
+    console.log("Skipping daily briefing due to quiet hours");
+    return;
+  }
   // 1. Notion/KV updates that we want to notify about
   const [escalationText, backlogText, emailDigestText] = await Promise.all([
     getEscalationNoticeText(env),

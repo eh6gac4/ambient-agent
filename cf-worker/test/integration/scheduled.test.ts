@@ -130,7 +130,7 @@ describe("scheduled handler - holiday skip", () => {
 
     (isHoliday as ReturnType<typeof vi.fn>).mockResolvedValueOnce(true);
 
-    await worker.scheduled(makeScheduledEvent("0 23 * * *"), env);
+    await worker.scheduled(makeScheduledEvent("30 20 * * *"), env);
     expect(sendDailyBriefing).not.toHaveBeenCalled();
   });
 

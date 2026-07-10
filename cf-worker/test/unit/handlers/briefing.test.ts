@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { sendDailyBriefing, getEmailDigestText } from "../../../src/handlers/briefing.js";
 import { createMockEnv } from "../../helpers/mocks.js";
 
@@ -30,6 +30,13 @@ vi.mock("../../../src/clients/telegram.js", async (importOriginal) => ({
 describe("sendDailyBriefing", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers();
+    // デフォルトで昼間（12:00 JST）に設定
+    vi.setSystemTime(new Date("2026-07-10T12:00:00+09:00"));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("escapes Markdown special characters in summary, event names and task titles", async () => {
@@ -75,6 +82,19 @@ describe("sendDailyBriefing", () => {
 
     const sent = (sendMessage as ReturnType<typeof vi.fn>).mock.calls[0][1] as string;
     expect(sent).toContain("期限切れ\\_タスク");
+  });
+
+  it("skips briefing and returns early during quiet hours", async () => {
+    const env = createMockEnv();
+    const { sendMessage } = await import("../../../src/clients/telegram.js");
+
+    // 静穏時間帯（深夜23:00）にシステム時刻を設定
+    vi.setSystemTime(new Date("2026-07-10T23:00:00+09:00"));
+
+    await sendDailyBriefing(env);
+
+    // sendMessage が呼ばれていないことを確認
+    expect(sendMessage).not.toHaveBeenCalled();
   });
 });
 
