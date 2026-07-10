@@ -53,34 +53,40 @@ function mockHolidaysApi(holidays: Record<string, string>) {
   );
 }
 
+// 常設の基準時刻（平日 20:30 JST = UTC 11:30、2026年6月15日月曜日）
+const WEEKDAY_UTC_MS = Date.UTC(2026, 5, 15, 11, 30, 0);
+
 function mockDateNow(ms: number) {
-  vi.spyOn(Date, "now").mockReturnValue(ms);
+  vi.useFakeTimers();
+  vi.setSystemTime(ms);
 }
 
-describe("E2E Workflow - Early Morning Briefing Skip Logic", () => {
+describe("E2E Workflow - Evening Briefing Skip Logic", () => {
   const env = createMockEnv();
 
-  // JST 05:30 = UTC 20:30
-  // Weekday: 2026-06-15 (Monday) 05:30 JST => UTC 2026-06-14 20:30:00
-  const WEEKDAY_UTC_MS = Date.UTC(2026, 5, 14, 20, 30, 0);
+  // JST 20:30 = UTC 11:30
+  // Weekday: 2026-06-15 (Monday) 20:30 JST => UTC 2026-06-15 11:30:00
+  const BRIEFING_WEEKDAY_UTC_MS = Date.UTC(2026, 5, 15, 11, 30, 0);
 
-  // Weekend: 2026-06-14 (Sunday) 05:30 JST => UTC 2026-06-13 20:30:00
-  const SUNDAY_UTC_MS = Date.UTC(2026, 5, 13, 20, 30, 0);
+  // Weekend: 2026-06-14 (Sunday) 20:30 JST => UTC 2026-06-14 11:30:00
+  const BRIEFING_SUNDAY_UTC_MS = Date.UTC(2026, 5, 14, 11, 30, 0);
 
-  // Holiday: 2026-01-01 (Thursday, 元日) 05:30 JST => UTC 2025-12-31 20:30:00
-  const HOLIDAY_UTC_MS = Date.UTC(2025, 11, 31, 20, 30, 0);
+  // Holiday: 2026-01-01 (Thursday, 元日) 20:30 JST => UTC 2026-01-01 11:30:00
+  const BRIEFING_HOLIDAY_UTC_MS = Date.UTC(2026, 0, 1, 11, 30, 0);
 
   beforeEach(() => {
     vi.clearAllMocks();
+
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
-  it("triggers morning briefing on a weekday morning (JST 05:30) when not a holiday", async () => {
-    mockDateNow(WEEKDAY_UTC_MS);
+  it("triggers evening briefing on a weekday evening (JST 20:30) when not a holiday", async () => {
+    mockDateNow(BRIEFING_WEEKDAY_UTC_MS);
     mockHolidaysApi({ "2026-01-01": "元日" }); // Not a holiday on 2026-06-15
 
     const { getOpenTasks } = await import("../../src/clients/notion.js");
@@ -94,8 +100,8 @@ describe("E2E Workflow - Early Morning Briefing Skip Logic", () => {
     expect(sendMessage).toHaveBeenCalled();
   });
 
-  it("skips morning briefing on a weekend (Sunday JST 05:30)", async () => {
-    mockDateNow(SUNDAY_UTC_MS);
+  it("skips evening briefing on a weekend (Sunday JST 20:30)", async () => {
+    mockDateNow(BRIEFING_SUNDAY_UTC_MS);
     mockHolidaysApi({ "2026-01-01": "元日" });
 
     const { sendMessage } = await import("../../src/clients/telegram.js");
@@ -106,8 +112,8 @@ describe("E2E Workflow - Early Morning Briefing Skip Logic", () => {
     expect(sendMessage).not.toHaveBeenCalled();
   });
 
-  it("skips morning briefing on a weekday JST 05:30 that is a Japanese holiday (元日)", async () => {
-    mockDateNow(HOLIDAY_UTC_MS);
+  it("skips evening briefing on a weekday JST 20:30 that is a Japanese holiday (元日)", async () => {
+    mockDateNow(BRIEFING_HOLIDAY_UTC_MS);
     mockHolidaysApi({ "2026-01-01": "元日" });
 
     const { sendMessage } = await import("../../src/clients/telegram.js");
@@ -136,12 +142,14 @@ describe("E2E Workflow - Location-based Task Filtering", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockDateNow(WEEKDAY_UTC_MS);
     mockHolidaysApi({}); // Not a holiday
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
   it("handles home-arrival trigger: extracts home tasks, case-insensitive, deduplicates with Gemini", async () => {
@@ -256,12 +264,14 @@ describe("E2E Integration - Separation of Judgment Logic", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockDateNow(WEEKDAY_UTC_MS);
     mockHolidaysApi({});
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
   it("runNotificationTrigger coordinates APIs and calls injected selection function", async () => {

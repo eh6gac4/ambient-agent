@@ -38,8 +38,10 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 |---|---|---|---|
 | 07:30〜21:30 毎時 | hourly_gmail | Gmail 未読を少しずつサイレント処理（通知せず KV に蓄積） + カレンダー同期 | なし（バックグラウンド処理のため） |
 | 05:20 | morning_prep | ①ブロックリスト学習 → ②カレンダー同期 → ③バックログ昇格 → ④優先度昇格 | あり |
-| 05:30 | morning_briefing | ①日次ブリーフィング → ②APIコストレポート → ③期限間近通知 → ④メール処理サマリ | あり |
+| 20:30 | morning_briefing | ①日次ブリーフィング（一日の振り返り） → ②APIコストレポート → ③期限間近通知 → ④メール処理サマリ | あり |
 | 月 09:00 | stale_tasks | 14日以上未更新タスクを通知 | あり |
+
+> **静穏時間帯（Quiet Hours）**: デフォルトで `22:00〜07:00` の間は、自動的に通知系ジョブ（ブリーフィング等）をスキップします。早朝や深夜の不要な通知を防ぐための措置です。
 
 > **休日スキップ**: 土日および日本の祝日（`holidays-jp.github.io` API 参照）は通知系ジョブを実行しない。帰宅通知（`/home-arrival`）・退社通知（`/office-leave`）も同様にスキップ。
 
@@ -65,6 +67,7 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 
 **morning_briefing の詳細:**
 - 直近 24 時間に hourly_gmail が処理したメールをまとめて1通の「📧 メール処理サマリ」として Telegram 送信（タスク登録は件数のみ＋ダッシュボードリンク、アーカイブは件名一覧）
+- 静穏時間帯（22:00〜07:00）に実行された場合はブリーフィングをスキップします。
 
 ## Telegram コマンド
 
@@ -312,8 +315,8 @@ npx dotenv -e .env.local -- wrangler kv key put \
 
 | アクション ID | 説明 | パラメータ |
 |---|---|---|
-| `home_arrival` | 帰宅通知（既存フロー。祝日スキップ・タスク有無チェック込み） | なし |
-| `office_leave` | 退社通知（既存フロー。祝日スキップ・タスク有無チェック込み） | なし |
+| `home_arrival` | 帰宅通知（既存フロー。祝日スキップ・タスク有無チェック込み）。Notionの `Location` が「home, 家, 自宅」のタスクのみを厳格に抽出します。 | なし |
+| `office_leave` | 退社通知（既存フロー。祝日スキップ・タスク有無チェック込み）。Notionの `Location` が「office, オフィス, 会社, 職場」のタスクのみを厳格に抽出します。 | なし |
 | `telegram_notify` | 任意テキストを Telegram に送信 | `message`: 送信文字列（省略時は `{regionId} {transition}`） |
 
 新しいアクションは `src/handlers/geofence-actions.ts` の `ACTIONS` に関数を追加するだけで利用可能。
@@ -386,7 +389,7 @@ npm run tunnel:dev   # API から token 取得 → cloudflared を spawn
 `wrangler dev --test-scheduled` 起動済みなので、以下で個別ジョブを発火できる:
 
 ```bash
-# 例: 05:30 morning_briefing ジョブを実行
+# 例: 20:30 morning_briefing ジョブを実行
 curl "http://localhost:8787/__scheduled?cron=30+20+*+*+*"
 ```
 
