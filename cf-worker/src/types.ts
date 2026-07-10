@@ -1,6 +1,7 @@
 export interface Env {
   AGENT_KV: KVNamespace;
   AGENT_DB: D1Database;
+  GROCERY_DB?: D1Database;
   GEMINI_API_KEY: string;
   NOTION_TOKEN: string;
   NOTION_TASKS_DB_ID: string;
