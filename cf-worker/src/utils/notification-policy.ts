@@ -29,7 +29,7 @@ export function shouldSendBriefing(
 /**
  * Notionタスクの配列から、指定された location に関連するタスクのみをフィルタリングして返す。
  */
-export function filterTasksForLocation(tasks: Task[], location: string): Task[] {
+export function filterTasksForLocation<T extends { location: string | null }>(tasks: T[], location: string): T[] {
   const locLower = location.toLowerCase();
   let targetLocations = [locLower];
   if (locLower === "home" || locLower === "家" || locLower === "自宅") {
