@@ -109,9 +109,12 @@ export async function handleOwnTracksLocation(
     }),
   );
 
-  // 3. Mapbox POI ベースのタスク提案 (停止時のみ)
-  // vel が 0 〜 5 km/h であれば、ほぼ停止しているとみなす
-  if (payload.vel != null && payload.vel < 5) {
+  // 3. Mapbox POI ベースのタスク提案
+  // 速度データ(vel)が存在しない場合もあるため、速度が明らかに速い場合(20km/h以上)を除き、
+  // 前回チェックした地点からの距離ベースで判定する。
+  const isMovingFast = payload.vel != null && payload.vel >= 20;
+
+  if (!isMovingFast) {
     const poiKey = device ? `poi_check_${device}` : `poi_check_default`;
     const lastCheckStr = await env.AGENT_KV.get(poiKey);
     let shouldCheck = false;
