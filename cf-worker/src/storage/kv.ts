@@ -93,6 +93,10 @@ export async function getRegions(env: Env): Promise<Region[]> {
   return (await env.AGENT_KV.get<Region[]>(REGIONS_KEY, "json")) ?? [];
 }
 
+export async function setRegions(env: Env, regions: Region[]): Promise<void> {
+  await env.AGENT_KV.put(REGIONS_KEY, JSON.stringify(regions));
+}
+
 export async function getGeofenceState(
   env: Env,
   regionId: string,
