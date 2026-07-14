@@ -9,7 +9,7 @@ import { handleOfficeLeave } from "./handlers/office-leave.js";
 import { handleOwnTracksLocation } from "./handlers/location.js";
 import { sendMessage } from "./clients/telegram.js";
 import { isHoliday } from "./utils/holiday.js";
-import { cleanOldProcessed, cleanOldLocations, cleanOldAppLogs } from "./storage/d1.js";
+import { cleanOldProcessed, cleanOldLocations, cleanOldAppLogs, insertAppLog } from "./storage/d1.js";
 import { reportError } from "./handlers/error-handler.js";
 
 // 無料プランの Cron 上限（5個）に合わせて5ジョブに統合
@@ -77,6 +77,7 @@ export default {
       if (!env.ALERT_TOKEN || auth !== `Bearer ${env.ALERT_TOKEN}`) {
         return new Response("Unauthorized", { status: 401 });
       }
+      await insertAppLog(env, "info", "API /home-arrival called", {});
       try {
         const notifications = await handleHomeArrival(env);
         return new Response(JSON.stringify({ notifications }), {
@@ -98,6 +99,7 @@ export default {
       if (!env.ALERT_TOKEN || auth !== `Bearer ${env.ALERT_TOKEN}`) {
         return new Response("Unauthorized", { status: 401 });
       }
+      await insertAppLog(env, "info", "API /office-leave called", {});
       try {
         const notifications = await handleOfficeLeave(env);
         return new Response(JSON.stringify({ notifications }), {
