@@ -5,6 +5,7 @@ import { sendMessage } from "../clients/telegram.js";
 import { isHoliday } from "../utils/holiday.js";
 import { jstDateTimeStr } from "../utils/jst.js";
 import { PRIORITY_ICON } from "../utils/task.js";
+import { insertAppLog } from "../storage/d1.js";
 
 type SelectFn = (
   env: Env,
@@ -28,23 +29,27 @@ export async function runNotificationTrigger(
   header: string,
 ): Promise<HomeArrivalNotification[]> {
   if (await isHoliday()) {
-    console.log(JSON.stringify({ event: "notification_trigger", header, result: "skipped_holiday" }));
+    const msg = { event: "notification_trigger", header, result: "skipped_holiday" };
+    await insertAppLog(env, "info", "Notification skipped due to holiday", msg);
     return [];
   }
 
   const tasks = await getOpenTasks(env);
   if (tasks.length === 0) {
-    console.log(JSON.stringify({ event: "notification_trigger", header, result: "sent_empty_no_tasks" }));
+    const msg = { event: "notification_trigger", header, result: "sent_empty_no_tasks" };
+    await insertAppLog(env, "info", "Notification sent empty (no tasks)", msg);
     await sendMessage(env, `${header}\n\n該当するタスクはありません。お疲れ様でした！`);
     return [];
   }
 
   const notifications = await select(env, tasks, jstDateTimeStr());
   if (notifications.length > 0) {
-    console.log(JSON.stringify({ event: "notification_trigger", header, result: "sent", count: notifications.length }));
+    const msg = { event: "notification_trigger", header, result: "sent", count: notifications.length };
+    await insertAppLog(env, "info", "Notification sent successfully", msg);
     await sendMessage(env, buildTelegramMessage(header, notifications));
   } else {
-    console.log(JSON.stringify({ event: "notification_trigger", header, result: "sent_empty_no_selection" }));
+    const msg = { event: "notification_trigger", header, result: "sent_empty_no_selection" };
+    await insertAppLog(env, "info", "Notification sent empty (no selection)", msg);
     await sendMessage(env, `${header}\n\n該当するタスクはありません。お疲れ様でした！`);
   }
 
