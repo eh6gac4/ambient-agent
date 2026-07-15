@@ -8,6 +8,7 @@ import { getMapboxPoi } from "../clients/mapbox.js";
 import { getOpenTasks } from "../clients/notion.js";
 import { selectPoiTasks } from "../clients/gemini.js";
 import { sendMessage } from "../clients/telegram.js";
+import { getTaskLink } from "./task-formatter.js";
 
 /** OwnTracks の location ペイロード（最小限の型定義）。 */
 interface OwnTracksPayload {
@@ -187,7 +188,9 @@ export async function handleOwnTracksLocation(
         if (relatedTasks.length > 0) {
           const lines = [`📍 **${poi.name}** 付近にいるみたいやね！\nここでできそうなタスクがあるで：\n`];
           for (const rt of relatedTasks) {
-            lines.push(`- ${rt.title}\n  (_${rt.reason}_)`);
+            const originalTask = openTasks.find(t => t.title === rt.title);
+            const titleLink = getTaskLink(rt.title, originalTask?.pageId);
+            lines.push(`- ${titleLink}\n  (_${rt.reason}_)`);
           }
           await sendMessage(env, lines.join("\n"));
           await insertAppLog(env, "info", "Sent POI task suggestion", { poi, relatedTasks });

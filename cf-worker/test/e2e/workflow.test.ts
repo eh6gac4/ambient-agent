@@ -298,6 +298,6 @@ describe("E2E Integration - Separation of Judgment Logic", () => {
 
     // Assert Telegram notification was sent
     expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("Custom Trigger"));
-    expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("🔴 Task A"));
+    expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("🔴 [Task A]"));
   });
 });

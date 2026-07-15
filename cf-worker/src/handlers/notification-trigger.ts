@@ -1,4 +1,4 @@
-import type { Env } from "../types.js";
+import type { Env, Task } from "../types.js";
 import { getOpenTasks } from "../clients/notion.js";
 import type { HomeArrivalNotification } from "../clients/gemini.js";
 import { sendMessage } from "../clients/telegram.js";
@@ -6,6 +6,7 @@ import { isHoliday } from "../utils/holiday.js";
 import { jstDateTimeStr } from "../utils/jst.js";
 import { PRIORITY_ICON } from "../utils/task.js";
 import { insertAppLog } from "../storage/d1.js";
+import { getTaskLink } from "./task-formatter.js";
 
 type SelectFn = (
   env: Env,
@@ -13,8 +14,12 @@ type SelectFn = (
   currentJstDatetime: string,
 ) => Promise<HomeArrivalNotification[]>;
 
-function buildTelegramMessage(header: string, notifications: HomeArrivalNotification[]): string {
-  const lines = notifications.map((n) => `${PRIORITY_ICON[n.priority] ?? "•"} ${n.title}`);
+function buildTelegramMessage(header: string, notifications: HomeArrivalNotification[], allTasks: Task[]): string {
+  const lines = notifications.map((n) => {
+    const task = allTasks.find((t) => t.title === n.title);
+    const titleLink = getTaskLink(n.title, task?.pageId);
+    return `${PRIORITY_ICON[n.priority] ?? "•"} ${titleLink}`;
+  });
   return `${header}\n\n${lines.join("\n")}`;
 }
 
@@ -46,7 +51,7 @@ export async function runNotificationTrigger(
   if (notifications.length > 0) {
     const msg = { event: "notification_trigger", header, result: "sent", count: notifications.length };
     await insertAppLog(env, "info", "Notification sent successfully", msg);
-    await sendMessage(env, buildTelegramMessage(header, notifications));
+    await sendMessage(env, buildTelegramMessage(header, notifications, tasks));
   } else {
     const msg = { event: "notification_trigger", header, result: "sent_empty_no_selection" };
     await insertAppLog(env, "info", "Notification sent empty (no selection)", msg);

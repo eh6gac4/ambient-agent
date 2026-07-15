@@ -9,6 +9,7 @@ import { jstNow, toDateStr } from "../utils/jst.js";
 import { shouldSendBriefing } from "../utils/notification-policy.js";
 import { getEscalationNoticeText, getBacklogPromotionNoticeText } from "./escalation.js";
 import { getDueSoonNoticeText } from "./calendar.js";
+import { getTaskLink } from "./task-formatter.js";
 
 const PRICE_INPUT_PER_M = 1.5;
 const PRICE_OUTPUT_PER_M = 9.0;
@@ -52,7 +53,7 @@ function formatEventsSection(events: CalendarEvent[]): string {
 
 function formatOverdueSection(overdue: Task[]): string {
   if (!overdue.length) return "";
-  const lines = overdue.map((t) => `• ${PRIORITY_ICON[t.priority]} ${escapeMd(t.title)} (${formatDueShort(t.due)})`);
+  const lines = overdue.map((t) => `• ${PRIORITY_ICON[t.priority]} ${getTaskLink(t.title, t.pageId)} (${formatDueShort(t.due)})`);
   return `*⚠️ 期限切れ (${overdue.length}件)*\n${lines.join("\n")}`;
 }
 
@@ -68,7 +69,7 @@ function formatTasksSection(tasks: Task[]): string {
     lines.push(labels[p]);
     for (const t of grouped[p]) {
       const due = t.due ? ` (〜${formatDueShort(t.due)})` : "";
-      lines.push(`• ${escapeMd(t.title)}${due}`);
+      lines.push(`• ${getTaskLink(t.title, t.pageId)}${due}`);
     }
   }
   return `*✅ 未完了タスク (${tasks.length}件)*\n${lines.join("\n")}`;
