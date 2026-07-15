@@ -2,7 +2,7 @@ import type { Env, Task } from "../types.js";
 import { getTodaysEvents, insertEvent, deleteEvent, updateEventDateTime } from "../clients/gcal-api.js";
 import { getOpenTasks } from "../clients/notion.js";
 import { sendMessage, escapeMd } from "../clients/telegram.js";
-import { formatTaskList, fmtDue } from "./task-formatter.js";
+import { formatTaskList, fmtDue, getTaskLink } from "./task-formatter.js";
 import { getCalendarSync, setCalendarSync, deleteCalendarSync, getAllCalendarSync } from "../storage/d1.js";
 import { jstNow } from "../utils/jst.js";
 
@@ -116,12 +116,12 @@ export function getDueSoonNoticeText(tasks: Task[]): string | null {
   const sections: string[] = [];
   if (dueToday.length) {
     sections.push(
-      `*📅 今日期限 (${dueToday.length}件)*\n` + dueToday.map((t) => `• ${escapeMd(t.title)}`).join("\n"),
+      `*📅 今日期限 (${dueToday.length}件)*\n` + dueToday.map((t) => `• ${getTaskLink(t.title, t.pageId)}`).join("\n"),
     );
   }
   if (dueTomorrow.length) {
     sections.push(
-      `*📅 明日期限 (${dueTomorrow.length}件)*\n` + dueTomorrow.map((t) => `• ${escapeMd(t.title)}`).join("\n"),
+      `*📅 明日期限 (${dueTomorrow.length}件)*\n` + dueTomorrow.map((t) => `• ${getTaskLink(t.title, t.pageId)}`).join("\n"),
     );
   }
   return "*⏰ 期限間近タスク*\n\n" + sections.join("\n\n");

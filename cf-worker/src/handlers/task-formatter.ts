@@ -55,6 +55,13 @@ export function sortTasks(tasks: Task[]): Task[] {
   });
 }
 
+export function getTaskLink(title: string, pageId?: string): string {
+  const safeTitle = escapeMd(title);
+  return pageId
+    ? `[${safeTitle.replaceAll("]", "\\]")}](${TASK_APP_URL}/?task=${pageId})`
+    : safeTitle;
+}
+
 export function formatTaskList(tasks: Task[], numbered = false): string {
   const sorted = sortTasks(tasks);
   let currentStatus = "";
@@ -69,12 +76,10 @@ export function formatTaskList(tasks: Task[], numbered = false): string {
     const due = t.due ? `（${fmtDue(t.due)}）` : "";
     const icon = PRIORITY_ICON[t.priority] ?? "";
     const prefix = numbered ? `${i + 1}. ` : "• ";
-    // escapeMd は \ * _ ` [ を処理する。リンクテキスト内は ] も閉じ括弧扱いになるため追加でエスケープ。
-    const safeTitle = escapeMd(t.title);
-    const titleLink = t.pageId
-      ? `[${safeTitle.replaceAll("]", "\\]")}](${TASK_APP_URL}/?task=${t.pageId})`
-      : safeTitle;
+    
+    const titleLink = getTaskLink(t.title, t.pageId);
     lines.push(`${prefix}${icon} ${titleLink}${due}`);
   }
   return lines.join("\n");
 }
+

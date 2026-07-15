@@ -14,9 +14,13 @@ vi.mock("../../../src/clients/gemini.js", () => ({
   selectOfficeLeaveNotifications: vi.fn(),
 }));
 
-vi.mock("../../../src/clients/telegram.js", () => ({
-  sendMessage: vi.fn().mockResolvedValue(undefined),
-}));
+vi.mock("../../../src/clients/telegram.js", async (importOriginal) => {
+  const actual = await importOriginal<any>();
+  return {
+    ...actual,
+    sendMessage: vi.fn().mockResolvedValue(undefined),
+  };
+});
 
 describe("handleOfficeLeave", () => {
   beforeEach(() => {
