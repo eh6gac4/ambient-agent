@@ -79,6 +79,7 @@ async function callGemini(
   userContent: any[],
   maxTokens = 1024,
   responseMimeType?: string,
+  enableGoogleSearch = false,
 ): Promise<string> {
   const url = `${API_URL_BASE}/${MODEL}:generateContent?key=${env.GEMINI_API_KEY}`;
   
@@ -94,6 +95,10 @@ async function callGemini(
       ...(responseMimeType ? { responseMimeType } : {}),
     },
   };
+
+  if (enableGoogleSearch) {
+    body.tools = [{ googleSearch: {} }];
+  }
 
   if (system && system.length > 0) {
     body.systemInstruction = {
@@ -404,4 +409,16 @@ export async function selectPoiTasks(env: Env, tasks: Task[], poiName: string, p
 
   const text = await callGemini(env, "select_poi_tasks", prompt, [{ text: "関連タスクを抽出してください。" }], 1024, "application/json");
   return extractJsonArray<{ title: string; reason: string }>(text);
+}
+
+const SEARCH_AI_NEWS_PROMPT = `あなたはAI関連の最新ニュースを収集し、ユーザーに配信するアシスタントです。
+最新のAI関連ニュースおよび、OpenAI、Anthropic、Googleなどの主要AI企業の最新公式リリース情報をウェブ検索してください。
+主要なトピックをいくつかピックアップし、要約して出力してください。
+各トピックのタイトルには、必ず情報元のURLをMarkdownリンクとして埋め込んでください。
+全体を関西弁で親しみやすく出力してください。`;
+
+export async function searchAiNews(env: Env): Promise<string> {
+  const today = jstDateStr();
+  const userContent = [{ text: `今日の日付: ${today}\n最新のAIニュースを検索してまとめてください。` }];
+  return callGemini(env, "search_ai_news", SEARCH_AI_NEWS_PROMPT, userContent, 2048, undefined, true);
 }
