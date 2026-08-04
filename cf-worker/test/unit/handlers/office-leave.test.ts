@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { handleOfficeLeave } from "../../../src/handlers/office-leave.js";
 import { createMockEnv, sampleTasks } from "../../helpers/mocks.js";
 
@@ -25,6 +25,12 @@ vi.mock("../../../src/clients/telegram.js", async (importOriginal) => {
 describe("handleOfficeLeave", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-07-29T18:00:00+09:00")); // 16:00以降
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("returns empty array without calling Gemini when no open tasks", async () => {
