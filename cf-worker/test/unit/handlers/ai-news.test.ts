@@ -31,15 +31,12 @@ describe("deliverMorningAiNews", () => {
     expect(sendMessage).toHaveBeenCalledWith(env, "今日のAIニュースやで〜");
   });
 
-  it("sends a fallback error message when the search fails", async () => {
+  it("propagates errors so the scheduled handler's common reportError path can take over", async () => {
     const env = createMockEnv();
     const { searchAiNews } = await import("../../../src/clients/gemini.js");
-    const { sendMessage } = await import("../../../src/clients/telegram.js");
 
     (searchAiNews as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("Gemini API failed"));
 
-    await deliverMorningAiNews(env);
-
-    expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("エラー起きたみたいや"));
+    await expect(deliverMorningAiNews(env)).rejects.toThrow("Gemini API failed");
   });
 });
