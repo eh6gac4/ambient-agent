@@ -196,15 +196,6 @@ function imageToBase64(imageData: ArrayBuffer): string {
   return btoa(bin);
 }
 
-export async function extractTasksFromImage(env: Env, imageData: ArrayBuffer, mediaType: string): Promise<ExtractedTask[]> {
-  const userContent = [
-    { inlineData: { mimeType: mediaType, data: imageToBase64(imageData) } },
-    { text: "この画像からアクションが必要なタスクを抽出してください。" },
-  ];
-  const text = await callGemini(env, "extract_tasks_image", EXTRACT_TASKS_PROMPT, userContent, 1024, "application/json");
-  return extractJsonArray<ExtractedTask>(text);
-}
-
 const ANALYZE_IMAGE_PROMPT = `あなたは画像からタスクを分析するアシスタントです。
 
 画像（レシート・ホワイトボード・メモ・スクリーンショット等）を読み、要約と実行が必要なタスクを JSON で返してください。

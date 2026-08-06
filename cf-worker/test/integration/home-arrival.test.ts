@@ -46,16 +46,13 @@ describe("/home-arrival ingress", () => {
     expect(resp.status).toBe(401);
   });
 
-  it("returns notifications JSON when tasks exist", async () => {
+  it("returns notifications JSON for Location-matched (home) tasks", async () => {
     const env = createMockEnv();
     const { getOpenTasks } = await import("../../src/clients/notion.js");
-    const { selectHomeArrivalNotifications } = await import("../../src/clients/gemini.js");
     const { sendMessage } = await import("../../src/clients/telegram.js");
 
-    (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue(sampleTasks());
-    (selectHomeArrivalNotifications as ReturnType<typeof vi.fn>).mockResolvedValue([
-      { title: "子どもの宿題を確認", priority: "high" },
-    ]);
+    const tasks = sampleTasks().map((t, i) => ({ ...t, location: i === 0 ? "home" : t.location }));
+    (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue(tasks);
 
     const resp = await worker.fetch(homeArrivalRequest(env.ALERT_TOKEN), env);
     expect(resp.status).toBe(200);

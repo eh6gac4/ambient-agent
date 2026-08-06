@@ -152,17 +152,11 @@ describe("E2E Workflow - Location-based Task Filtering", () => {
     vi.useRealTimers();
   });
 
-  it("handles home-arrival trigger: extracts home tasks, case-insensitive, deduplicates with Gemini", async () => {
+  it("handles home-arrival trigger: extracts home tasks, case-insensitive (Gemini selection stopped)", async () => {
     const { getOpenTasks } = await import("../../src/clients/notion.js");
-    const { selectHomeArrivalNotifications } = await import("../../src/clients/gemini.js");
     const { sendMessage } = await import("../../src/clients/telegram.js");
 
     (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue(mockTasks);
-    // Gemini returns one duplicate (Buy groceries) and one new task (Water plants - already in list, and Buy bread - new)
-    (selectHomeArrivalNotifications as ReturnType<typeof vi.fn>).mockResolvedValue([
-      { title: "Buy groceries", priority: "medium" },
-      { title: "Buy bread", priority: "low" },
-    ]);
 
     const req = new Request("https://example.com/home-arrival", {
       method: "GET",
@@ -174,38 +168,28 @@ describe("E2E Workflow - Location-based Task Filtering", () => {
 
     const body = await resp.json<{ notifications: Array<{ title: string; priority: string }> }>();
 
-    // Expected home arrival notifications:
+    // Expected home arrival notifications (Location プロパティ一致のみ、Gemini 選定は停止済み):
     // 1. Buy milk (home)
     // 2. Clean room (自宅)
     // 3. Water plants (家)
     // 4. Buy groceries (Home - case insensitive)
-    // 5. Buy bread (Gemini selected)
-    // Deduplicated: Buy groceries is only listed once.
-    expect(body.notifications).toHaveLength(5);
+    expect(body.notifications).toHaveLength(4);
     const titles = body.notifications.map((n) => n.title);
     expect(titles).toContain("Buy milk");
     expect(titles).toContain("Clean room");
     expect(titles).toContain("Water plants");
     expect(titles).toContain("Buy groceries");
-    expect(titles).toContain("Buy bread");
 
     // Verify Telegram message was sent
     expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("帰宅通知"));
     expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("Buy milk"));
-    expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("Buy bread"));
   });
 
-  it("handles office-leave trigger: extracts office tasks, case-insensitive, deduplicates with Gemini", async () => {
+  it("handles office-leave trigger: extracts office tasks, case-insensitive (Gemini selection stopped)", async () => {
     const { getOpenTasks } = await import("../../src/clients/notion.js");
-    const { selectOfficeLeaveNotifications } = await import("../../src/clients/gemini.js");
     const { sendMessage } = await import("../../src/clients/telegram.js");
 
     (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue(mockTasks);
-    // Gemini returns one duplicate (Write report) and one new task (Submit expense)
-    (selectOfficeLeaveNotifications as ReturnType<typeof vi.fn>).mockResolvedValue([
-      { title: "Write report", priority: "high" },
-      { title: "Submit expense", priority: "medium" },
-    ]);
 
     const req = new Request("https://example.com/office-leave", {
       method: "GET",
@@ -217,25 +201,21 @@ describe("E2E Workflow - Location-based Task Filtering", () => {
 
     const body = await resp.json<{ notifications: Array<{ title: string; priority: string }> }>();
 
-    // Expected office leave notifications:
+    // Expected office leave notifications (Location プロパティ一致のみ、Gemini 選定は停止済み):
     // 1. Write report (office)
     // 2. Attend meeting (オフィス)
     // 3. Clean desk (会社)
     // 4. Buy coffee (職場)
-    // 5. Submit expense (Gemini selected)
-    // Deduplicated: Write report only listed once.
-    expect(body.notifications).toHaveLength(5);
+    expect(body.notifications).toHaveLength(4);
     const titles = body.notifications.map((n) => n.title);
     expect(titles).toContain("Write report");
     expect(titles).toContain("Attend meeting");
     expect(titles).toContain("Clean desk");
     expect(titles).toContain("Buy coffee");
-    expect(titles).toContain("Submit expense");
 
     // Verify Telegram message was sent
     expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("退社通知"));
     expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("Write report"));
-    expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("Submit expense"));
   });
 
   it("sends a proper Telegram notification when no tasks are found", async () => {

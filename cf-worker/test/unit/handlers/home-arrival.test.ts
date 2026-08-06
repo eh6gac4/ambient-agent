@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { handleHomeArrival } from "../../../src/handlers/home-arrival.js";
 import { createMockEnv, sampleTasks } from "../../helpers/mocks.js";
+import type { Task } from "../../../src/types.js";
 
 vi.mock("../../../src/utils/holiday.js", () => ({
   isHoliday: vi.fn().mockResolvedValue(false),
@@ -8,10 +9,6 @@ vi.mock("../../../src/utils/holiday.js", () => ({
 
 vi.mock("../../../src/clients/notion.js", () => ({
   getOpenTasks: vi.fn(),
-}));
-
-vi.mock("../../../src/clients/gemini.js", () => ({
-  selectHomeArrivalNotifications: vi.fn(),
 }));
 
 vi.mock("../../../src/clients/telegram.js", async (importOriginal) => {
@@ -22,57 +19,48 @@ vi.mock("../../../src/clients/telegram.js", async (importOriginal) => {
   };
 });
 
+function homeTasks(): Task[] {
+  return sampleTasks().map((t, i) => ({ ...t, location: i === 0 ? "home" : t.location }));
+}
+
 describe("handleHomeArrival", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("returns empty array without calling Gemini when no open tasks", async () => {
+  it("returns empty array when no open tasks", async () => {
     const env = createMockEnv();
     const { getOpenTasks } = await import("../../../src/clients/notion.js");
-    const { selectHomeArrivalNotifications } = await import("../../../src/clients/gemini.js");
 
     (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
     const result = await handleHomeArrival(env);
     expect(result).toEqual([]);
-    expect(selectHomeArrivalNotifications).not.toHaveBeenCalled();
   });
 
-  it("passes tasks to Gemini and sends Telegram message with priority icons", async () => {
+  it("sends Telegram message for Location-matched (home) tasks", async () => {
     const env = createMockEnv();
     const { getOpenTasks } = await import("../../../src/clients/notion.js");
-    const { selectHomeArrivalNotifications } = await import("../../../src/clients/gemini.js");
     const { sendMessage } = await import("../../../src/clients/telegram.js");
 
-    (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue(sampleTasks());
-    (selectHomeArrivalNotifications as ReturnType<typeof vi.fn>).mockResolvedValue([
-      { title: "子どもの宿題を確認", priority: "high" },
-      { title: "夕食の買い物", priority: "medium" },
-      { title: "洗濯物を取り込む", priority: "low" },
-    ]);
+    (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue(homeTasks());
 
     const result = await handleHomeArrival(env);
 
-    expect(result).toHaveLength(3);
-    expect(selectHomeArrivalNotifications).toHaveBeenCalledWith(env, sampleTasks(), expect.any(String));
+    expect(result).toHaveLength(1);
+    expect(result[0].title).toBe(homeTasks()[0].title);
 
     const message = (sendMessage as ReturnType<typeof vi.fn>).mock.calls[0][1] as string;
     expect(message).toContain("🏠");
-    expect(message).toContain("🔴");
-    expect(message).toContain("🟡");
-    expect(message).toContain("🟢");
-    expect(message).toContain("子どもの宿題を確認");
+    expect(message).toContain(homeTasks()[0].title);
   });
 
-  it("skips Telegram when Gemini returns no notifications", async () => {
+  it("sends empty-tasks message when no Location-matched tasks", async () => {
     const env = createMockEnv();
     const { getOpenTasks } = await import("../../../src/clients/notion.js");
-    const { selectHomeArrivalNotifications } = await import("../../../src/clients/gemini.js");
     const { sendMessage } = await import("../../../src/clients/telegram.js");
 
     (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue(sampleTasks());
-    (selectHomeArrivalNotifications as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
     const result = await handleHomeArrival(env);
     expect(result).toEqual([]);
@@ -91,21 +79,5 @@ describe("handleHomeArrival", () => {
     expect(result).toEqual([]);
     expect(getOpenTasks).not.toHaveBeenCalled();
     expect(sendMessage).not.toHaveBeenCalled();
-  });
-
-  it("passes JST datetime string to Gemini", async () => {
-    const env = createMockEnv();
-    const { getOpenTasks } = await import("../../../src/clients/notion.js");
-    const { selectHomeArrivalNotifications } = await import("../../../src/clients/gemini.js");
-
-    (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue(sampleTasks());
-    (selectHomeArrivalNotifications as ReturnType<typeof vi.fn>).mockResolvedValue([]);
-
-    await handleHomeArrival(env);
-
-    const jstArg = (selectHomeArrivalNotifications as ReturnType<typeof vi.fn>).mock.calls[0][2] as string;
-    // JST datetime should contain year/month/day and time
-    expect(jstArg).toMatch(/\d{4}/);
-    expect(jstArg).toMatch(/\d{2}:\d{2}/);
   });
 });

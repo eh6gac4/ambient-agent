@@ -4,11 +4,6 @@ import { withRetry } from "../utils/retry.js";
 import { getRegions, getGeofenceState, setGeofenceState } from "../storage/kv.js";
 import { insertLocation, insertAppLog } from "../storage/d1.js";
 import { runGeofenceAction } from "./geofence-actions.js";
-import { getMapboxPoi } from "../clients/mapbox.js";
-import { getOpenTasks } from "../clients/notion.js";
-import { selectPoiTasks } from "../clients/gemini.js";
-import { sendMessage } from "../clients/telegram.js";
-import { getTaskLink } from "./task-formatter.js";
 
 /** OwnTracks の location ペイロード（最小限の型定義）。 */
 interface OwnTracksPayload {
@@ -109,93 +104,4 @@ export async function handleOwnTracksLocation(
       }
     }),
   );
-
-  // 3. Mapbox POI ベースのタスク提案
-  // 速度データ(vel)が存在しない場合もあるため、速度が明らかに速い場合(20km/h以上)を除き、
-  // 前回チェックした地点からの距離ベースで判定する。
-  const isMovingFast = payload.vel != null && payload.vel >= 20;
-
-  if (!isMovingFast) {
-    const poiKey = device ? `poi_check_${device}` : `poi_check_default`;
-    const lastCheckStr = await env.AGENT_KV.get(poiKey);
-    let shouldCheck = false;
-    
-    if (lastCheckStr) {
-      try {
-        const lastCheck = JSON.parse(lastCheckStr);
-        const dist = haversineMeters(lat, lon, lastCheck.lat, lastCheck.lon);
-        // 前回チェックした地点から200m以上離れて停止したら再チェック
-        if (dist > 200) {
-          shouldCheck = true;
-        }
-      } catch (e) {
-        shouldCheck = true;
-      }
-    } else {
-      shouldCheck = true;
-    }
-
-    if (shouldCheck) {
-      // 連続で呼ばれないよう、即座に位置を記録
-      await env.AGENT_KV.put(poiKey, JSON.stringify({ lat, lon, tst }));
-
-      // Mapbox で周辺の施設を取得
-      const poi = await getMapboxPoi(env, lat, lon);
-      if (poi && poi.name) {
-        await insertAppLog(env, "info", `Mapbox POI detected for ${device || "unknown"}`, { poi });
-        
-        // Notion から未完了タスクを取得
-        const openTasks = await getOpenTasks(env);
-
-        // grocery-list から買い物リストの未完了アイテムを取得
-        if (env.GROCERY_DB && env.TELEGRAM_CHAT_ID) {
-          const tgUserId = Number(env.TELEGRAM_CHAT_ID);
-          if (!isNaN(tgUserId)) {
-            try {
-              const { results } = await env.GROCERY_DB.prepare(`
-                SELECT i.name, i.category, i.quantity, i.unit, l.name as list_name
-                FROM items i
-                JOIN list_members lm ON i.list_id = lm.list_id
-                JOIN lists l ON i.list_id = l.id
-                WHERE lm.tg_user_id = ? AND i.checked = 0
-              `).bind(tgUserId).all();
-              
-              for (const g of results as any[]) {
-                let title = `[買い物: ${g.list_name}] ${g.name}`;
-                if (g.quantity) title += ` (${g.quantity}${g.unit || ""})`;
-                title += ` (カテゴリ: ${g.category})`;
-                
-                openTasks.push({
-                  title,
-                  status: "Pending",
-                  priority: "medium",
-                  due: null,
-                  location: null,
-                  lastEdited: null,
-                  url: "",
-                  pageId: ""
-                });
-              }
-            } catch (err) {
-              console.error("Failed to fetch groceries:", err);
-            }
-          }
-        }
-
-        // Gemini にタスクの関連性を判定させる
-        const relatedTasks = await selectPoiTasks(env, openTasks, poi.name, poi.category);
-
-        if (relatedTasks.length > 0) {
-          const lines = [`📍 **${poi.name}** 付近にいるみたいやね！\nここでできそうなタスクがあるで：\n`];
-          for (const rt of relatedTasks) {
-            const originalTask = openTasks.find(t => t.title === rt.title);
-            const titleLink = getTaskLink(rt.title, originalTask?.pageId);
-            lines.push(`- ${titleLink}\n  (_${rt.reason}_)`);
-          }
-          await sendMessage(env, lines.join("\n"));
-          await insertAppLog(env, "info", "Sent POI task suggestion", { poi, relatedTasks });
-        }
-      }
-    }
-  }
 }
