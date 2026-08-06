@@ -112,14 +112,10 @@ describe("POST /owntracks", () => {
 
   it("圏外→圏内の遷移で home_arrival (handleHomeArrival) が発火する", async () => {
     const { getOpenTasks } = await import("../../src/clients/notion.js");
-    const { selectHomeArrivalNotifications } = await import("../../src/clients/gemini.js");
     const { sendMessage } = await import("../../src/clients/telegram.js");
 
     (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue([
-      { title: "タスク1", priority: "high", due: null, status: "未着手" },
-    ]);
-    (selectHomeArrivalNotifications as ReturnType<typeof vi.fn>).mockResolvedValue([
-      { title: "タスク1", priority: "high" },
+      { title: "タスク1", priority: "high", due: null, status: "未着手", location: "home" },
     ]);
 
     const env = createMockEnv();
@@ -143,14 +139,10 @@ describe("POST /owntracks", () => {
 
   it("圏内→圏内では再発火しない", async () => {
     const { getOpenTasks } = await import("../../src/clients/notion.js");
-    const { selectHomeArrivalNotifications } = await import("../../src/clients/gemini.js");
     const { sendMessage } = await import("../../src/clients/telegram.js");
 
     (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue([
-      { title: "タスク1", priority: "high", due: null, status: "未着手" },
-    ]);
-    (selectHomeArrivalNotifications as ReturnType<typeof vi.fn>).mockResolvedValue([
-      { title: "タスク1", priority: "high" },
+      { title: "タスク1", priority: "high", due: null, status: "未着手", location: "home" },
     ]);
 
     const env = createMockEnv();

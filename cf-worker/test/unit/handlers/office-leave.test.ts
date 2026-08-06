@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { handleOfficeLeave } from "../../../src/handlers/office-leave.js";
 import { createMockEnv, sampleTasks } from "../../helpers/mocks.js";
+import type { Task } from "../../../src/types.js";
 
 vi.mock("../../../src/utils/holiday.js", () => ({
   isHoliday: vi.fn().mockResolvedValue(false),
@@ -10,10 +11,6 @@ vi.mock("../../../src/clients/notion.js", () => ({
   getOpenTasks: vi.fn(),
 }));
 
-vi.mock("../../../src/clients/gemini.js", () => ({
-  selectOfficeLeaveNotifications: vi.fn(),
-}));
-
 vi.mock("../../../src/clients/telegram.js", async (importOriginal) => {
   const actual = await importOriginal<any>();
   return {
@@ -21,6 +18,10 @@ vi.mock("../../../src/clients/telegram.js", async (importOriginal) => {
     sendMessage: vi.fn().mockResolvedValue(undefined),
   };
 });
+
+function officeTasks(): Task[] {
+  return sampleTasks().map((t, i) => ({ ...t, location: i === 0 ? "office" : t.location }));
+}
 
 describe("handleOfficeLeave", () => {
   beforeEach(() => {
@@ -33,52 +34,39 @@ describe("handleOfficeLeave", () => {
     vi.useRealTimers();
   });
 
-  it("returns empty array without calling Gemini when no open tasks", async () => {
+  it("returns empty array when no open tasks", async () => {
     const env = createMockEnv();
     const { getOpenTasks } = await import("../../../src/clients/notion.js");
-    const { selectOfficeLeaveNotifications } = await import("../../../src/clients/gemini.js");
 
     (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
     const result = await handleOfficeLeave(env);
     expect(result).toEqual([]);
-    expect(selectOfficeLeaveNotifications).not.toHaveBeenCalled();
   });
 
-  it("passes tasks to Gemini and sends Telegram message with priority icons", async () => {
+  it("sends Telegram message for Location-matched (office) tasks", async () => {
     const env = createMockEnv();
     const { getOpenTasks } = await import("../../../src/clients/notion.js");
-    const { selectOfficeLeaveNotifications } = await import("../../../src/clients/gemini.js");
     const { sendMessage } = await import("../../../src/clients/telegram.js");
 
-    (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue(sampleTasks());
-    (selectOfficeLeaveNotifications as ReturnType<typeof vi.fn>).mockResolvedValue([
-      { title: "請求書を提出", priority: "high" },
-      { title: "帰りに郵便局", priority: "medium" },
-      { title: "資料の整理", priority: "low" },
-    ]);
+    (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue(officeTasks());
 
     const result = await handleOfficeLeave(env);
 
-    expect(result).toHaveLength(3);
-    expect(selectOfficeLeaveNotifications).toHaveBeenCalledWith(env, sampleTasks(), expect.any(String));
+    expect(result).toHaveLength(1);
+    expect(result[0].title).toBe(officeTasks()[0].title);
 
     const message = (sendMessage as ReturnType<typeof vi.fn>).mock.calls[0][1] as string;
     expect(message).toContain("🏢");
-    expect(message).toContain("🔴");
-    expect(message).toContain("🟡");
-    expect(message).toContain("🟢");
-    expect(message).toContain("請求書を提出");
+    expect(message).toContain(officeTasks()[0].title);
   });
 
-  it("skips Telegram when Gemini returns no notifications", async () => {
+  it("sends empty-tasks message when no Location-matched tasks", async () => {
     const env = createMockEnv();
     const { getOpenTasks } = await import("../../../src/clients/notion.js");
-    const { selectOfficeLeaveNotifications } = await import("../../../src/clients/gemini.js");
     const { sendMessage } = await import("../../../src/clients/telegram.js");
 
     (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue(sampleTasks());
-    (selectOfficeLeaveNotifications as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
     const result = await handleOfficeLeave(env);
     expect(result).toEqual([]);
@@ -97,20 +85,5 @@ describe("handleOfficeLeave", () => {
     expect(result).toEqual([]);
     expect(getOpenTasks).not.toHaveBeenCalled();
     expect(sendMessage).not.toHaveBeenCalled();
-  });
-
-  it("passes JST datetime string to Gemini", async () => {
-    const env = createMockEnv();
-    const { getOpenTasks } = await import("../../../src/clients/notion.js");
-    const { selectOfficeLeaveNotifications } = await import("../../../src/clients/gemini.js");
-
-    (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue(sampleTasks());
-    (selectOfficeLeaveNotifications as ReturnType<typeof vi.fn>).mockResolvedValue([]);
-
-    await handleOfficeLeave(env);
-
-    const jstArg = (selectOfficeLeaveNotifications as ReturnType<typeof vi.fn>).mock.calls[0][2] as string;
-    expect(jstArg).toMatch(/\d{4}/);
-    expect(jstArg).toMatch(/\d{2}:\d{2}/);
   });
 });

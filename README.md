@@ -26,8 +26,8 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 | メソッド・パス | 用途 | 認証 |
 |---|---|---|
 | `POST /webhook` | Telegram Update 受信（コマンド・メッセージ） | Telegram |
-| `GET /home-arrival` | iPhone ショートカット（帰宅 Wi-Fi 接続時）から呼び出し、Notion オープンタスクを Gemini が選定して Telegram 通知 | `Authorization: Bearer <ALERT_TOKEN>` |
-| `GET /office-leave` | iPhone ショートカット（会社 Wi-Fi 切断時）から呼び出し、帰宅途中・翌朝に向けたタスクを Gemini が選定して Telegram 通知 | `Authorization: Bearer <ALERT_TOKEN>` |
+| `GET /home-arrival` | iPhone ショートカット（帰宅 Wi-Fi 接続時）から呼び出し、Notion オープンタスクのうち Location が「家」関連のものを Telegram 通知（Gemini によるAI選定は API コスト削減のため停止済み） | `Authorization: Bearer <ALERT_TOKEN>` |
+| `GET /office-leave` | iPhone ショートカット（会社 Wi-Fi 切断時）から呼び出し、Notion オープンタスクのうち Location が「オフィス」関連のものを Telegram 通知（Gemini によるAI選定は API コスト削減のため停止済み） | `Authorization: Bearer <ALERT_TOKEN>` |
 | `POST /owntracks` | OwnTracks アプリ → マネージド MQTT(EMQX Cloud 等) → Webhook 経由で位置情報を受信し、サーバー側ジオフェンス判定を実行 | `Authorization: Bearer <OWNTRACKS_TOKEN>` |
 
 ## スケジュール
