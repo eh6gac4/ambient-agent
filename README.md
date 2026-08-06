@@ -19,7 +19,7 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 | Cloudflare Workers | メイン実行環境（TypeScript） |
 | Cloudflare D1 | スレッドマップ・カレンダー同期・処理済みメッセージ管理（`AGENT_DB`）および 買い物リストDB（`GROCERY_DB`） |
 | Cloudflare KV | Telegram オフセット・タスクキャッシュ・ブロックリスト・位置情報ステート |
-| Cloudflare Cron Triggers | 定期ジョブのスケジューリング（4ジョブ） |
+| Cloudflare Cron Triggers | 定期ジョブのスケジューリング（5ジョブ） |
 
 ## HTTP エンドポイント
 
@@ -38,7 +38,8 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 |---|---|---|---|
 | 07:30〜21:30 毎時 | hourly_gmail | Gmail 未読を少しずつサイレント処理（通知せず KV に蓄積） + カレンダー同期 | なし（バックグラウンド処理のため） |
 | 05:20 | morning_prep | ①ブロックリスト学習 → ②カレンダー同期 → ③バックログ昇格 → ④優先度昇格 | あり |
-| 20:30 | morning_briefing | ①日次ブリーフィング（一日の振り返り） → ②APIコストレポート → ③期限間近通知 → ④メール処理サマリ | あり |
+| 05:30 | morning_briefing | ①日次ブリーフィング（一日の振り返り） → ②期限間近通知 → ③メール処理サマリ | あり |
+| 日 05:30 | weekly_cost_report | 直近1週間の Gemini API 呼び出しコストレポートを Telegram 送信 | あり |
 | 月 09:00 | stale_tasks | 14日以上未更新タスクを通知 | あり |
 
 > **静穏時間帯（Quiet Hours）**: デフォルトで `22:00〜07:00` の間は、自動的に通知系ジョブ（ブリーフィング等）をスキップします。早朝や深夜の不要な通知を防ぐための措置です。

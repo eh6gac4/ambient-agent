@@ -9,6 +9,7 @@ crons = [
   "30 22-23,0-12 * * *",  # 毎時30分 (JST 07:30-21:30): hourly_gmail (silent batch)
   "20 20 * * *",          # 05:20 JST: morning_prep (learn→calendar→escalation)
   "30 20 * * *",           # 05:30 JST: morning_briefing (briefing→cost→due_soon→email_digest)
+  "30 20 * * 0",          # 日 05:30 JST: weekly_cost_report
   "0 0 * * 1",            # 月 09:00 JST: stale_tasks_notice
 ]
 
