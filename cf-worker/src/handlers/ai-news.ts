@@ -1,8 +1,8 @@
 import type { Env } from "../types.js";
-import { searchAiNews } from "../clients/gemini.js";
 import { sendMessage } from "../clients/telegram.js";
 
+const MORNING_NEWS_URL = "https://asa-mobile.toshiki-cho-dev.workers.dev/";
+
 export async function deliverMorningAiNews(env: Env): Promise<void> {
-  const newsContent = await searchAiNews(env);
-  await sendMessage(env, newsContent);
+  await sendMessage(env, MORNING_NEWS_URL);
 }

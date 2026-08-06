@@ -37,7 +37,7 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 | 時刻 (JST) | ジョブ | 内容 | 休日スキップ |
 |---|---|---|---|
 | 07:30〜21:30 毎時 | hourly_gmail | Gmail 未読を少しずつサイレント処理（通知せず KV に蓄積） + カレンダー同期 | なし（バックグラウンド処理のため） |
-| 05:20 | morning_prep | ①ブロックリスト学習 → ②カレンダー同期 → ③バックログ昇格 → ④優先度昇格 | あり |
+| 05:20 | morning_prep | ①ブロックリスト学習 → ②カレンダー同期 → ③バックログ昇格 → ④優先度昇格 → ⑤朝ニュースURL配信 | あり |
 | 05:30 | morning_briefing | ①日次ブリーフィング（一日の振り返り） → ②期限間近通知 → ③メール処理サマリ | あり |
 | 日 05:30 | weekly_cost_report | 直近1週間の Gemini API 呼び出しコストレポートを Telegram 送信 | あり |
 | 月 09:00 | stale_tasks | 14日以上未更新タスクを通知 | あり |
@@ -59,6 +59,7 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 - カレンダー同期: 完了済みタスクのカレンダーイベントを削除、未着手タスクを Calendar に登録
 - バックログ昇格: 期限3日以内（過去 due 含む）の「バックログ」ステータスのタスクを「未着手」に昇格。Due 未設定のバックログは対象外
 - 優先度昇格: 期限3日以内の medium タスクを high に昇格
+- 朝ニュースURL配信: `https://asa-mobile.toshiki-cho-dev.workers.dev/` を Telegram に送信（Gemini API は使用しない）
 
 **カレンダー登録のタイミング:**
 - 期日付きタスクは作成時（Gmail / Telegram テキスト・画像・URL）に即座に Calendar へ登録（同日時刻指定タスクの取りこぼし防止）
