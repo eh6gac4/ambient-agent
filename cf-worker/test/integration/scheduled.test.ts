@@ -82,14 +82,6 @@ describe("scheduled handler - cron dispatch", () => {
     expect(syncCalendar).toHaveBeenCalledWith(env);
   });
 
-  it("30 20 * * * (morning_briefing) runs briefing", async () => {
-    const env = createMockEnv();
-    const { sendDailyBriefing } = await import("../../src/handlers/briefing.js");
-
-    await worker.scheduled(makeScheduledEvent("30 20 * * *"), env);
-    expect(sendDailyBriefing).toHaveBeenCalledWith(env);
-  });
-
   it("dispatches sendStaleTasksNotice for 0 0 * * 1", async () => {
     const env = createMockEnv();
     const { sendStaleTasksNotice } = await import("../../src/handlers/escalation.js");
@@ -121,17 +113,6 @@ describe("scheduled handler - cron dispatch", () => {
 describe("scheduled handler - holiday skip", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  it("skips morningBriefing on holiday", async () => {
-    const env = createMockEnv();
-    const { isHoliday } = await import("../../src/utils/holiday.js");
-    const { sendDailyBriefing } = await import("../../src/handlers/briefing.js");
-
-    (isHoliday as ReturnType<typeof vi.fn>).mockResolvedValueOnce(true);
-
-    await worker.scheduled(makeScheduledEvent("30 20 * * *"), env);
-    expect(sendDailyBriefing).not.toHaveBeenCalled();
   });
 
   it("skips morningPrep on holiday", async () => {

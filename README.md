@@ -19,7 +19,7 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 | Cloudflare Workers | メイン実行環境（TypeScript） |
 | Cloudflare D1 | スレッドマップ・カレンダー同期・処理済みメッセージ管理（`AGENT_DB`）および 買い物リストDB（`GROCERY_DB`） |
 | Cloudflare KV | Telegram オフセット・タスクキャッシュ・ブロックリスト・位置情報ステート |
-| Cloudflare Cron Triggers | 定期ジョブのスケジューリング（5ジョブ） |
+| Cloudflare Cron Triggers | 定期ジョブのスケジューリング（4ジョブ） |
 
 ## HTTP エンドポイント
 
@@ -38,7 +38,6 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 |---|---|---|---|
 | 07:30〜21:30 毎時 | hourly_gmail | Gmail 未読を少しずつサイレント処理（通知せず KV に蓄積） + カレンダー同期 | なし（バックグラウンド処理のため） |
 | 05:20 | morning_prep | ①ブロックリスト学習 → ②カレンダー同期 → ③バックログ昇格 → ④優先度昇格 | あり |
-| 05:30 | morning_briefing | ①日次ブリーフィング（一日の振り返り） → ②期限間近通知 → ③メール処理サマリ | あり |
 | 日 05:30 | weekly_cost_report | 直近1週間の Gemini API 呼び出しコストレポートを Telegram 送信 | あり |
 | 月 09:00 | stale_tasks | 14日以上未更新タスクを通知 | あり |
 
@@ -66,9 +65,7 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 - hourly_gmail / morning_prep の同期は補完用。重複防止は D1 `calendar_sync` で行い、dedup キーは「期日時刻」単位（同一日付で時刻だけ変わっても反映）
 - 既存イベントの日時変更は PATCH で行い、Calendar 側に追加されたメモや出席者を保持する
 
-**morning_briefing の詳細:**
-- 直近 24 時間に hourly_gmail が処理したメールをまとめて1通の「📧 メール処理サマリ」として Telegram 送信（タスク登録は件数のみ＋ダッシュボードリンク、アーカイブは件名一覧）
-- 静穏時間帯（22:00〜07:00）に実行された場合はブリーフィングをスキップします。
+**morning_briefing の cron 配信は停止済み**（Gemini API コスト削減のため）。手動実行（`/briefing` コマンド）のみ利用可能。
 
 ## Telegram コマンド
 
