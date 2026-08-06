@@ -1,7 +1,7 @@
 import type { Env } from "./types.js";
 import { checkGmail, learnFromCancelled } from "./handlers/gmail.js";
 import { syncCalendar } from "./handlers/calendar.js";
-import { sendDailyBriefing, sendWeeklyCostReport } from "./handlers/briefing.js";
+import { sendWeeklyCostReport } from "./handlers/briefing.js";
 import { sendStaleTasksNotice } from "./handlers/escalation.js";
 import { handleTelegramWebhook } from "./handlers/telegram.js";
 import { handleHomeArrival } from "./handlers/home-arrival.js";
@@ -12,7 +12,7 @@ import { isHoliday } from "./utils/holiday.js";
 import { cleanOldProcessed, cleanOldLocations, cleanOldAppLogs, insertAppLog } from "./storage/d1.js";
 import { reportError } from "./handlers/error-handler.js";
 
-// 無料プランの Cron 上限（5個）に合わせて5ジョブに統合
+// 無料プランの Cron 上限は5個（現状4ジョブ使用）
 async function hourlyGmail(env: Env): Promise<void> {
   await checkGmail(env, { silent: true });
   // Notion で日時が編集されたタスクをカレンダーへ反映。
@@ -37,14 +37,9 @@ async function morningPrep(env: Env): Promise<void> {
   }
 }
 
-async function morningBriefing(env: Env): Promise<void> {
-  await sendDailyBriefing(env);
-}
-
 const CRON_JOBS: Record<string, (env: Env) => Promise<void>> = {
   "30 22-23,0-12 * * *": hourlyGmail,  // 毎時30分 (JST 07:30-21:30): silent gmail batch
   "20 20 * * *": morningPrep,          // 05:20 JST: learn→calendar
-  "30 20 * * *": morningBriefing,       // 05:30 JST: briefing (events/tasks/escalations/digest)
   "30 20 * * 0": sendWeeklyCostReport,  // 月 05:30 JST: cost report
   "0 0 * * 1": sendStaleTasksNotice,   // 月 09:00 JST
 };
@@ -52,7 +47,6 @@ const CRON_JOBS: Record<string, (env: Env) => Promise<void>> = {
 // 休日（土日・祝日）にスキップするジョブ。hourlyGmail はサイレント処理なので除外。
 const SKIP_ON_HOLIDAY = new Set([
   "20 20 * * *",
-  "30 20 * * *",
   "30 20 * * 0",
   "0 0 * * 1",
 ]);
