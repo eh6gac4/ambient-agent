@@ -40,15 +40,15 @@ async function morningPrep(env: Env): Promise<void> {
 const CRON_JOBS: Record<string, (env: Env) => Promise<void>> = {
   "30 22-23,0-12 * * *": hourlyGmail,  // 毎時30分 (JST 07:30-21:30): silent gmail batch
   "20 20 * * *": morningPrep,          // 05:20 JST: learn→calendar
-  "30 20 * * 0": sendWeeklyCostReport,  // 月 05:30 JST: cost report
-  "0 0 * * 1": sendStaleTasksNotice,   // 月 09:00 JST
+  "30 20 * * SUN": sendWeeklyCostReport,  // 日 05:30 JST: cost report
+  "0 0 * * MON": sendStaleTasksNotice,    // 月 09:00 JST
 };
 
 // 休日（土日・祝日）にスキップするジョブ。hourlyGmail はサイレント処理なので除外。
 const SKIP_ON_HOLIDAY = new Set([
   "20 20 * * *",
-  "30 20 * * 0",
-  "0 0 * * 1",
+  "30 20 * * SUN",
+  "0 0 * * MON",
 ]);
 
 export default {
