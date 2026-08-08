@@ -81,11 +81,11 @@ describe("scheduled handler - cron dispatch", () => {
     expect(syncCalendar).toHaveBeenCalledWith(env);
   });
 
-  it("dispatches sendStaleTasksNotice for 0 0 * * 1", async () => {
+  it("dispatches sendStaleTasksNotice for 0 0 * * MON", async () => {
     const env = createMockEnv();
     const { sendStaleTasksNotice } = await import("../../src/handlers/escalation.js");
 
-    await worker.scheduled(makeScheduledEvent("0 0 * * 1"), env);
+    await worker.scheduled(makeScheduledEvent("0 0 * * MON"), env);
     expect(sendStaleTasksNotice).toHaveBeenCalledWith(env);
   });
 
@@ -132,7 +132,7 @@ describe("scheduled handler - holiday skip", () => {
 
     (isHoliday as ReturnType<typeof vi.fn>).mockResolvedValueOnce(true);
 
-    await worker.scheduled(makeScheduledEvent("0 0 * * 1"), env);
+    await worker.scheduled(makeScheduledEvent("0 0 * * MON"), env);
     expect(sendStaleTasksNotice).not.toHaveBeenCalled();
   });
 
