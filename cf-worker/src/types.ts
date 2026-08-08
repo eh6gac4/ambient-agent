@@ -1,7 +1,6 @@
 export interface Env {
   AGENT_KV: KVNamespace;
   AGENT_DB: D1Database;
-  GROCERY_DB?: D1Database;
   GEMINI_API_KEY: string;
   NOTION_TOKEN: string;
   NOTION_TASKS_DB_ID: string;
@@ -14,9 +13,6 @@ export interface Env {
   GOOGLE_REFRESH_TOKEN: string;
   OPERATING_START_HOUR?: string;
   OPERATING_END_HOUR?: string;
-  DAILY_BRIEFING_HOUR?: string;
-  TASK_REMINDER_HOURS?: string;
-  COST_REPORT_HOUR?: string;
   GMAIL_TASK_LABEL?: string;
   GMAIL_ACCOUNT_INDEX?: string;
   NOTION_SUBITEM_PARENT_PROP?: string;
@@ -24,7 +20,6 @@ export interface Env {
   GITHUB_REPO?: string;
   QUIET_HOURS_START?: string;
   QUIET_HOURS_END?: string;
-  MAPBOX_ACCESS_TOKEN?: string;
 }
 
 // ─── Geofence ────────────────────────────────────────────────────────────────
@@ -103,4 +98,10 @@ export interface UsageEntry {
 export interface CalendarEvent {
   summary: string;
   start: string;
+}
+
+/** 帰宅/退社などの通知トリガーで Telegram に送るタスク通知。 */
+export interface HomeArrivalNotification {
+  title: string;
+  priority: "high" | "medium" | "low";
 }

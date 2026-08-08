@@ -23,7 +23,6 @@ vi.mock("../../../src/handlers/calendar.js", () => ({
   getTodaysEvents: vi.fn().mockResolvedValue([]),
   syncCalendar: vi.fn().mockResolvedValue(undefined),
   sendDueSoonNotice: vi.fn().mockResolvedValue(undefined),
-  sendTaskReminder: vi.fn().mockResolvedValue(undefined),
   syncTaskCalendarEventSafe: vi.fn().mockResolvedValue(undefined),
 }));
 

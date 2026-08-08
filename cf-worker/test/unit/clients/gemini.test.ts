@@ -4,8 +4,6 @@ import {
   extractTasksFromText,
   extractTasksFromUrlContent,
   pickTaskTitle,
-  selectHomeArrivalNotifications,
-  selectOfficeLeaveNotifications,
 } from "../../../src/clients/gemini.js";
 import { createMockEnv } from "../../helpers/mocks.js";
 import geminiFixtures from "../../fixtures/gemini-responses.json" with { type: "json" };
@@ -110,64 +108,5 @@ describe("extractTasksFromUrlContent", () => {
     await extractTasksFromUrlContent(env, "https://example.com/task", "コンテンツ");
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(body.contents[0].parts[0].text).toContain("https://example.com/task");
-  });
-});
-
-describe("selectHomeArrivalNotifications / selectOfficeLeaveNotifications", () => {
-  beforeEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  const tasks = [
-    { title: "牛乳を買う", priority: "medium", due: "2026-06-14", status: "未着手" },
-    { title: "請求書を提出", priority: "high", due: null, status: "進行中" },
-  ];
-
-  function stubArrayResponse(arr: unknown) {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({
-        candidates: [{ content: { parts: [{ text: JSON.stringify(arr) }] } }],
-        usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 5 },
-      }), { status: 200 }),
-    );
-    vi.stubGlobal("fetch", fetchMock);
-    return fetchMock;
-  }
-
-  it("home arrival parses notifications and uses the home prompt", async () => {
-    const env = createMockEnv();
-    const fetchMock = stubArrayResponse([{ title: "牛乳を買う", priority: "medium" }]);
-
-    const result = await selectHomeArrivalNotifications(env, tasks, "2026/06/14 19:00");
-    expect(result).toEqual([{ title: "牛乳を買う", priority: "medium" }]);
-
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(body.systemInstruction.parts[0].text).toContain("帰宅");
-    expect(body.contents[0].parts[0].text).toContain("2026/06/14 19:00");
-  });
-
-  it("office leave parses notifications and uses the office prompt", async () => {
-    const env = createMockEnv();
-    const fetchMock = stubArrayResponse([{ title: "請求書を提出", priority: "high" }]);
-
-    const result = await selectOfficeLeaveNotifications(env, tasks, "2026/06/14 18:00");
-    expect(result).toEqual([{ title: "請求書を提出", priority: "high" }]);
-
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(body.systemInstruction.parts[0].text).toContain("退社");
-  });
-
-  it("returns empty array when response has no JSON array", async () => {
-    const env = createMockEnv();
-    stubArrayResponse(null); // serializes to "null", no [...] match
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({
-        content: [{ type: "text", text: "通知すべきタスクはありません" }],
-        usage: { input_tokens: 5, output_tokens: 2 },
-      }), { status: 200 }),
-    ));
-
-    const result = await selectHomeArrivalNotifications(env, tasks, "2026/06/14 19:00");
-    expect(result).toEqual([]);
   });
 });

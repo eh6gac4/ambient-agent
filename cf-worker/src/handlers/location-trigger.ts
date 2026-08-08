@@ -1,5 +1,4 @@
-import type { Env, GeofenceContext } from "../types.js";
-import type { HomeArrivalNotification } from "../clients/gemini.js";
+import type { Env, GeofenceContext, HomeArrivalNotification } from "../types.js";
 import { runNotificationTrigger } from "./notification-trigger.js";
 
 /**

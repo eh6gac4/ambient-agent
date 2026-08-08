@@ -1,7 +1,5 @@
 import { describe, it, expect } from "vitest";
 import {
-  getTelegramOffset,
-  setTelegramOffset,
   getTaskCache,
   setTaskCache,
   getNoTaskSenders,
@@ -11,19 +9,6 @@ import {
   getDailyUsage,
 } from "../../../src/storage/kv.js";
 import { createMockEnv, sampleTasks } from "../../helpers/mocks.js";
-
-describe("telegram offset", () => {
-  it("returns 0 when not set", async () => {
-    const env = createMockEnv();
-    expect(await getTelegramOffset(env)).toBe(0);
-  });
-
-  it("persists and retrieves offset", async () => {
-    const env = createMockEnv();
-    await setTelegramOffset(env, 12345);
-    expect(await getTelegramOffset(env)).toBe(12345);
-  });
-});
 
 describe("task cache", () => {
   it("returns empty array when not set", async () => {

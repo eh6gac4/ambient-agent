@@ -17,7 +17,7 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 | コンポーネント | 用途 |
 |---|---|
 | Cloudflare Workers | メイン実行環境（TypeScript） |
-| Cloudflare D1 | スレッドマップ・カレンダー同期・処理済みメッセージ管理（`AGENT_DB`）および 買い物リストDB（`GROCERY_DB`） |
+| Cloudflare D1 | スレッドマップ・カレンダー同期・処理済みメッセージ管理（`AGENT_DB`） |
 | Cloudflare KV | Telegram オフセット・タスクキャッシュ・ブロックリスト・位置情報ステート |
 | Cloudflare Cron Triggers | 定期ジョブのスケジューリング（4ジョブ） |
 
@@ -26,8 +26,8 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 | メソッド・パス | 用途 | 認証 |
 |---|---|---|
 | `POST /webhook` | Telegram Update 受信（コマンド・メッセージ） | Telegram |
-| `GET /home-arrival` | iPhone ショートカット（帰宅 Wi-Fi 接続時）から呼び出し、Notion オープンタスクのうち Location が「家」関連のものを Telegram 通知（Gemini によるAI選定は API コスト削減のため停止済み） | `Authorization: Bearer <ALERT_TOKEN>` |
-| `GET /office-leave` | iPhone ショートカット（会社 Wi-Fi 切断時）から呼び出し、Notion オープンタスクのうち Location が「オフィス」関連のものを Telegram 通知（Gemini によるAI選定は API コスト削減のため停止済み） | `Authorization: Bearer <ALERT_TOKEN>` |
+| `GET /home-arrival` | iPhone ショートカット（帰宅 Wi-Fi 接続時）から呼び出し、Notion オープンタスクのうち Location が「家」関連のものを Telegram 通知 | `Authorization: Bearer <ALERT_TOKEN>` |
+| `GET /office-leave` | iPhone ショートカット（会社 Wi-Fi 切断時）から呼び出し、Notion オープンタスクのうち Location が「オフィス」関連のものを Telegram 通知 | `Authorization: Bearer <ALERT_TOKEN>` |
 | `POST /owntracks` | OwnTracks アプリ → マネージド MQTT(EMQX Cloud 等) → Webhook 経由で位置情報を受信し、サーバー側ジオフェンス判定を実行 | `Authorization: Bearer <OWNTRACKS_TOKEN>` |
 
 ## スケジュール
@@ -141,15 +141,10 @@ ambient-agent/
 │   │   ├── push-secrets.mjs       # Worker Secrets 一括登録
 │   │   ├── setup-dev-tunnel.mjs   # dev 用 Cloudflare Named Tunnel + DNS をセットアップ
 │   │   ├── run-dev-tunnel.mjs     # cloudflared を connector token で起動
-│   │   ├── set-dev-webhook.mjs    # dev bot の Telegram webhook を登録/解除
-│   │   └── migrate-data.ts        # 既存 JSON → D1/KV 移行
+│   │   └── set-dev-webhook.mjs    # dev bot の Telegram webhook を登録/解除
 │   ├── wrangler.toml              # Cloudflare 設定（D1・KV・Cron）
 │   ├── .env.local.example         # 本番デプロイ用環境変数テンプレート
 │   └── .dev.vars.example          # ローカル dev 用 secrets テンプレート
-├── agent/                        # Python 実装（旧・参照用）
-├── prompts/
-│   ├── extract_tasks.md          # タスク抽出プロンプト
-│   └── analyze_email.md          # メール要約プロンプト
 └── .github/workflows/
     └── deploy.yml                # master マージ時に自動デプロイ
 ```
@@ -182,12 +177,7 @@ npm run d1 -- execute ambient-agent-db --remote --file=migrations/0002_location_
 
 1. [Google Cloud Console](https://console.cloud.google.com/) で Gmail API・Calendar API を有効化
 2. OAuth 2.0 クライアント ID（デスクトップアプリ）を作成
-3. ローカルで初回認証を実行して `data/token.json` を生成:
-
-```bash
-pip install -r requirements.txt
-python -c "from agent.google_auth import get_credentials; get_credentials()"
-```
+3. [OAuth 2.0 Playground](https://developers.google.com/oauthplayground) 等で `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` を使い Gmail・Calendar スコープの認可コードフローを実行し、`refresh_token` を取得する（`GOOGLE_REFRESH_TOKEN` として利用）
 
 ### 3. Notion インテグレーション
 
@@ -214,7 +204,7 @@ npm run secrets:push
 | `OWNTRACKS_TOKEN` | `POST /owntracks` (OwnTracks Webhook) 認証用の任意の長い乱数 |
 | `GOOGLE_CLIENT_ID` | Google Cloud Console → 認証情報 |
 | `GOOGLE_CLIENT_SECRET` | 同上 |
-| `GOOGLE_REFRESH_TOKEN` | `data/token.json` の `refresh_token` |
+| `GOOGLE_REFRESH_TOKEN` | 上記 OAuth フローで取得した `refresh_token` |
 
 ### 5. デプロイ & Webhook 登録
 
@@ -318,8 +308,6 @@ npx dotenv -e .env.local -- wrangler kv key put \
 | `telegram_notify` | 任意テキストを Telegram に送信 | `message`: 送信文字列（省略時は `{regionId} {transition}`） |
 
 新しいアクションは `src/handlers/geofence-actions.ts` の `ACTIONS` に関数を追加するだけで利用可能。
-
-> 周辺施設（POI）に基づく Gemini タスク提案機能は API コスト削減のため停止済み。
 
 ## CI/CD
 

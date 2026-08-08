@@ -29,7 +29,6 @@ vi.mock("../../src/clients/gemini.js", () => ({
 vi.mock("../../src/handlers/calendar.js", () => ({
   deleteCalendarEventForTask: vi.fn().mockResolvedValue(undefined),
   syncCalendar: vi.fn().mockResolvedValue(undefined),
-  sendTaskReminder: vi.fn().mockResolvedValue(undefined),
   getTodaysEvents: vi.fn().mockResolvedValue([]),
 }));
 

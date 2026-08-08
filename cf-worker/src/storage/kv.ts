@@ -1,15 +1,5 @@
 import type { Env, Task, UsageEntry, Region } from "../types.js";
 
-// Telegram
-export async function getTelegramOffset(env: Env): Promise<number> {
-  const val = await env.AGENT_KV.get("telegram:offset");
-  return val ? parseInt(val, 10) : 0;
-}
-
-export async function setTelegramOffset(env: Env, offset: number): Promise<void> {
-  await env.AGENT_KV.put("telegram:offset", String(offset));
-}
-
 export async function getTaskCache(env: Env): Promise<Task[]> {
   const val = await env.AGENT_KV.get<Task[]>("telegram:task_cache", "json");
   return val ?? [];
@@ -91,10 +81,6 @@ const REGIONS_KEY = "geofence:regions";
 
 export async function getRegions(env: Env): Promise<Region[]> {
   return (await env.AGENT_KV.get<Region[]>(REGIONS_KEY, "json")) ?? [];
-}
-
-export async function setRegions(env: Env, regions: Region[]): Promise<void> {
-  await env.AGENT_KV.put(REGIONS_KEY, JSON.stringify(regions));
 }
 
 export async function getGeofenceState(

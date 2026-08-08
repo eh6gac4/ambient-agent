@@ -13,11 +13,6 @@ vi.mock("../../src/clients/notion.js", () => ({
   getOpenTasks: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock("../../src/clients/gemini.js", () => ({
-  selectHomeArrivalNotifications: vi.fn().mockResolvedValue([]),
-  selectOfficeLeaveNotifications: vi.fn().mockResolvedValue([]),
-}));
-
 vi.mock("../../src/clients/telegram.js", () => ({
   sendMessage: vi.fn().mockResolvedValue(undefined),
   getFileUrl: vi.fn(),
