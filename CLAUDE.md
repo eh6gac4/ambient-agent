@@ -30,7 +30,7 @@ npx wrangler tail
 - コード変更後はブランチを切り、PR を作成して master にマージする。
 - ブランチ名の例: `feat/xxx`、`fix/xxx`、`docs/xxx`
 - master への直接 push はしない。
-- コミット前に全テストをパスさせる: `pytest` または `docker compose run --rm agent pytest`
+- コミット前に全テストをパスさせる: `cd cf-worker && npm test`
 
 ## 開発フロー
 
@@ -51,8 +51,7 @@ npx wrangler tail
 
 - **メインの実行環境は Cloudflare Workers（`cf-worker/`）。** Docker は使用しない。
 - **`data/` を削除しない。** `token.json`・`credentials.json` は Git 管理外で、消えると再認証が必要になる。
-- **Notion API は `data_sources.query` を使う。** `notion_handler.py` の `_query_db()` 参照。
-- **重複通知が届いたら**、Docker コンテナが誤って起動していないか確認する。`docker compose ps` と `ps aux` で確認して重複プロセスを停止する。
+- **Notion API は `data_sources.query` を使う。** `cf-worker/src/clients/notion.ts` の `queryDB()` 参照。
 - **テスト等で日本時間（JST）の日付文字列を生成する際**は `new Date().toISOString()` を避け、`Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo" })` を使用する（実行環境のタイムゾーン差異によるバグを防ぐため）。
 
 ## ドキュメント更新ルール

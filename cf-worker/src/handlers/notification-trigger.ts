@@ -1,6 +1,5 @@
-import type { Env, Task } from "../types.js";
+import type { Env, Task, HomeArrivalNotification } from "../types.js";
 import { getOpenTasks } from "../clients/notion.js";
-import type { HomeArrivalNotification } from "../clients/gemini.js";
 import { sendMessage } from "../clients/telegram.js";
 import { isHoliday } from "../utils/holiday.js";
 import { jstDateTimeStr } from "../utils/jst.js";

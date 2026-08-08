@@ -15,8 +15,6 @@ vi.mock("../../src/clients/notion.js", () => ({
 }));
 
 vi.mock("../../src/clients/gemini.js", () => ({
-  selectHomeArrivalNotifications: vi.fn(),
-  selectOfficeLeaveNotifications: vi.fn(),
   summarizeDay: vi.fn().mockResolvedValue("E2E Gemini Summary"),
 }));
 

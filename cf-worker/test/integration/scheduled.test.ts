@@ -16,7 +16,6 @@ vi.mock("../../src/handlers/gmail.js", () => ({
 
 vi.mock("../../src/handlers/calendar.js", () => ({
   syncCalendar: vi.fn().mockResolvedValue(undefined),
-  sendTaskReminder: vi.fn().mockResolvedValue(undefined),
   deleteCalendarEventForTask: vi.fn().mockResolvedValue(undefined),
   getTodaysEvents: vi.fn().mockResolvedValue([]),
 }));
@@ -124,17 +123,6 @@ describe("scheduled handler - holiday skip", () => {
 
     await worker.scheduled(makeScheduledEvent("50 22 * * *"), env);
     expect(syncCalendar).not.toHaveBeenCalled();
-  });
-
-  it("skips sendTaskReminder on holiday", async () => {
-    const env = createMockEnv();
-    const { isHoliday } = await import("../../src/utils/holiday.js");
-    const { sendTaskReminder } = await import("../../src/handlers/calendar.js");
-
-    (isHoliday as ReturnType<typeof vi.fn>).mockResolvedValueOnce(true);
-
-    await worker.scheduled(makeScheduledEvent("0 4 * * *"), env);
-    expect(sendTaskReminder).not.toHaveBeenCalled();
   });
 
   it("skips sendStaleTasksNotice on holiday", async () => {
