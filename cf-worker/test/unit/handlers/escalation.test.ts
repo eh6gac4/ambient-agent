@@ -3,7 +3,7 @@ import { getBacklogPromotionNoticeText, getEscalationNoticeText, sendStaleTasksN
 import { createMockEnv, sampleTasks } from "../../helpers/mocks.js";
 import type { Task } from "../../../src/types.js";
 
-vi.mock("../../../src/clients/notion.js", () => ({
+vi.mock("../../../src/clients/tasks.js", () => ({
   getOpenTasks: vi.fn(),
   escalatePriorityTasks: vi.fn(),
   promoteBacklogTasks: vi.fn(),
@@ -22,7 +22,7 @@ describe("getEscalationNoticeText", () => {
 
   it("sends notice when tasks are escalated", async () => {
     const env = createMockEnv();
-    const { escalatePriorityTasks } = await import("../../../src/clients/notion.js");
+    const { escalatePriorityTasks } = await import("../../../src/clients/tasks.js");
     const { sendMessage } = await import("../../../src/clients/telegram.js");
 
     (escalatePriorityTasks as ReturnType<typeof vi.fn>).mockResolvedValue([
@@ -36,7 +36,7 @@ describe("getEscalationNoticeText", () => {
 
   it("does not send when no tasks escalated", async () => {
     const env = createMockEnv();
-    const { escalatePriorityTasks } = await import("../../../src/clients/notion.js");
+    const { escalatePriorityTasks } = await import("../../../src/clients/tasks.js");
     const { sendMessage } = await import("../../../src/clients/telegram.js");
 
     (escalatePriorityTasks as ReturnType<typeof vi.fn>).mockResolvedValue([]);
@@ -47,7 +47,7 @@ describe("getEscalationNoticeText", () => {
 
   it("escapes Markdown special characters in task titles", async () => {
     const env = createMockEnv();
-    const { escalatePriorityTasks } = await import("../../../src/clients/notion.js");
+    const { escalatePriorityTasks } = await import("../../../src/clients/tasks.js");
     const { sendMessage } = await import("../../../src/clients/telegram.js");
 
     (escalatePriorityTasks as ReturnType<typeof vi.fn>).mockResolvedValue([
@@ -66,7 +66,7 @@ describe("getBacklogPromotionNoticeText", () => {
 
   it("sends notice when backlog tasks are promoted", async () => {
     const env = createMockEnv();
-    const { promoteBacklogTasks } = await import("../../../src/clients/notion.js");
+    const { promoteBacklogTasks } = await import("../../../src/clients/tasks.js");
     const { sendMessage } = await import("../../../src/clients/telegram.js");
 
     (promoteBacklogTasks as ReturnType<typeof vi.fn>).mockResolvedValue([
@@ -80,7 +80,7 @@ describe("getBacklogPromotionNoticeText", () => {
 
   it("does not send when nothing was promoted", async () => {
     const env = createMockEnv();
-    const { promoteBacklogTasks } = await import("../../../src/clients/notion.js");
+    const { promoteBacklogTasks } = await import("../../../src/clients/tasks.js");
     const { sendMessage } = await import("../../../src/clients/telegram.js");
 
     (promoteBacklogTasks as ReturnType<typeof vi.fn>).mockResolvedValue([]);
@@ -93,7 +93,7 @@ describe("getBacklogPromotionNoticeText", () => {
 describe("sendStaleTasksNotice", () => {
   it("reports tasks not updated for 14+ days", async () => {
     const env = createMockEnv();
-    const { getOpenTasks } = await import("../../../src/clients/notion.js");
+    const { getOpenTasks } = await import("../../../src/clients/tasks.js");
     const { sendMessage } = await import("../../../src/clients/telegram.js");
 
     const tasks = sampleTasks(); // page-003 has lastEdited: "2026-04-01" (>14 days before 2026-04-25)
@@ -106,7 +106,7 @@ describe("sendStaleTasksNotice", () => {
 
   it("does not send when no stale tasks", async () => {
     const env = createMockEnv();
-    const { getOpenTasks } = await import("../../../src/clients/notion.js");
+    const { getOpenTasks } = await import("../../../src/clients/tasks.js");
     const { sendMessage } = await import("../../../src/clients/telegram.js");
 
     // Reset to fresh implementation (clearAllMocks doesn't reset mockResolvedValue)

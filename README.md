@@ -1,13 +1,14 @@
 # Ambient Agent
 
-Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日次ブリーフィングを自動化するエージェント。
+Gmail・Google Calendar・Telegram を連携し、タスク抽出と日次ブリーフィングを自動化するエージェント。
+タスクの登録先は [notion-tasks](https://github.com/eh6gac4/notion-tasks)（https://todo.eh6gac4.work ）が使う Cloudflare D1。
 
 **実行環境: Cloudflare Workers（無料枠）**
 
 ## アーキテクチャ
 
 ```
-[Telegram] ──webhook──▶ [Cloudflare Worker] ──▶ Notion / Gmail / Calendar / Gemini
+[Telegram] ──webhook──▶ [Cloudflare Worker] ──▶ タスクストア(D1) / Gmail / Calendar / Gemini
 [Cron Triggers] ────────▶ [Cloudflare Worker]
                                   │
                           [D1] [KV Namespace]
@@ -26,8 +27,8 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 | メソッド・パス | 用途 | 認証 |
 |---|---|---|
 | `POST /webhook` | Telegram Update 受信（コマンド・メッセージ） | Telegram |
-| `GET /home-arrival` | iPhone ショートカット（帰宅 Wi-Fi 接続時）から呼び出し、Notion オープンタスクのうち Location が「家」関連のものを Telegram 通知 | `Authorization: Bearer <ALERT_TOKEN>` |
-| `GET /office-leave` | iPhone ショートカット（会社 Wi-Fi 切断時）から呼び出し、Notion オープンタスクのうち Location が「オフィス」関連のものを Telegram 通知 | `Authorization: Bearer <ALERT_TOKEN>` |
+| `GET /home-arrival` | iPhone ショートカット（帰宅 Wi-Fi 接続時）から呼び出し、オープンタスクのうち Location が「家」関連のものを Telegram 通知 | `Authorization: Bearer <ALERT_TOKEN>` |
+| `GET /office-leave` | iPhone ショートカット（会社 Wi-Fi 切断時）から呼び出し、オープンタスクのうち Location が「オフィス」関連のものを Telegram 通知 | `Authorization: Bearer <ALERT_TOKEN>` |
 | `POST /owntracks` | OwnTracks アプリ → マネージド MQTT(EMQX Cloud 等) → Webhook 経由で位置情報を受信し、サーバー側ジオフェンス判定を実行 | `Authorization: Bearer <OWNTRACKS_TOKEN>` |
 
 ## スケジュール
@@ -46,12 +47,12 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 > **休日スキップ**: 土日および日本の祝日（`holidays-jp.github.io` API 参照）は通知系ジョブを実行しない。帰宅通知（`/home-arrival`）・退社通知（`/office-leave`）も同様にスキップ。
 
 **hourly_gmail の詳細:**
-- 未読メールを要約・タスク抽出し Notion に登録（返信スレッドは既存タスクを更新）
-- Notion ページのタイトルは Gemini が生成する「誰から何の用件か分かる短文」を使う（メール件名そのままは避ける）
+- 未読メールを要約・タスク抽出しタスクストアに登録（返信スレッドは既存タスクを更新）
+- タスクのタイトルは Gemini が生成する「誰から何の用件か分かる短文」を使う（メール件名そのままは避ける）
 - Telegram 通知はせず、結果を `email_digest:pending` (KV) に追記
 - Workers の subrequest 上限（無料プラン 50/呼び出し）に達したら break、未処理分は次回 cron に持ち越し
 - 個別メール処理エラーは log して続行
-- メール処理後に `syncCalendar` を実行し、Notion で編集された日時を Google Calendar へ伝播（既存イベントは PATCH で日時のみ差し替え）
+- メール処理後に `syncCalendar` を実行し、todo アプリ側で編集された日時を Google Calendar へ伝播（既存イベントは PATCH で日時のみ差し替え）
 
 **morning_prep の詳細:**
 - ブロックリスト学習: `sender_map` を走査し、ステータスが「中止」のタスクの送信者を `no_task_senders` (KV) に追加。完了済みは `sender_map` から外すだけ
@@ -80,23 +81,33 @@ Gmail・Google Calendar・Notion・Telegram を連携し、タスク抽出と日
 | `/briefing` | 日次ブリーフィングを今すぐ実行 |
 | `/blocklist` | ブロック中の送信者一覧 |
 | `/unblock <メール>` | 送信者のブロックを解除 |
-| URL 送信 | ページ内容を取得してタスクを抽出し Notion に登録 |
-| テキスト・転送メッセージ送信 | Gemini でタスク抽出して Notion に登録 |
-| 画像送信 | Gemini Vision で要約・タスク抽出 → 親タスクを Notion 登録、各アクションは Notion DB のサブアイテムとして個別登録、画像をページ本文に添付 |
+| URL 送信 | ページ内容を取得してタスクを抽出しタスクストアに登録 |
+| テキスト・転送メッセージ送信 | Gemini でタスク抽出してタスクストアに登録 |
+| 画像送信 | Gemini Vision で要約・タスク抽出 → 親タスクを登録、各アクションはサブタスクとして個別登録、画像は R2 に置いて添付ファイルとして紐付け |
 
-## Notion DB 必須プロパティ
+## タスクストア
 
-| プロパティ名 | 種別 | 備考 |
+タスクの読み書き先は [notion-tasks](https://github.com/eh6gac4/notion-tasks) と共有する Cloudflare D1 データベース `notion-tasks`（UI は https://todo.eh6gac4.work ）。Notion API は経由しない。
+
+| バインディング | リソース | 用途 |
 |---|---|---|
-| タイトル | タイトル | |
-| Due | 日付 | |
-| Priority | セレクト | high / medium / low |
-| Status | ステータス | 未着手 / 完了 / 中止 / バックログ など |
-| Source | テキスト | Gmail / Telegram / URL など |
-| SourceURL | URL | メール元タスクの Gmail リンク |
-| 親アイテム | リレーション（同DB・自己） | Notion の「サブアイテム」機能で自動生成される双方向リレーション。プロパティ名が異なる場合は環境変数 `NOTION_SUBITEM_PARENT_PROP` で上書き可能 |
+| `TASKS_DB` | D1 `notion-tasks` | タスク本体・サブタスク関連・添付メタデータ |
+| `TASK_ATTACHMENTS` | R2 `notion-tasks-attachments` | 添付ファイル（Telegram 画像）の実体 |
 
-**サブタスク化:** メール／画像からタスクを生成する際、Gemini が抽出した各アクションは親ページ本文内のチェックボックスではなく **DB のサブアイテム（独立した子ページ）** として作成され、それぞれ Due / Priority / アイコンを個別に持つ。親ページはメール件名・本文を保持。
+読み書きするテーブル（スキーマの正は notion-tasks の `migrations/0001_init.sql`。あちらを変更したらこちらも追従する）:
+
+| テーブル | 使い方 |
+|---|---|
+| `tasks` | 1 タスク 1 行。`title` / `status` / `priority` / `due` / `location` / `source` / `source_url` / `body`(Markdown) / `icon_type`+`icon_value`(絵文字) |
+| `task_relations` | サブタスクの親子。`(from_id=子, to_id=親, type='parent')` の有向辺 1 本 |
+| `task_attachments` | 添付メタデータ。実体は R2、`r2_key` で参照 |
+
+- **ステータス**: 未着手 / 進行中 / 確認中 / 一時中断 / 完了 / 中止 / バックログ（オープン扱いは前半 4 つ）
+- **Due の形式**: 日付のみは `YYYY-MM-DD`、時刻付きは `YYYY-MM-DDTHH:mm:ss.sss+09:00`（todo アプリ側の `src/lib/due-date.ts` に合わせる）
+- **新規タスクの `notion_url` は空文字**。todo アプリはこれを見て「Open in Notion」ボタンを出し分ける
+- **タスク ID** は Notion からの移行時にページ UUID をそのまま引き継いでいるため、`gmail_thread_map` / `task_sender_map` / `calendar_sync`（AGENT_DB）に保存済みの ID はそのまま使える
+
+**サブタスク化:** メール／画像からタスクを生成する際、Gemini が抽出した各アクションは本文内のチェックボックスではなく **独立したタスク（親への `parent` リレーション付き）** として作成され、それぞれ Due / Priority / アイコンを個別に持つ。親タスクはメール件名・本文（Markdown）を保持。
 
 ## ファイル構成
 
@@ -111,7 +122,7 @@ ambient-agent/
 │   │   │   ├── gcal-api.ts       # Google Calendar REST API
 │   │   │   ├── gmail-api.ts      # Gmail REST API
 │   │   │   ├── google-auth.ts    # OAuth2 トークンリフレッシュ
-│   │   │   ├── notion.ts         # Notion API
+│   │   │   ├── tasks.ts          # タスクストア (D1/R2)
 │   │   │   └── telegram.ts       # Telegram Bot API
 │   │   ├── handlers/             # ジョブ・コマンドハンドラー
 │   │   │   ├── briefing.ts       # 日次ブリーフィング・コストレポート
@@ -133,7 +144,7 @@ ambient-agent/
 │   │       ├── holiday.ts        # 土日・祝日判定（JST）
 │   │       ├── jst.ts            # JST 日時ヘルパー（jstNow/jstDateStr/toDateStr 等）
 │   │       └── task.ts           # 優先度定数・最優先タスク選択
-│   ├── test/                     # Vitest テスト（221件）
+│   ├── test/                     # Vitest テスト（242件）
 │   ├── migrations/               # D1 スキーマ
 │   │   ├── 0001_initial.sql      # Gmail・Calendar・タスク関連テーブル
 │   │   └── 0002_location_history.sql # 位置情報履歴テーブル
@@ -142,7 +153,7 @@ ambient-agent/
 │   │   ├── setup-dev-tunnel.mjs   # dev 用 Cloudflare Named Tunnel + DNS をセットアップ
 │   │   ├── run-dev-tunnel.mjs     # cloudflared を connector token で起動
 │   │   └── set-dev-webhook.mjs    # dev bot の Telegram webhook を登録/解除
-│   ├── wrangler.toml              # Cloudflare 設定（D1・KV・Cron）
+│   ├── wrangler.toml              # Cloudflare 設定（D1・KV・R2・Cron）
 │   ├── .env.local.example         # 本番デプロイ用環境変数テンプレート
 │   └── .dev.vars.example          # ローカル dev 用 secrets テンプレート
 └── .github/workflows/
@@ -179,11 +190,11 @@ npm run d1 -- execute ambient-agent-db --remote --file=migrations/0002_location_
 2. OAuth 2.0 クライアント ID（デスクトップアプリ）を作成
 3. [OAuth 2.0 Playground](https://developers.google.com/oauthplayground) 等で `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` を使い Gmail・Calendar スコープの認可コードフローを実行し、`refresh_token` を取得する（`GOOGLE_REFRESH_TOKEN` として利用）
 
-### 3. Notion インテグレーション
+### 3. タスクストア（D1 / R2）
 
-1. [Notion Integrations](https://www.notion.so/my-integrations) でインテグレーション作成
-2. タスク DB を作成し、インテグレーションを DB に接続
-3. DB の URL から ID（32桁）を取得
+`wrangler.toml` の `TASKS_DB` / `TASK_ATTACHMENTS` バインディングが notion-tasks 側で作成済みの
+D1 `notion-tasks` と R2 `notion-tasks-attachments` を指す。同一 Cloudflare アカウントであれば
+追加のリソース作成は不要で、secret も要らない（スキーマ適用は notion-tasks 側の手順）。
 
 ### 4. Worker Secrets の登録
 
@@ -196,8 +207,6 @@ npm run secrets:push
 | Secret | 取得先 |
 |---|---|
 | `GEMINI_API_KEY` | [Google AI Studio](https://aistudio.google.com/app/apikey) |
-| `NOTION_TOKEN` | Notion インテグレーションの Internal Secret |
-| `NOTION_TASKS_DB_ID` | タスク DB の URL 末尾 32 文字 |
 | `TELEGRAM_BOT_TOKEN` | [@BotFather](https://t.me/BotFather) |
 | `TELEGRAM_CHAT_ID` | `getUpdates` API の `chat.id` |
 | `ALERT_TOKEN` | `GET /home-arrival` / `GET /office-leave` 認証用の任意の長い乱数 |
@@ -303,8 +312,8 @@ npx dotenv -e .env.local -- wrangler kv key put \
 
 | アクション ID | 説明 | パラメータ |
 |---|---|---|
-| `home_arrival` | 帰宅通知（既存フロー。祝日スキップ・タスク有無チェック込み）。Notionの `Location` が「home, 家, 自宅」のタスクのみを厳格に抽出します。 | なし |
-| `office_leave` | 退社通知（既存フロー。祝日スキップ・タスク有無チェック込み）。Notionの `Location` が「office, オフィス, 会社, 職場」のタスクのみを厳格に抽出します。 | なし |
+| `home_arrival` | 帰宅通知（既存フロー。祝日スキップ・タスク有無チェック込み）。タスクの `Location` が「home, 家, 自宅」のタスクのみを厳格に抽出します。 | なし |
+| `office_leave` | 退社通知（既存フロー。祝日スキップ・タスク有無チェック込み）。タスクの `Location` が「office, オフィス, 会社, 職場」のタスクのみを厳格に抽出します。 | なし |
 | `telegram_notify` | 任意テキストを Telegram に送信 | `message`: 送信文字列（省略時は `{regionId} {transition}`） |
 
 新しいアクションは `src/handlers/geofence-actions.ts` の `ACTIONS` に関数を追加するだけで利用可能。
@@ -332,7 +341,7 @@ npx dotenv -e .env.local -- wrangler tail --format=pretty
 
 ### ローカル dev 環境
 
-本番にデプロイせず、ローカルで Telegram / cron を含めた挙動を検証できる。D1・KV は wrangler dev のローカルエミュレーションで本番と完全分離。Notion は dummy（dev 専用 DB を作っても可）、Gmail / Calendar / Google は本番と同じ認証情報を流用する。
+本番にデプロイせず、ローカルで Telegram / cron を含めた挙動を検証できる。D1・KV・R2 は wrangler dev のローカルエミュレーションで本番と完全分離（タスクストアも同様にローカルの空 DB になる）。Gmail / Calendar / Google は本番と同じ認証情報を流用する。
 
 公開 URL には Cloudflare Named Tunnel（`dev-bot.eh6gac4.work`）を使い、connector token は API から都度取得するためローカル保存しない。
 
@@ -347,7 +356,7 @@ npx dotenv -e .env.local -- wrangler tail --format=pretty
    ```bash
    cp .dev.vars.example .dev.vars
    # TELEGRAM_BOT_TOKEN を dev bot の値に
-   # Notion は dummy のまま、Google / Google は .env.local と同じ値を入れる
+   # Google 関連は .env.local と同じ値を入れる
    ```
 5. **Tunnel + DNS をセットアップ** (idempotent):
    ```bash
@@ -370,7 +379,7 @@ npm run dev   # http://localhost:8787 で待ち受け
 npm run tunnel:dev   # API から token 取得 → cloudflared を spawn
 ```
 
-`@amby_dev_bot` にメッセージを送ると、Cloudflare edge → tunnel → ローカル Worker と流れ、ターミナル1にログが出る。Notion 関連のコマンドは dummy creds で 401 になる（想定通り）。
+`@amby_dev_bot` にメッセージを送ると、Cloudflare edge → tunnel → ローカル Worker と流れ、ターミナル1にログが出る。タスク系コマンドはローカル D1 が空なので、必要なら notion-tasks の `migrations/0001_init.sql` を `wrangler d1 execute notion-tasks --local --file=...` で流し込んでおく。
 
 #### cron ジョブの手動実行
 

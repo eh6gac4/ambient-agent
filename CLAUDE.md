@@ -17,6 +17,10 @@ cd cf-worker && npx wrangler tail
 npx wrangler kv key get geofence:regions --binding=AGENT_KV --remote
 npx wrangler kv key get geofence:state:home --binding=AGENT_KV --remote
 
+# タスクストア（D1: binding=TASKS_DB, database=notion-tasks）
+npx wrangler d1 execute notion-tasks --remote --json \
+  --command "SELECT id, title, status, priority, due FROM tasks WHERE status IN ('未着手','進行中') ORDER BY due LIMIT 20;"
+
 # 位置履歴（D1: binding=AGENT_DB, table=location_history）
 npx wrangler d1 execute AGENT_DB --remote --json \
   --command "SELECT datetime(tst,'unixepoch','+9 hours') jst, lat, lon FROM location_history ORDER BY tst DESC LIMIT 20;"
@@ -51,7 +55,8 @@ npx wrangler tail
 
 - **メインの実行環境は Cloudflare Workers（`cf-worker/`）。** Docker は使用しない。
 - **`data/` を削除しない。** `token.json`・`credentials.json` は Git 管理外で、消えると再認証が必要になる。
-- **Notion API は `data_sources.query` を使う。** `cf-worker/src/clients/notion.ts` の `queryDB()` 参照。
+- **タスクの登録先は notion-tasks と共有する D1（`TASKS_DB` = データベース `notion-tasks`）。** 実装は `cf-worker/src/clients/tasks.ts`。Notion API は使わない。
+- **タスクのスキーマの正は notion-tasks リポジトリの `migrations/0001_init.sql`。** 向こうが変わったら `clients/tasks.ts` と `test/helpers/task-store.ts` の DDL を追従させる。
 - **テスト等で日本時間（JST）の日付文字列を生成する際**は `new Date().toISOString()` を避け、`Intl.DateTimeFormat("ja-JP", { timeZone: "Asia/Tokyo" })` を使用する（実行環境のタイムゾーン差異によるバグを防ぐため）。
 
 ## ドキュメント更新ルール

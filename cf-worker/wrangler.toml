@@ -21,10 +21,19 @@ binding = "AGENT_DB"
 database_name = "ambient-agent-db"
 database_id = "ba5c15ff-8e0e-4b86-b020-f1c4cb5975a3"
 
+# タスクストア。notion-tasks (https://todo.eh6gac4.work) と同じ D1 / R2 を共有する。
+# スキーマの正は notion-tasks リポジトリの migrations/0001_init.sql。
+[[d1_databases]]
+binding = "TASKS_DB"
+database_name = "notion-tasks"
+database_id = "c09d95cd-7b34-49e0-985e-0dda0248b86d"
+
+[[r2_buckets]]
+binding = "TASK_ATTACHMENTS"
+bucket_name = "notion-tasks-attachments"
+
 # secrets (set via: wrangler secret put SECRET_NAME)
 # GEMINI_API_KEY
-# NOTION_TOKEN
-# NOTION_TASKS_DB_ID
 # TELEGRAM_BOT_TOKEN
 # TELEGRAM_CHAT_ID
 # ALERT_TOKEN          # GET /home-arrival /office-leave 認証用の共有シークレット

@@ -8,7 +8,7 @@ vi.mock("../../src/clients/gcal-api.js", () => ({
   getTodaysEvents: vi.fn().mockResolvedValue([]),
 }));
 
-vi.mock("../../src/clients/notion.js", () => ({
+vi.mock("../../src/clients/tasks.js", () => ({
   getOpenTasks: vi.fn(),
   escalatePriorityTasks: vi.fn().mockResolvedValue([]),
   promoteBacklogTasks: vi.fn().mockResolvedValue([]),
@@ -87,7 +87,7 @@ describe("E2E Workflow - Location-based Task Filtering", () => {
   });
 
   it("handles home-arrival trigger: extracts home tasks, case-insensitive (Gemini selection stopped)", async () => {
-    const { getOpenTasks } = await import("../../src/clients/notion.js");
+    const { getOpenTasks } = await import("../../src/clients/tasks.js");
     const { sendMessage } = await import("../../src/clients/telegram.js");
 
     (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue(mockTasks);
@@ -120,7 +120,7 @@ describe("E2E Workflow - Location-based Task Filtering", () => {
   });
 
   it("handles office-leave trigger: extracts office tasks, case-insensitive (Gemini selection stopped)", async () => {
-    const { getOpenTasks } = await import("../../src/clients/notion.js");
+    const { getOpenTasks } = await import("../../src/clients/tasks.js");
     const { sendMessage } = await import("../../src/clients/telegram.js");
 
     (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue(mockTasks);
@@ -153,7 +153,7 @@ describe("E2E Workflow - Location-based Task Filtering", () => {
   });
 
   it("sends a proper Telegram notification when no tasks are found", async () => {
-    const { getOpenTasks } = await import("../../src/clients/notion.js");
+    const { getOpenTasks } = await import("../../src/clients/tasks.js");
     const { sendMessage } = await import("../../src/clients/telegram.js");
 
     (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue([]);
@@ -189,7 +189,7 @@ describe("E2E Integration - Separation of Judgment Logic", () => {
   });
 
   it("runNotificationTrigger coordinates APIs and calls injected selection function", async () => {
-    const { getOpenTasks } = await import("../../src/clients/notion.js");
+    const { getOpenTasks } = await import("../../src/clients/tasks.js");
     const { sendMessage } = await import("../../src/clients/telegram.js");
 
     (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue([

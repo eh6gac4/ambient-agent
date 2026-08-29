@@ -177,7 +177,7 @@ export async function analyzeEmail(env: Env, subject: string, body: string): Pro
   return result;
 }
 
-/** Notion ページのタイトル候補。LLM が task_title を返さなければ件名にフォールバック。 */
+/** タスクのタイトル候補。LLM が task_title を返さなければ件名にフォールバック。 */
 export function pickTaskTitle(analysis: EmailAnalysis, subject: string): string {
   const t = analysis.task_title?.trim();
   return t && t.length > 0 ? t : subject;

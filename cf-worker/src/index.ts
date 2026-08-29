@@ -15,7 +15,7 @@ import { reportError } from "./handlers/error-handler.js";
 // 無料プランの Cron 上限は5個（現状4ジョブ使用）
 async function hourlyGmail(env: Env): Promise<void> {
   await checkGmail(env, { silent: true });
-  // Notion で日時が編集されたタスクをカレンダーへ反映。
+  // タスク側 (todo アプリ) で日時が編集されたタスクをカレンダーへ反映。
   // 失敗してもメール処理結果には影響させない。
   try {
     await syncCalendar(env);

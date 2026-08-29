@@ -1,6 +1,6 @@
 import type { Env, Task } from "../types.js";
 import { getTodaysEvents, insertEvent, deleteEvent, updateEventDateTime } from "../clients/gcal-api.js";
-import { getOpenTasks } from "../clients/notion.js";
+import { getOpenTasks } from "../clients/tasks.js";
 import { getTaskLink } from "./task-formatter.js";
 import { getCalendarSync, setCalendarSync, deleteCalendarSync, getAllCalendarSync } from "../storage/d1.js";
 import { jstNow } from "../utils/jst.js";

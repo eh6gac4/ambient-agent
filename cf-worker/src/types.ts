@@ -1,9 +1,11 @@
 export interface Env {
   AGENT_KV: KVNamespace;
   AGENT_DB: D1Database;
+  /** タスクストア (notion-tasks と共有する D1 データベース `notion-tasks`) */
+  TASKS_DB: D1Database;
+  /** タスク添付ファイルの実体 (notion-tasks と共有する R2 バケット) */
+  TASK_ATTACHMENTS?: R2Bucket;
   GEMINI_API_KEY: string;
-  NOTION_TOKEN: string;
-  NOTION_TASKS_DB_ID: string;
   TELEGRAM_BOT_TOKEN: string;
   TELEGRAM_CHAT_ID: string;
   ALERT_TOKEN: string;
@@ -15,7 +17,6 @@ export interface Env {
   OPERATING_END_HOUR?: string;
   GMAIL_TASK_LABEL?: string;
   GMAIL_ACCOUNT_INDEX?: string;
-  NOTION_SUBITEM_PARENT_PROP?: string;
   GITHUB_PAT?: string;
   GITHUB_REPO?: string;
   QUIET_HOURS_START?: string;

@@ -1,5 +1,5 @@
 import type { Env } from "../types.js";
-import { getOpenTasks, escalatePriorityTasks, promoteBacklogTasks } from "../clients/notion.js";
+import { getOpenTasks, escalatePriorityTasks, promoteBacklogTasks } from "../clients/tasks.js";
 import { sendMessage } from "../clients/telegram.js";
 import { fmtDue, getTaskLink } from "./task-formatter.js";
 import { jstNow } from "../utils/jst.js";
