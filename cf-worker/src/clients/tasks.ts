@@ -374,10 +374,13 @@ export async function updateTaskDue(env: Env, taskId: string, due: string): Prom
   if (!changes) throw new Error(`updateTaskDue failed: task not found (${taskId})`);
 }
 
+/**
+ * 返信メールの取り込み。1 スレッド = 1 タスクなので新規タスクは作らず、
+ * 既存タスクの Priority / Due を前倒し方向にのみ更新し、返信本文を追記する。
+ */
 export async function updateTaskFromReply(
   env: Env,
   taskId: string,
-  subtasks: ExtractedTask[],
   priority: string,
   due: string | null,
   bodyText?: string,
@@ -407,16 +410,5 @@ export async function updateTaskFromReply(
 
   if (Object.keys(updates).length) {
     await updateTaskRow(env, taskId, updates);
-  }
-
-  for (const sub of subtasks) {
-    await addSubtask(env, taskId, {
-      title: sub.title,
-      due: sub.due,
-      priority: sub.priority,
-      icon: sub.icon,
-      source: "Gmail",
-      sourceUrl: row.source_url ?? undefined,
-    });
   }
 }

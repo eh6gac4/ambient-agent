@@ -68,12 +68,11 @@ export async function checkGmail(env: Env, options: CheckGmailOptions = {}): Pro
       if (tasks.length) {
         const best = bestPriorityTask(tasks);
         const dues = tasks.map((t) => t.due).filter((d): d is string => Boolean(d)).sort();
-        const subtaskTitles = tasks.map((t) => t.title);
 
         const existingPageId = await getThreadMapEntry(env, threadId);
 
         if (existingPageId) {
-          await updateTaskFromReply(env, existingPageId, tasks, best.priority, dues[0] ?? null, body);
+          await updateTaskFromReply(env, existingPageId, best.priority, dues[0] ?? null, body);
           if (taskLabelId) await addLabel(env, meta.id, taskLabelId);
           // updateTaskFromReply で Due が前倒しされた場合に備えてタスクストアの最新値で同期
           const latest = await getTaskTitleAndDue(env, existingPageId);
@@ -81,13 +80,13 @@ export async function checkGmail(env: Env, options: CheckGmailOptions = {}): Pro
             await syncTaskCalendarEventSafe(env, { pageId: existingPageId, title: latest.title, due: latest.due });
           }
           taskLines.push(
-            `• *${escapeMd(taskTitle)}*（更新）\n  ${escapeMd(summary)}\n  → ${subtaskTitles.map(escapeMd).join("、")}\n  ${taskLink(existingPageId)}`,
+            `• *${escapeMd(taskTitle)}*（更新）\n  ${escapeMd(summary)}\n  ${taskLink(existingPageId)}`,
           );
         } else {
           const pageId = await addTask(
             env,
             { title: taskTitle, due: dues[0] ?? null, priority: best.priority, icon: best.icon, source: "Gmail", sourceUrl: gmailUrl },
-            tasks,
+            undefined,
             body,
           );
           if (pageId) {
@@ -98,7 +97,7 @@ export async function checkGmail(env: Env, options: CheckGmailOptions = {}): Pro
           }
           const link = pageId ? taskLink(pageId) : `[📧 Gmail で開く](${gmailUrl})`;
           taskLines.push(
-            `• *${escapeMd(taskTitle)}*\n  ${escapeMd(summary)}\n  → ${subtaskTitles.map(escapeMd).join("、")}\n  ${link}`,
+            `• *${escapeMd(taskTitle)}*\n  ${escapeMd(summary)}\n  ${link}`,
           );
         }
       } else {

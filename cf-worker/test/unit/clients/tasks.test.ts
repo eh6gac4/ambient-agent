@@ -330,57 +330,42 @@ describe("promoteBacklogTasks", () => {
 describe("updateTaskFromReply", () => {
   it("raises priority only when the reply is more urgent", async () => {
     await seedTask(env, { id: "page-001", priority: "medium" });
-    await updateTaskFromReply(env, "page-001", [], "high", null);
+    await updateTaskFromReply(env, "page-001", "high", null);
     expect((await row("page-001")).priority).toBe("high");
 
-    await updateTaskFromReply(env, "page-001", [], "low", null);
+    await updateTaskFromReply(env, "page-001", "low", null);
     expect((await row("page-001")).priority).toBe("high");
   });
 
   it("moves the due date up but never back", async () => {
     await seedTask(env, { id: "page-001", due: "2026-06-10" });
-    await updateTaskFromReply(env, "page-001", [], "medium", "2026-06-01");
+    await updateTaskFromReply(env, "page-001", "medium", "2026-06-01");
     expect((await row("page-001")).due).toBe("2026-06-01");
 
-    await updateTaskFromReply(env, "page-001", [], "medium", "2026-06-20");
+    await updateTaskFromReply(env, "page-001", "medium", "2026-06-20");
     expect((await row("page-001")).due).toBe("2026-06-01");
   });
 
-  it("appends the reply body and inherits sourceUrl for new subtasks", async () => {
+  it("appends the reply body without creating any new task", async () => {
     await seedTask(env, {
       id: "page-001",
       body: "---\n\n### 📧 メール本文\n\n最初の本文",
-      sourceUrl: "https://mail.google.com/thread",
     });
 
-    await updateTaskFromReply(
-      env,
-      "page-001",
-      [{ title: "返信対応", priority: "high", due: null }],
-      "high",
-      null,
-      "返信の本文です。",
-    );
+    await updateTaskFromReply(env, "page-001", "high", null, "返信の本文です。");
 
     const body = (await row("page-001")).body as string;
     expect(body).toContain("最初の本文");
     expect(body).toContain("### 📧 返信メール");
     expect(body).toContain("返信の本文です。");
 
-    const sub = await env.TASKS_DB.prepare(
-      `SELECT t.* FROM tasks t
-         JOIN task_relations r ON r.from_id = t.id AND r.type = 'parent'
-        WHERE r.to_id = ?`,
-    )
-      .bind("page-001")
-      .first<Record<string, unknown>>();
-    expect(sub?.title).toBe("返信対応");
-    expect(sub?.source).toBe("Gmail");
-    expect(sub?.source_url).toBe("https://mail.google.com/thread");
+    // 返信では子タスクを一切作らない
+    const count = await env.TASKS_DB.prepare("SELECT COUNT(*) AS n FROM tasks").first<{ n: number }>();
+    expect(count?.n).toBe(1);
   });
 
   it("throws when the task no longer exists", async () => {
-    await expect(updateTaskFromReply(env, "missing", [], "high", null)).rejects.toThrow();
+    await expect(updateTaskFromReply(env, "missing", "high", null)).rejects.toThrow();
   });
 });
 
