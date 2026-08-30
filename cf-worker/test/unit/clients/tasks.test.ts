@@ -100,28 +100,6 @@ describe("addTask", () => {
     expect(subs.results[1].due).toBeNull();
   });
 
-  it("does not create a child when there is only one extracted task", async () => {
-    const parentId = await addTask(
-      env,
-      { title: "請求書の支払い", source: "Gmail", priority: "high", due: "2026-05-21" },
-      [{ title: "請求書の支払いを確認する", priority: "high", due: "2026-05-21" }],
-    );
-
-    const subs = await env.TASKS_DB.prepare(
-      `SELECT t.id FROM tasks t
-         JOIN task_relations r ON r.from_id = t.id AND r.type = 'parent'
-        WHERE r.to_id = ?`,
-    )
-      .bind(parentId)
-      .all<Record<string, unknown>>();
-    expect(subs.results).toHaveLength(0);
-
-    // 親タスクに Due / Priority は反映されている
-    const parent = await row(parentId!);
-    expect(parent.due).toBe("2026-05-21");
-    expect(parent.priority).toBe("high");
-  });
-
   it("appends the email body as a markdown section", async () => {
     const id = await addTask(env, { title: "メール本文付き" }, undefined, "これはメール本文です。");
     const body = (await row(id!)).body as string;
@@ -352,84 +330,42 @@ describe("promoteBacklogTasks", () => {
 describe("updateTaskFromReply", () => {
   it("raises priority only when the reply is more urgent", async () => {
     await seedTask(env, { id: "page-001", priority: "medium" });
-    await updateTaskFromReply(env, "page-001", [], "high", null);
+    await updateTaskFromReply(env, "page-001", "high", null);
     expect((await row("page-001")).priority).toBe("high");
 
-    await updateTaskFromReply(env, "page-001", [], "low", null);
+    await updateTaskFromReply(env, "page-001", "low", null);
     expect((await row("page-001")).priority).toBe("high");
   });
 
   it("moves the due date up but never back", async () => {
     await seedTask(env, { id: "page-001", due: "2026-06-10" });
-    await updateTaskFromReply(env, "page-001", [], "medium", "2026-06-01");
+    await updateTaskFromReply(env, "page-001", "medium", "2026-06-01");
     expect((await row("page-001")).due).toBe("2026-06-01");
 
-    await updateTaskFromReply(env, "page-001", [], "medium", "2026-06-20");
+    await updateTaskFromReply(env, "page-001", "medium", "2026-06-20");
     expect((await row("page-001")).due).toBe("2026-06-01");
   });
 
-  it("appends the reply body and inherits sourceUrl for new subtasks", async () => {
+  it("appends the reply body without creating any new task", async () => {
     await seedTask(env, {
       id: "page-001",
       body: "---\n\n### 📧 メール本文\n\n最初の本文",
-      sourceUrl: "https://mail.google.com/thread",
     });
 
-    await updateTaskFromReply(
-      env,
-      "page-001",
-      [{ title: "返信対応", priority: "high", due: null }],
-      "high",
-      null,
-      "返信の本文です。",
-    );
+    await updateTaskFromReply(env, "page-001", "high", null, "返信の本文です。");
 
     const body = (await row("page-001")).body as string;
     expect(body).toContain("最初の本文");
     expect(body).toContain("### 📧 返信メール");
     expect(body).toContain("返信の本文です。");
 
-    const sub = await env.TASKS_DB.prepare(
-      `SELECT t.* FROM tasks t
-         JOIN task_relations r ON r.from_id = t.id AND r.type = 'parent'
-        WHERE r.to_id = ?`,
-    )
-      .bind("page-001")
-      .first<Record<string, unknown>>();
-    expect(sub?.title).toBe("返信対応");
-    expect(sub?.source).toBe("Gmail");
-    expect(sub?.source_url).toBe("https://mail.google.com/thread");
-  });
-
-  it("skips reply tasks whose title matches the parent or an existing child", async () => {
-    await seedTask(env, { id: "page-001", title: "請求書の支払い" });
-    await addSubtask(env, "page-001", { title: "見積書を送る", priority: "medium", due: null });
-
-    await updateTaskFromReply(
-      env,
-      "page-001",
-      [
-        { title: "請求書の支払い", priority: "medium", due: null }, // 親と同名 → スキップ
-        { title: "見積書を送る", priority: "medium", due: null }, // 既存の子と同名 → スキップ
-        { title: "契約書に押印する", priority: "medium", due: null }, // 新規 → 追加
-      ],
-      "medium",
-      null,
-    );
-
-    const children = await env.TASKS_DB.prepare(
-      `SELECT t.title FROM tasks t
-         JOIN task_relations r ON r.from_id = t.id AND r.type = 'parent'
-        WHERE r.to_id = ?
-        ORDER BY t.title`,
-    )
-      .bind("page-001")
-      .all<{ title: string }>();
-    expect(children.results.map((r) => r.title)).toEqual(["契約書に押印する", "見積書を送る"]);
+    // 返信では子タスクを一切作らない
+    const count = await env.TASKS_DB.prepare("SELECT COUNT(*) AS n FROM tasks").first<{ n: number }>();
+    expect(count?.n).toBe(1);
   });
 
   it("throws when the task no longer exists", async () => {
-    await expect(updateTaskFromReply(env, "missing", [], "high", null)).rejects.toThrow();
+    await expect(updateTaskFromReply(env, "missing", "high", null)).rejects.toThrow();
   });
 });
 

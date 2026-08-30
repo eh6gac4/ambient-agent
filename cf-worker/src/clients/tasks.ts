@@ -252,9 +252,7 @@ export async function addTask(
     attachment,
   });
 
-  // 用件が 1 件だけのメールは、親タイトル（用件要約）と子タイトル（アクション文）が
-  // ほぼ同内容になり同じタスクが 2 行できてしまう。2 件以上のときだけ内訳を子に割る。
-  if (subtasks && subtasks.length >= 2) {
+  if (subtasks?.length) {
     for (const sub of subtasks) {
       await addSubtask(env, taskId, {
         title: sub.title,
@@ -280,23 +278,6 @@ export async function addSubtask(
   } catch (err) {
     console.warn(`addSubtask failed for parent=${parentTaskId}:`, err);
     return null;
-  }
-}
-
-/** 指定タスクにぶら下がる子タスクのタイトル（trim 済み）を集合で返す。 */
-async function getChildTaskTitles(env: Env, parentTaskId: string): Promise<Set<string>> {
-  try {
-    const result = await env.TASKS_DB.prepare(
-      `SELECT t.title FROM tasks t
-         JOIN task_relations r ON r.from_id = t.id AND r.type = 'parent'
-        WHERE r.to_id = ?`,
-    )
-      .bind(parentTaskId)
-      .all<{ title: string }>();
-    return new Set((result.results ?? []).map((r) => (r.title ?? "").trim()));
-  } catch (err) {
-    console.warn(`getChildTaskTitles failed for parent=${parentTaskId}:`, err);
-    return new Set();
   }
 }
 
@@ -393,10 +374,13 @@ export async function updateTaskDue(env: Env, taskId: string, due: string): Prom
   if (!changes) throw new Error(`updateTaskDue failed: task not found (${taskId})`);
 }
 
+/**
+ * 返信メールの取り込み。1 スレッド = 1 タスクなので新規タスクは作らず、
+ * 既存タスクの Priority / Due を前倒し方向にのみ更新し、返信本文を追記する。
+ */
 export async function updateTaskFromReply(
   env: Env,
   taskId: string,
-  subtasks: ExtractedTask[],
   priority: string,
   due: string | null,
   bodyText?: string,
@@ -426,24 +410,5 @@ export async function updateTaskFromReply(
 
   if (Object.keys(updates).length) {
     await updateTaskRow(env, taskId, updates);
-  }
-
-  // 同一スレッドの返信は毎回 LLM で再抽出され、元メールのタスク（＝この親）や
-  // 既存の子と同じ内容を含みやすい。trim 後の完全一致で既知のものはスキップする。
-  const known = await getChildTaskTitles(env, taskId);
-  known.add((row.title ?? "").trim());
-
-  for (const sub of subtasks) {
-    const title = sub.title.trim();
-    if (known.has(title)) continue;
-    known.add(title);
-    await addSubtask(env, taskId, {
-      title: sub.title,
-      due: sub.due,
-      priority: sub.priority,
-      icon: sub.icon,
-      source: "Gmail",
-      sourceUrl: row.source_url ?? undefined,
-    });
   }
 }

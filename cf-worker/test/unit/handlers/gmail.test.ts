@@ -86,7 +86,7 @@ describe("checkGmail", () => {
     expect(addTask).toHaveBeenCalledWith(
       env,
       expect.objectContaining({ title: "田中さんへの進捗報告", source: "Gmail" }),
-      [expect.objectContaining({ title: "進捗を報告する", priority: "high", due: "2026-04-30" })],
+      undefined,
       "内容",
     );
     const { syncTaskCalendarEventSafe } = await import("../../../src/handlers/calendar.js");
@@ -123,7 +123,7 @@ describe("checkGmail", () => {
     expect(addTask).toHaveBeenCalledWith(
       env,
       expect.objectContaining({ title: "件名そのまま" }),
-      expect.anything(),
+      undefined,
       expect.anything(),
     );
   });
@@ -155,7 +155,7 @@ describe("checkGmail", () => {
     expect(addTask).toHaveBeenCalledWith(
       env,
       expect.objectContaining({ source: "Gmail", icon: "💰" }),
-      expect.anything(),
+      undefined,
       expect.anything(),
     );
   });
@@ -186,7 +186,6 @@ describe("checkGmail", () => {
     expect(updateTaskFromReply).toHaveBeenCalledWith(
       env,
       "existing-page-id",
-      [expect.objectContaining({ title: "追加確認を実施する", priority: "medium", due: null })],
       "medium",
       null,
       "返信内容",
