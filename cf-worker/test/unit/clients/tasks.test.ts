@@ -100,6 +100,28 @@ describe("addTask", () => {
     expect(subs.results[1].due).toBeNull();
   });
 
+  it("does not create a child when there is only one extracted task", async () => {
+    const parentId = await addTask(
+      env,
+      { title: "請求書の支払い", source: "Gmail", priority: "high", due: "2026-05-21" },
+      [{ title: "請求書の支払いを確認する", priority: "high", due: "2026-05-21" }],
+    );
+
+    const subs = await env.TASKS_DB.prepare(
+      `SELECT t.id FROM tasks t
+         JOIN task_relations r ON r.from_id = t.id AND r.type = 'parent'
+        WHERE r.to_id = ?`,
+    )
+      .bind(parentId)
+      .all<Record<string, unknown>>();
+    expect(subs.results).toHaveLength(0);
+
+    // 親タスクに Due / Priority は反映されている
+    const parent = await row(parentId!);
+    expect(parent.due).toBe("2026-05-21");
+    expect(parent.priority).toBe("high");
+  });
+
   it("appends the email body as a markdown section", async () => {
     const id = await addTask(env, { title: "メール本文付き" }, undefined, "これはメール本文です。");
     const body = (await row(id!)).body as string;
@@ -377,6 +399,33 @@ describe("updateTaskFromReply", () => {
     expect(sub?.title).toBe("返信対応");
     expect(sub?.source).toBe("Gmail");
     expect(sub?.source_url).toBe("https://mail.google.com/thread");
+  });
+
+  it("skips reply tasks whose title matches the parent or an existing child", async () => {
+    await seedTask(env, { id: "page-001", title: "請求書の支払い" });
+    await addSubtask(env, "page-001", { title: "見積書を送る", priority: "medium", due: null });
+
+    await updateTaskFromReply(
+      env,
+      "page-001",
+      [
+        { title: "請求書の支払い", priority: "medium", due: null }, // 親と同名 → スキップ
+        { title: "見積書を送る", priority: "medium", due: null }, // 既存の子と同名 → スキップ
+        { title: "契約書に押印する", priority: "medium", due: null }, // 新規 → 追加
+      ],
+      "medium",
+      null,
+    );
+
+    const children = await env.TASKS_DB.prepare(
+      `SELECT t.title FROM tasks t
+         JOIN task_relations r ON r.from_id = t.id AND r.type = 'parent'
+        WHERE r.to_id = ?
+        ORDER BY t.title`,
+    )
+      .bind("page-001")
+      .all<{ title: string }>();
+    expect(children.results.map((r) => r.title)).toEqual(["契約書に押印する", "見積書を送る"]);
   });
 
   it("throws when the task no longer exists", async () => {
