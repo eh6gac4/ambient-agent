@@ -82,9 +82,8 @@ export function createMockEnv(overrides: Partial<Env> = {}): Env {
   return {
     AGENT_KV: createMockKV(),
     AGENT_DB: createMockD1(),
+    TASKS_DB: createMockD1(),
     GEMINI_API_KEY: "test-gemini-key",
-    NOTION_TOKEN: "test-notion-token",
-    NOTION_TASKS_DB_ID: "test-db-id",
     TELEGRAM_BOT_TOKEN: "test-bot-token",
     TELEGRAM_CHAT_ID: "123456789",
     GOOGLE_CLIENT_ID: "test-client-id",
@@ -122,7 +121,7 @@ export function sampleTasks(): Task[] {
       priority: "high",
       status: "未着手", location: null,
       lastEdited: "2026-04-20",
-      url: "https://notion.so/page-001",
+      url: "https://todo.eh6gac4.work/?task=page-001",
       pageId: "page-001",
     },
     {
@@ -131,7 +130,7 @@ export function sampleTasks(): Task[] {
       priority: "medium",
       status: "進行中", location: null,
       lastEdited: "2026-04-10",
-      url: "https://notion.so/page-002",
+      url: "https://todo.eh6gac4.work/?task=page-002",
       pageId: "page-002",
     },
     {
@@ -140,7 +139,7 @@ export function sampleTasks(): Task[] {
       priority: "low",
       status: "未着手", location: null,
       lastEdited: "2026-04-01",
-      url: "https://notion.so/page-003",
+      url: "https://todo.eh6gac4.work/?task=page-003",
       pageId: "page-003",
     },
   ];

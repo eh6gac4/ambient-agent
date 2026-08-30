@@ -2,7 +2,7 @@ import type { Env, GeofenceContext, HomeArrivalNotification } from "../types.js"
 import { runNotificationTrigger } from "./notification-trigger.js";
 
 /**
- * ジオフェンスに突入 (enter) した際に、Notion の Location プロパティが
+ * ジオフェンスに突入 (enter) した際に、タスクの Location が
  * 突入したエリア (regionId あるいは params.location) と一致するタスクがあれば通知する。
  */
 export async function handleLocationTrigger(

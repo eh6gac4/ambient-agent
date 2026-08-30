@@ -9,7 +9,7 @@ vi.mock("../../src/utils/holiday.js", () => ({
   isHoliday: vi.fn().mockResolvedValue(false),
 }));
 
-vi.mock("../../src/clients/notion.js", () => ({
+vi.mock("../../src/clients/tasks.js", () => ({
   getOpenTasks: vi.fn().mockResolvedValue([]),
 }));
 
@@ -106,7 +106,7 @@ describe("POST /owntracks", () => {
   });
 
   it("圏外→圏内の遷移で home_arrival (handleHomeArrival) が発火する", async () => {
-    const { getOpenTasks } = await import("../../src/clients/notion.js");
+    const { getOpenTasks } = await import("../../src/clients/tasks.js");
     const { sendMessage } = await import("../../src/clients/telegram.js");
 
     (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue([
@@ -133,7 +133,7 @@ describe("POST /owntracks", () => {
   });
 
   it("圏内→圏内では再発火しない", async () => {
-    const { getOpenTasks } = await import("../../src/clients/notion.js");
+    const { getOpenTasks } = await import("../../src/clients/tasks.js");
     const { sendMessage } = await import("../../src/clients/telegram.js");
 
     (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue([

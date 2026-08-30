@@ -10,8 +10,6 @@ export default defineWorkersConfig({
           // Provide placeholder values for secrets in tests
           bindings: {
             GEMINI_API_KEY: "test-gemini-key",
-            NOTION_TOKEN: "test-notion-token",
-            NOTION_TASKS_DB_ID: "test-db-id",
             TELEGRAM_BOT_TOKEN: "test-bot-token",
             TELEGRAM_CHAT_ID: "test-chat-id",
             GOOGLE_CLIENT_ID: "test-client-id",

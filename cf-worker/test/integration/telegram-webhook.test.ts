@@ -3,13 +3,13 @@ import worker from "../../src/index.js";
 import { createMockEnv, sampleTasks } from "../helpers/mocks.js";
 import telegramFixtures from "../fixtures/telegram-updates.json" with { type: "json" };
 
-vi.mock("../../src/clients/notion.js", () => ({
+vi.mock("../../src/clients/tasks.js", () => ({
   getOpenTasks: vi.fn().mockResolvedValue([]),
   addTask: vi.fn().mockResolvedValue("page-new"),
   completeTask: vi.fn().mockResolvedValue(undefined),
   cancelTask: vi.fn().mockResolvedValue(undefined),
   updateTaskDue: vi.fn().mockResolvedValue(undefined),
-  uploadImageToNotion: vi.fn().mockResolvedValue("upload-id-001"),
+  uploadTaskImage: vi.fn().mockResolvedValue({ id: "att-001", key: "tasks/attachments/att-001/telegram.jpg", name: "telegram.jpg", contentType: "image/jpeg", size: 1024 }),
 }));
 
 vi.mock("../../src/clients/telegram.js", () => ({
@@ -73,7 +73,7 @@ describe("Telegram webhook E2E", () => {
 
   it("/add creates task and responds OK", async () => {
     const env = createMockEnv();
-    const { addTask } = await import("../../src/clients/notion.js");
+    const { addTask } = await import("../../src/clients/tasks.js");
     const { sendMessage } = await import("../../src/clients/telegram.js");
 
     const resp = await worker.fetch(webhookRequest(telegramFixtures.addCommand), env);
@@ -90,7 +90,7 @@ describe("Telegram webhook E2E", () => {
 
   it("/tasks sends task list", async () => {
     const env = createMockEnv();
-    const { getOpenTasks } = await import("../../src/clients/notion.js");
+    const { getOpenTasks } = await import("../../src/clients/tasks.js");
     const { sendMessage } = await import("../../src/clients/telegram.js");
     (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue(sampleTasks());
 
@@ -109,7 +109,7 @@ describe("Telegram webhook E2E", () => {
 
   it("returns OK even if handler throws", async () => {
     const env = createMockEnv();
-    const { addTask } = await import("../../src/clients/notion.js");
+    const { addTask } = await import("../../src/clients/tasks.js");
     (addTask as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("Notion error"));
 
     const resp = await worker.fetch(webhookRequest(telegramFixtures.addCommand), env);

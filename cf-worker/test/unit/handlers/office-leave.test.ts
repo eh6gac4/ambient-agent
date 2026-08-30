@@ -7,7 +7,7 @@ vi.mock("../../../src/utils/holiday.js", () => ({
   isHoliday: vi.fn().mockResolvedValue(false),
 }));
 
-vi.mock("../../../src/clients/notion.js", () => ({
+vi.mock("../../../src/clients/tasks.js", () => ({
   getOpenTasks: vi.fn(),
 }));
 
@@ -36,7 +36,7 @@ describe("handleOfficeLeave", () => {
 
   it("returns empty array when no open tasks", async () => {
     const env = createMockEnv();
-    const { getOpenTasks } = await import("../../../src/clients/notion.js");
+    const { getOpenTasks } = await import("../../../src/clients/tasks.js");
 
     (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue([]);
 
@@ -46,7 +46,7 @@ describe("handleOfficeLeave", () => {
 
   it("sends Telegram message for Location-matched (office) tasks", async () => {
     const env = createMockEnv();
-    const { getOpenTasks } = await import("../../../src/clients/notion.js");
+    const { getOpenTasks } = await import("../../../src/clients/tasks.js");
     const { sendMessage } = await import("../../../src/clients/telegram.js");
 
     (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue(officeTasks());
@@ -63,7 +63,7 @@ describe("handleOfficeLeave", () => {
 
   it("sends empty-tasks message when no Location-matched tasks", async () => {
     const env = createMockEnv();
-    const { getOpenTasks } = await import("../../../src/clients/notion.js");
+    const { getOpenTasks } = await import("../../../src/clients/tasks.js");
     const { sendMessage } = await import("../../../src/clients/telegram.js");
 
     (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue(sampleTasks());
@@ -76,7 +76,7 @@ describe("handleOfficeLeave", () => {
   it("returns empty array on holiday without calling any downstream", async () => {
     const env = createMockEnv();
     const { isHoliday } = await import("../../../src/utils/holiday.js");
-    const { getOpenTasks } = await import("../../../src/clients/notion.js");
+    const { getOpenTasks } = await import("../../../src/clients/tasks.js");
     const { sendMessage } = await import("../../../src/clients/telegram.js");
 
     (isHoliday as ReturnType<typeof vi.fn>).mockResolvedValueOnce(true);

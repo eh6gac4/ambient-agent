@@ -1,6 +1,6 @@
 import type { Env, ExtractedTask } from "../types.js";
 import { sendMessage, getFileUrl } from "../clients/telegram.js";
-import { addTask, getOpenTasks, completeTask, cancelTask, updateTaskDue, uploadImageToNotion } from "../clients/notion.js";
+import { addTask, getOpenTasks, completeTask, cancelTask, updateTaskDue, uploadTaskImage } from "../clients/tasks.js";
 import { extractTasksFromText, extractTasksFromUrlContent, analyzeImage } from "../clients/gemini.js";
 import { getSenderForTask } from "../storage/d1.js";
 import { getTaskCache, setTaskCache, getNoTaskSenders, addNoTaskSender, removeNoTaskSender } from "../storage/kv.js";
@@ -222,9 +222,9 @@ async function handlePhoto(env: Env, message: Record<string, unknown>): Promise<
   const imageData = await imgResp.arrayBuffer();
 
   await sendMessage(env, "⏳ 画像からタスクを抽出中...");
-  const [{ summary, tasks }, uploadId] = await Promise.all([
+  const [{ summary, tasks }, attachment] = await Promise.all([
     analyzeImage(env, imageData, mediaType),
-    uploadImageToNotion(env, imageData, mediaType, `telegram-${largest.file_id}.${ext}`),
+    uploadTaskImage(env, imageData, mediaType, `telegram-${largest.file_id}.${ext}`),
   ]);
 
   const subtaskTitles = tasks.map((t) => t.title);
@@ -239,13 +239,13 @@ async function handlePhoto(env: Env, message: Record<string, unknown>): Promise<
     { title, due: dues[0] ?? null, priority: best.priority, icon: best.icon, source: "Telegram" },
     tasks,
     undefined,
-    uploadId ?? undefined,
+    attachment ?? undefined,
   );
   if (id) await syncTaskCalendarEventSafe(env, { pageId: id, title, due: dues[0] ?? null });
 
   const lines = [`✅ タスクを登録しました`, ``, `*${title}*`];
   if (subtaskTitles.length) lines.push(...subtaskTitles.map((t) => `• ${t}`));
-  if (!uploadId) lines.push(``, `⚠️ 画像のアップロードに失敗したためテキストのみ登録`);
+  if (!attachment) lines.push(``, `⚠️ 画像のアップロードに失敗したためテキストのみ登録`);
   if (id) lines.push(``, taskLink(id));
   await sendMessage(env, lines.join("\n"));
 }

@@ -21,7 +21,7 @@ vi.mock("../../../src/clients/gemini.js", () => ({
   },
 }));
 
-vi.mock("../../../src/clients/notion.js", () => ({
+vi.mock("../../../src/clients/tasks.js", () => ({
   addTask: vi.fn(),
   updateTaskFromReply: vi.fn(),
   getTaskStatus: vi.fn(),
@@ -61,7 +61,7 @@ describe("checkGmail", () => {
     const env = createMockEnv();
     const { listAllMessages, getMessage, parseMessage } = await import("../../../src/clients/gmail-api.js");
     const { analyzeEmail } = await import("../../../src/clients/gemini.js");
-    const { addTask } = await import("../../../src/clients/notion.js");
+    const { addTask } = await import("../../../src/clients/tasks.js");
     const { getThreadMapEntry } = await import("../../../src/storage/d1.js");
 
     (listAllMessages as ReturnType<typeof vi.fn>).mockResolvedValue([{ id: "msg-001", threadId: "thread-001" }]);
@@ -100,7 +100,7 @@ describe("checkGmail", () => {
     const env = createMockEnv();
     const { listAllMessages, getMessage, parseMessage } = await import("../../../src/clients/gmail-api.js");
     const { analyzeEmail } = await import("../../../src/clients/gemini.js");
-    const { addTask } = await import("../../../src/clients/notion.js");
+    const { addTask } = await import("../../../src/clients/tasks.js");
     const { getThreadMapEntry } = await import("../../../src/storage/d1.js");
 
     (listAllMessages as ReturnType<typeof vi.fn>).mockResolvedValue([{ id: "msg-002", threadId: "thread-002" }]);
@@ -132,7 +132,7 @@ describe("checkGmail", () => {
     const env = createMockEnv();
     const { listAllMessages, getMessage, parseMessage } = await import("../../../src/clients/gmail-api.js");
     const { analyzeEmail } = await import("../../../src/clients/gemini.js");
-    const { addTask } = await import("../../../src/clients/notion.js");
+    const { addTask } = await import("../../../src/clients/tasks.js");
     const { getThreadMapEntry } = await import("../../../src/storage/d1.js");
 
     (listAllMessages as ReturnType<typeof vi.fn>).mockResolvedValue([{ id: "msg-001", threadId: "thread-001" }]);
@@ -164,7 +164,7 @@ describe("checkGmail", () => {
     const env = createMockEnv();
     const { listAllMessages, getMessage, parseMessage } = await import("../../../src/clients/gmail-api.js");
     const { analyzeEmail } = await import("../../../src/clients/gemini.js");
-    const { addTask, updateTaskFromReply } = await import("../../../src/clients/notion.js");
+    const { addTask, updateTaskFromReply } = await import("../../../src/clients/tasks.js");
     const { getThreadMapEntry } = await import("../../../src/storage/d1.js");
 
     (listAllMessages as ReturnType<typeof vi.fn>).mockResolvedValue([{ id: "msg-003", threadId: "thread-001" }]);
@@ -198,7 +198,7 @@ describe("checkGmail", () => {
     const env = createMockEnv();
     const { listAllMessages, getMessage, parseMessage } = await import("../../../src/clients/gmail-api.js");
     const { analyzeEmail } = await import("../../../src/clients/gemini.js");
-    const { getTaskTitleAndDue } = await import("../../../src/clients/notion.js");
+    const { getTaskTitleAndDue } = await import("../../../src/clients/tasks.js");
     const { getThreadMapEntry } = await import("../../../src/storage/d1.js");
     const { syncTaskCalendarEventSafe } = await import("../../../src/handlers/calendar.js");
 
@@ -235,7 +235,7 @@ describe("checkGmail", () => {
 
     const { listAllMessages, getMessage, parseMessage } = await import("../../../src/clients/gmail-api.js");
     const { analyzeEmail } = await import("../../../src/clients/gemini.js");
-    const { addTask } = await import("../../../src/clients/notion.js");
+    const { addTask } = await import("../../../src/clients/tasks.js");
 
     (listAllMessages as ReturnType<typeof vi.fn>).mockResolvedValue([{ id: "msg-spam", threadId: "thread-spam" }]);
     (getMessage as ReturnType<typeof vi.fn>).mockResolvedValue(gmailFixtures.newEmail);
@@ -312,7 +312,7 @@ describe("checkGmail", () => {
     const env = createMockEnv();
     const { listAllMessages, getMessage, parseMessage, isCalendarInvite } = await import("../../../src/clients/gmail-api.js");
     const { analyzeEmail } = await import("../../../src/clients/gemini.js");
-    const { addTask } = await import("../../../src/clients/notion.js");
+    const { addTask } = await import("../../../src/clients/tasks.js");
     const { getThreadMapEntry, isProcessed } = await import("../../../src/storage/d1.js");
 
     (isCalendarInvite as ReturnType<typeof vi.fn>).mockReturnValue(false);
@@ -346,7 +346,7 @@ describe("checkGmail", () => {
     const env = createMockEnv();
     const { listAllMessages, getMessage, parseMessage, isCalendarInvite } = await import("../../../src/clients/gmail-api.js");
     const { analyzeEmail } = await import("../../../src/clients/gemini.js");
-    const { addTask } = await import("../../../src/clients/notion.js");
+    const { addTask } = await import("../../../src/clients/tasks.js");
     const { getThreadMapEntry, isProcessed } = await import("../../../src/storage/d1.js");
     const { sendMessage } = await import("../../../src/clients/telegram.js");
 
@@ -384,7 +384,7 @@ describe("learnFromCancelled", () => {
   it("adds cancelled task sender to blocklist", async () => {
     const env = createMockEnv();
     const { getAllSenderMap } = await import("../../../src/storage/d1.js");
-    const { getTaskStatus } = await import("../../../src/clients/notion.js");
+    const { getTaskStatus } = await import("../../../src/clients/tasks.js");
     const { sendMessage } = await import("../../../src/clients/telegram.js");
 
     (getAllSenderMap as ReturnType<typeof vi.fn>).mockResolvedValue(
@@ -402,7 +402,7 @@ describe("learnFromCancelled", () => {
   it("removes completed task from sender_map without adding to blocklist", async () => {
     const env = createMockEnv();
     const { getAllSenderMap, deleteSenderMapEntry } = await import("../../../src/storage/d1.js");
-    const { getTaskStatus } = await import("../../../src/clients/notion.js");
+    const { getTaskStatus } = await import("../../../src/clients/tasks.js");
 
     (getAllSenderMap as ReturnType<typeof vi.fn>).mockResolvedValue(
       new Map([["page-done", "friend@example.com"]]),

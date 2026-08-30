@@ -1,6 +1,6 @@
 import type { Env, CalendarEvent, Task } from "../types.js";
 import { getTodaysEvents } from "../clients/gcal-api.js";
-import { getOpenTasks } from "../clients/notion.js";
+import { getOpenTasks } from "../clients/tasks.js";
 import { summarizeDay } from "../clients/gemini.js";
 import { sendMessage, escapeMd } from "../clients/telegram.js";
 import { getDailyUsage, takeEmailDigest } from "../storage/kv.js";
@@ -85,7 +85,7 @@ export async function sendDailyBriefing(env: Env): Promise<void> {
     console.log("Skipping daily briefing due to quiet hours");
     return;
   }
-  // 1. Notion/KV updates that we want to notify about
+  // 1. タスクストア/KV updates that we want to notify about
   const [escalationText, backlogText, emailDigestText] = await Promise.all([
     getEscalationNoticeText(env),
     getBacklogPromotionNoticeText(env),

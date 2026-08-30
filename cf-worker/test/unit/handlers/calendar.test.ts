@@ -3,7 +3,7 @@ import { getDueSoonNoticeText, syncTaskCalendarEvent, syncCalendar } from "../..
 import { createMockEnv } from "../../helpers/mocks.js";
 import type { Task } from "../../../src/types.js";
 
-vi.mock("../../../src/clients/notion.js", () => ({
+vi.mock("../../../src/clients/tasks.js", () => ({
   getOpenTasks: vi.fn(),
 }));
 
@@ -34,7 +34,7 @@ describe("getDueSoonNoticeText", () => {
 
   it("sends notice for tasks due today and tomorrow", async () => {
     const env = createMockEnv();
-    const { getOpenTasks } = await import("../../../src/clients/notion.js");
+    const { getOpenTasks } = await import("../../../src/clients/tasks.js");
     const { sendMessage } = await import("../../../src/clients/telegram.js");
 
     const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
@@ -57,7 +57,7 @@ describe("getDueSoonNoticeText", () => {
 
   it("escapes Markdown special characters in task titles", async () => {
     const env = createMockEnv();
-    const { getOpenTasks } = await import("../../../src/clients/notion.js");
+    const { getOpenTasks } = await import("../../../src/clients/tasks.js");
     const { sendMessage } = await import("../../../src/clients/telegram.js");
 
     const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
@@ -73,7 +73,7 @@ describe("getDueSoonNoticeText", () => {
 
   it("does not send when no tasks due soon", async () => {
     const env = createMockEnv();
-    const { getOpenTasks } = await import("../../../src/clients/notion.js");
+    const { getOpenTasks } = await import("../../../src/clients/tasks.js");
     const { sendMessage } = await import("../../../src/clients/telegram.js");
 
     const tasks: Task[] = [
@@ -188,7 +188,7 @@ describe("syncCalendar (delegates to syncTaskCalendarEvent)", () => {
 
   it("creates one event for a single due task with an empty sync store", async () => {
     const env = createMockEnv();
-    const { getOpenTasks } = await import("../../../src/clients/notion.js");
+    const { getOpenTasks } = await import("../../../src/clients/tasks.js");
     const { insertEvent } = await import("../../../src/clients/gcal-api.js");
     const { getAllCalendarSync, getCalendarSync, setCalendarSync } = await import("../../../src/storage/d1.js");
     (getAllCalendarSync as ReturnType<typeof vi.fn>).mockResolvedValue(new Map());

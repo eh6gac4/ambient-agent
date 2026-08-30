@@ -3,13 +3,13 @@ import { handleTelegramWebhook } from "../../../src/handlers/telegram.js";
 import { createMockEnv, sampleTasks } from "../../helpers/mocks.js";
 import telegramFixtures from "../../fixtures/telegram-updates.json" with { type: "json" };
 
-vi.mock("../../../src/clients/notion.js", () => ({
+vi.mock("../../../src/clients/tasks.js", () => ({
   getOpenTasks: vi.fn(),
   addTask: vi.fn().mockResolvedValue("page-new"),
   completeTask: vi.fn().mockResolvedValue(undefined),
   cancelTask: vi.fn().mockResolvedValue(undefined),
   updateTaskDue: vi.fn().mockResolvedValue(undefined),
-  uploadImageToNotion: vi.fn().mockResolvedValue("upload-id-001"),
+  uploadTaskImage: vi.fn().mockResolvedValue({ id: "att-001", key: "tasks/attachments/att-001/telegram.jpg", name: "telegram.jpg", contentType: "image/jpeg", size: 1024 }),
 }));
 
 vi.mock("../../../src/clients/telegram.js", () => ({
@@ -75,7 +75,7 @@ describe("handleTelegramWebhook", () => {
 
   it("/add command creates a task", async () => {
     const env = createMockEnv();
-    const { addTask } = await import("../../../src/clients/notion.js");
+    const { addTask } = await import("../../../src/clients/tasks.js");
     const { sendMessage } = await import("../../../src/clients/telegram.js");
 
     await handleTelegramWebhook(env, telegramFixtures.addCommand);
@@ -91,16 +91,16 @@ describe("handleTelegramWebhook", () => {
 
   it("/tasks command fetches open tasks and caches them", async () => {
     const env = createMockEnv();
-    const { getOpenTasks } = await import("../../../src/clients/notion.js");
+    const { getOpenTasks } = await import("../../../src/clients/tasks.js");
     (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue(sampleTasks());
 
     await handleTelegramWebhook(env, telegramFixtures.tasksCommand);
     expect(getOpenTasks).toHaveBeenCalledWith(env);
   });
 
-  it("photo message: consolidates all extracted tasks into ONE Notion task with image attached", async () => {
+  it("photo message: consolidates all extracted tasks into ONE task with image attached", async () => {
     const env = createMockEnv({ OPERATING_START_HOUR: "0", OPERATING_END_HOUR: "24" });
-    const { addTask, uploadImageToNotion } = await import("../../../src/clients/notion.js");
+    const { addTask, uploadTaskImage } = await import("../../../src/clients/tasks.js");
     const { analyzeImage } = await import("../../../src/clients/gemini.js");
     const { getFileUrl } = await import("../../../src/clients/telegram.js");
 
@@ -117,7 +117,7 @@ describe("handleTelegramWebhook", () => {
 
     await handleTelegramWebhook(env, telegramFixtures.photoMessage);
 
-    expect(uploadImageToNotion).toHaveBeenCalledTimes(1);
+    expect(uploadTaskImage).toHaveBeenCalledTimes(1);
     expect(addTask).toHaveBeenCalledTimes(1);
     expect(addTask).toHaveBeenCalledWith(
       env,
@@ -128,7 +128,7 @@ describe("handleTelegramWebhook", () => {
         expect.objectContaining({ title: "パンを買う", priority: "low" }),
       ],
       undefined,
-      "upload-id-001",
+      { id: "att-001", key: "tasks/attachments/att-001/telegram.jpg", name: "telegram.jpg", contentType: "image/jpeg", size: 1024 },
     );
     const { sendMessage } = await import("../../../src/clients/telegram.js");
     expect(sendMessage).toHaveBeenCalledWith(
@@ -154,7 +154,7 @@ describe("handleTelegramWebhook", () => {
   it("text message: immediately syncs a dated task to the calendar", async () => {
     const env = createMockEnv({ OPERATING_START_HOUR: "0", OPERATING_END_HOUR: "24" });
     const { extractTasksFromText } = await import("../../../src/clients/gemini.js");
-    const { addTask } = await import("../../../src/clients/notion.js");
+    const { addTask } = await import("../../../src/clients/tasks.js");
     const { syncTaskCalendarEventSafe } = await import("../../../src/handlers/calendar.js");
 
     (extractTasksFromText as ReturnType<typeof vi.fn>).mockResolvedValue([

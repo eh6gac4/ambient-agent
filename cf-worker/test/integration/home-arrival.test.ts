@@ -6,7 +6,7 @@ vi.mock("../../src/utils/holiday.js", () => ({
   isHoliday: vi.fn().mockResolvedValue(false),
 }));
 
-vi.mock("../../src/clients/notion.js", () => ({
+vi.mock("../../src/clients/tasks.js", () => ({
   getOpenTasks: vi.fn(),
 }));
 
@@ -44,7 +44,7 @@ describe("/home-arrival ingress", () => {
 
   it("returns notifications JSON for Location-matched (home) tasks", async () => {
     const env = createMockEnv();
-    const { getOpenTasks } = await import("../../src/clients/notion.js");
+    const { getOpenTasks } = await import("../../src/clients/tasks.js");
     const { sendMessage } = await import("../../src/clients/telegram.js");
 
     const tasks = sampleTasks().map((t, i) => ({ ...t, location: i === 0 ? "home" : t.location }));
@@ -59,7 +59,7 @@ describe("/home-arrival ingress", () => {
 
   it("returns empty array and skips Telegram when no tasks", async () => {
     const env = createMockEnv();
-    const { getOpenTasks } = await import("../../src/clients/notion.js");
+    const { getOpenTasks } = await import("../../src/clients/tasks.js");
     const { sendMessage } = await import("../../src/clients/telegram.js");
 
     (getOpenTasks as ReturnType<typeof vi.fn>).mockResolvedValue([]);
@@ -73,7 +73,7 @@ describe("/home-arrival ingress", () => {
 
   it("returns 500 with empty notifications when handler throws", async () => {
     const env = createMockEnv();
-    const { getOpenTasks } = await import("../../src/clients/notion.js");
+    const { getOpenTasks } = await import("../../src/clients/tasks.js");
 
     (getOpenTasks as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("Notion error"));
 

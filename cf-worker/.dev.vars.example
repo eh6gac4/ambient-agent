@@ -20,10 +20,11 @@ ALERT_TOKEN=dev-alert-token
 OWNTRACKS_TOKEN=dev-owntracks-token
 
 # ------------------------------------------------------------
-# Notion (dummy で OK。実 dev DB を使うなら実値)
+# タスクストア (D1/R2) は secret ではなくバインディング。
+# wrangler dev はローカルエミュレーション（本番の notion-tasks D1 とは別物）を
+# 使うので、dev で /tasks 等を試すときは下記でスキーマを流し込む:
+#   npx wrangler d1 execute notion-tasks --local --file=<notion-tasks>/migrations/0001_init.sql
 # ------------------------------------------------------------
-NOTION_TOKEN=ntn_dummy_dev_token
-NOTION_TASKS_DB_ID=00000000000000000000000000000000
 
 # ------------------------------------------------------------
 # Anthropic / Google: 本番と同じ値で OK

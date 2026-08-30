@@ -6,8 +6,6 @@ import { execSync } from "node:child_process";
 
 const SECRET_KEYS = [
   "ANTHROPIC_API_KEY",
-  "NOTION_TOKEN",
-  "NOTION_TASKS_DB_ID",
   "TELEGRAM_BOT_TOKEN",
   "TELEGRAM_CHAT_ID",
   "ALERT_TOKEN",

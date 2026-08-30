@@ -1,7 +1,7 @@
 import type { Env } from "../types.js";
 import { listAllMessages, getMessage, parseMessage, isCalendarInvite, archiveMessage, addLabel, getOrCreateLabel } from "../clients/gmail-api.js";
 import { analyzeEmail, pickTaskTitle } from "../clients/gemini.js";
-import { addTask, updateTaskFromReply, getTaskStatus, getTaskTitleAndDue } from "../clients/notion.js";
+import { addTask, updateTaskFromReply, getTaskStatus, getTaskTitleAndDue } from "../clients/tasks.js";
 import { sendMessage, escapeMd } from "../clients/telegram.js";
 import { taskLink } from "./telegram.js";
 import { syncTaskCalendarEventSafe } from "./calendar.js";
@@ -75,7 +75,7 @@ export async function checkGmail(env: Env, options: CheckGmailOptions = {}): Pro
         if (existingPageId) {
           await updateTaskFromReply(env, existingPageId, tasks, best.priority, dues[0] ?? null, body);
           if (taskLabelId) await addLabel(env, meta.id, taskLabelId);
-          // updateTaskFromReply で Due が前倒しされた場合に備えて Notion の最新値で同期
+          // updateTaskFromReply で Due が前倒しされた場合に備えてタスクストアの最新値で同期
           const latest = await getTaskTitleAndDue(env, existingPageId);
           if (latest) {
             await syncTaskCalendarEventSafe(env, { pageId: existingPageId, title: latest.title, due: latest.due });

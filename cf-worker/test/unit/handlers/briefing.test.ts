@@ -6,7 +6,7 @@ vi.mock("../../../src/clients/gcal-api.js", () => ({
   getTodaysEvents: vi.fn(),
 }));
 
-vi.mock("../../../src/clients/notion.js", () => ({
+vi.mock("../../../src/clients/tasks.js", () => ({
   getOpenTasks: vi.fn(),
   escalatePriorityTasks: vi.fn().mockResolvedValue([]),
   promoteBacklogTasks: vi.fn().mockResolvedValue([]),
@@ -42,7 +42,7 @@ describe("sendDailyBriefing", () => {
   it("escapes Markdown special characters in summary, event names and task titles", async () => {
     const env = createMockEnv();
     const { getTodaysEvents } = await import("../../../src/clients/gcal-api.js");
-    const { getOpenTasks } = await import("../../../src/clients/notion.js");
+    const { getOpenTasks } = await import("../../../src/clients/tasks.js");
     const { summarizeDay } = await import("../../../src/clients/gemini.js");
     const { sendMessage } = await import("../../../src/clients/telegram.js");
 
@@ -68,7 +68,7 @@ describe("sendDailyBriefing", () => {
   it("escapes overdue task titles", async () => {
     const env = createMockEnv();
     const { getTodaysEvents } = await import("../../../src/clients/gcal-api.js");
-    const { getOpenTasks } = await import("../../../src/clients/notion.js");
+    const { getOpenTasks } = await import("../../../src/clients/tasks.js");
     const { summarizeDay } = await import("../../../src/clients/gemini.js");
     const { sendMessage } = await import("../../../src/clients/telegram.js");
 
