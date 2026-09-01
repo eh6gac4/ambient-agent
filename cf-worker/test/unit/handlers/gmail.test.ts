@@ -50,6 +50,7 @@ vi.mock("../../../src/storage/d1.js", () => ({
   isProcessed: vi.fn().mockResolvedValue(false),
   markProcessed: vi.fn().mockResolvedValue(undefined),
   cleanOldProcessed: vi.fn().mockResolvedValue(undefined),
+  saveEmail: vi.fn().mockResolvedValue(undefined),
 }));
 
 describe("checkGmail", () => {
@@ -249,6 +250,64 @@ describe("checkGmail", () => {
     await checkGmail(env);
     expect(analyzeEmail).not.toHaveBeenCalled();
     expect(addTask).not.toHaveBeenCalled();
+
+    const { saveEmail } = await import("../../../src/storage/d1.js");
+    expect(saveEmail).not.toHaveBeenCalled();
+  });
+
+  it("archives the message body for /mail search", async () => {
+    const env = createMockEnv();
+    const { listAllMessages, getMessage, parseMessage } = await import("../../../src/clients/gmail-api.js");
+    const { analyzeEmail } = await import("../../../src/clients/gemini.js");
+    const { saveEmail } = await import("../../../src/storage/d1.js");
+
+    (listAllMessages as ReturnType<typeof vi.fn>).mockResolvedValue([{ id: "msg-arch", threadId: "thread-arch" }]);
+    (getMessage as ReturnType<typeof vi.fn>).mockResolvedValue(gmailFixtures.newEmail);
+    (parseMessage as ReturnType<typeof vi.fn>).mockReturnValue({
+      subject: "請求書の送付",
+      body: "3月分の請求書を添付します",
+      senderEmail: "keiri@example.com",
+      threadId: "thread-arch",
+      gmailUrl: "https://mail.google.com/mail/u/0/#all/thread-arch",
+    });
+    (analyzeEmail as ReturnType<typeof vi.fn>).mockResolvedValue({ summary: "請求書", tasks: [] });
+
+    await checkGmail(env);
+    expect(saveEmail).toHaveBeenCalledWith(env, {
+      messageId: "msg-arch",
+      subject: "請求書の送付",
+      senderEmail: "keiri@example.com",
+      body: "3月分の請求書を添付します",
+      gmailUrl: "https://mail.google.com/mail/u/0/#all/thread-arch",
+    });
+  });
+
+  it("continues task creation when archiving fails", async () => {
+    const env = createMockEnv();
+    const { listAllMessages, getMessage, parseMessage } = await import("../../../src/clients/gmail-api.js");
+    const { analyzeEmail } = await import("../../../src/clients/gemini.js");
+    const { addTask } = await import("../../../src/clients/tasks.js");
+    const { getThreadMapEntry, saveEmail } = await import("../../../src/storage/d1.js");
+
+    (listAllMessages as ReturnType<typeof vi.fn>).mockResolvedValue([{ id: "msg-fail", threadId: "thread-fail" }]);
+    (getMessage as ReturnType<typeof vi.fn>).mockResolvedValue(gmailFixtures.newEmail);
+    (parseMessage as ReturnType<typeof vi.fn>).mockReturnValue({
+      subject: "確認依頼",
+      body: "本文",
+      senderEmail: "a@example.com",
+      threadId: "thread-fail",
+      gmailUrl: "",
+    });
+    (analyzeEmail as ReturnType<typeof vi.fn>).mockResolvedValue({
+      summary: "確認",
+      tasks: [{ title: "確認する", priority: "medium", due: null }],
+    });
+    (getThreadMapEntry as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    (addTask as ReturnType<typeof vi.fn>).mockResolvedValue("page-fail-001");
+    (saveEmail as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("D1 down"));
+
+    await checkGmail(env);
+    expect(addTask).toHaveBeenCalledTimes(1);
   });
 
   it("skips already-processed messages", async () => {

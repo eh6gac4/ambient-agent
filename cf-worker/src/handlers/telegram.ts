@@ -7,6 +7,7 @@ import { getTaskCache, setTaskCache, getNoTaskSenders, addNoTaskSender, removeNo
 import { deleteCalendarEventForTask, syncTaskCalendarEventSafe } from "./calendar.js";
 import { formatTaskList, sortTasks } from "./task-formatter.js";
 import { sendDailyBriefing } from "./briefing.js";
+import { searchMail } from "./mail-search.js";
 import { bestPriorityTask } from "../utils/task.js";
 import { jstNow } from "../utils/jst.js";
 
@@ -148,6 +149,11 @@ async function handleCommand(env: Env, text: string): Promise<void> {
       return;
     }
 
+    case "/mail": {
+      await sendMessage(env, await searchMail(env, arg));
+      return;
+    }
+
     case "/briefing": {
       await sendMessage(env, "⏳ ブリーフィングを生成中...");
       await sendDailyBriefing(env);
@@ -192,6 +198,7 @@ async function handleCommand(env: Env, text: string): Promise<void> {
           "`/unblock <メール>` — 送信者のブロックを解除\n" +
           "`/add <タスク名>` — タスクを追加\n" +
           "`/due <番号> <日付>` — 期限を変更（例: `/due 3 2026-03-25`）\n" +
+          "`/mail <キーワード>` — 取り込んだメールを部分一致で検索\n" +
           "`/briefing` — 今すぐブリーフィングを実行\n\n" +
           "URL・テキスト・転送メッセージ・画像を送るとタスクを自動抽出します",
       );

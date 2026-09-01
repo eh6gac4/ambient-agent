@@ -100,6 +100,26 @@ function extractEmail(sender: string): string {
   return sender.trim().toLowerCase();
 }
 
+/** messages.list を 1 ページぶん叩く。ID とページトークンだけを返す。 */
+async function fetchMessageIds(
+  token: string,
+  query: string,
+  maxResults: number,
+  pageToken?: string,
+): Promise<{ messages: Array<{ id: string; threadId: string }>; nextPageToken?: string }> {
+  const params = new URLSearchParams({ q: query, maxResults: String(maxResults) });
+  if (pageToken) params.set("pageToken", pageToken);
+
+  const resp = await fetch(`${BASE}/messages?${params}`, { headers: authHeader(token) });
+  if (!resp.ok) throw new Error(`Gmail list messages failed: ${resp.status}`);
+
+  const data = await resp.json<{
+    messages?: Array<{ id: string; threadId: string }>;
+    nextPageToken?: string;
+  }>();
+  return { messages: data.messages ?? [], nextPageToken: data.nextPageToken };
+}
+
 export async function listAllMessages(env: Env): Promise<Array<{ id: string; threadId: string }>> {
   const token = await getAccessToken(env);
   const messages: Array<{ id: string; threadId: string }> = [];
@@ -107,27 +127,41 @@ export async function listAllMessages(env: Env): Promise<Array<{ id: string; thr
 
   while (messages.length < MAX_MESSAGES_PER_RUN) {
     const batch = Math.min(100, MAX_MESSAGES_PER_RUN - messages.length);
-    const params = new URLSearchParams({ q: GMAIL_QUERY, maxResults: String(batch) });
-    if (pageToken) params.set("pageToken", pageToken);
-
-    const resp = await fetch(`${BASE}/messages?${params}`, { headers: authHeader(token) });
-    if (!resp.ok) throw new Error(`Gmail list messages failed: ${resp.status}`);
-
-    const data = await resp.json<{
-      messages?: Array<{ id: string; threadId: string }>;
-      nextPageToken?: string;
-    }>();
-    messages.push(...(data.messages ?? []));
-    pageToken = data.nextPageToken;
+    const page = await fetchMessageIds(token, GMAIL_QUERY, batch, pageToken);
+    messages.push(...page.messages);
+    pageToken = page.nextPageToken;
     if (!pageToken) break;
   }
 
   return messages;
 }
 
-export async function getMessage(env: Env, msgId: string): Promise<GmailMessage> {
+/**
+ * 任意のクエリで Gmail を検索する。Gmail 側の検索は語の前方一致である点に注意。
+ * 取り込み対象の抽出（listAllMessages）とは別用途。
+ */
+export async function searchMessages(
+  env: Env,
+  query: string,
+  limit: number,
+): Promise<Array<{ id: string; threadId: string }>> {
   const token = await getAccessToken(env);
-  const resp = await fetch(`${BASE}/messages/${msgId}?format=full`, {
+  const page = await fetchMessageIds(token, query, limit);
+  return page.messages;
+}
+
+export async function getMessage(env: Env, msgId: string): Promise<GmailMessage> {
+  return fetchMessage(env, msgId, "full");
+}
+
+/** 件名・送信者だけが必要なときの軽量版（本文を転送しない）。 */
+export async function getMessageHeaders(env: Env, msgId: string): Promise<GmailMessage> {
+  return fetchMessage(env, msgId, "metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Message-ID");
+}
+
+async function fetchMessage(env: Env, msgId: string, format: string): Promise<GmailMessage> {
+  const token = await getAccessToken(env);
+  const resp = await fetch(`${BASE}/messages/${msgId}?format=${format}`, {
     headers: authHeader(token),
   });
   if (!resp.ok) throw new Error(`Gmail getMessage failed: ${resp.status}`);

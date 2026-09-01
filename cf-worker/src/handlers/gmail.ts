@@ -16,6 +16,7 @@ import {
   isProcessed,
   markProcessed,
   cleanOldProcessed,
+  saveEmail,
 } from "../storage/d1.js";
 import { getNoTaskSenders, addNoTaskSender, appendEmailDigest } from "../storage/kv.js";
 
@@ -59,6 +60,13 @@ export async function checkGmail(env: Env, options: CheckGmailOptions = {}): Pro
         await archiveMessage(env, meta.id);
         await markProcessed(env, meta.id);
         continue;
+      }
+
+      // /mail の部分一致検索用に保管する。失敗してもタスク登録は続行する。
+      try {
+        await saveEmail(env, { messageId: meta.id, subject, senderEmail, body, gmailUrl });
+      } catch (err) {
+        console.error(`checkGmail: failed to archive message ${meta.id}:`, err);
       }
 
       const analysis = await analyzeEmail(env, subject, body);
