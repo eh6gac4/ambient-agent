@@ -28,6 +28,16 @@ export function jstDateTimeStr(): string {
   });
 }
 
+/** Date を JST の "YYYY/MM/DD" 文字列に変換する。 */
+export function toJstDateStr(d: Date): string {
+  return d.toLocaleDateString("ja-JP", {
+    timeZone: TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+}
+
 /** Date を UTC 基準の YYYY-MM-DD 文字列に変換する。 */
 export function toDateStr(d: Date): string {
   return d.toISOString().slice(0, 10);

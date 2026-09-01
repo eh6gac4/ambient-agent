@@ -56,6 +56,21 @@ vi.mock("../../src/storage/d1.js", () => ({
   setCalendarSync: vi.fn().mockResolvedValue(undefined),
   deleteCalendarSync: vi.fn().mockResolvedValue(undefined),
   getAllCalendarSync: vi.fn().mockResolvedValue(new Map()),
+  saveEmail: vi.fn().mockResolvedValue(undefined),
+  cleanOldEmails: vi.fn().mockResolvedValue(undefined),
+  searchEmails: vi.fn().mockResolvedValue([]),
+}));
+
+vi.mock("../../src/clients/gmail-api.js", () => ({
+  listAllMessages: vi.fn().mockResolvedValue([]),
+  searchMessages: vi.fn().mockResolvedValue([]),
+  getMessage: vi.fn(),
+  getMessageHeaders: vi.fn(),
+  parseMessage: vi.fn(),
+  isCalendarInvite: vi.fn().mockReturnValue(false),
+  archiveMessage: vi.fn().mockResolvedValue(undefined),
+  addLabel: vi.fn().mockResolvedValue(undefined),
+  getOrCreateLabel: vi.fn().mockResolvedValue("label-id-001"),
 }));
 
 function webhookRequest(update: unknown): Request {
@@ -97,6 +112,41 @@ describe("Telegram webhook E2E", () => {
     const resp = await worker.fetch(webhookRequest(telegramFixtures.tasksCommand), env);
     expect(resp.status).toBe(200);
     expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("タスク一覧"));
+  });
+
+  it("/mail searches archived mail by substring", async () => {
+    const env = createMockEnv();
+    const { searchEmails } = await import("../../src/storage/d1.js");
+    const { sendMessage } = await import("../../src/clients/telegram.js");
+    (searchEmails as ReturnType<typeof vi.fn>).mockResolvedValue([
+      {
+        subject: "請求書の送付",
+        senderEmail: "keiri@example.com",
+        gmailUrl: "https://mail.google.com/mail/u/0/#all/t1",
+        receivedAt: 1_756_000_000,
+        body: "3月分の請求書を添付します",
+      },
+    ]);
+
+    const update = { update_id: 1010, message: { message_id: 10, chat: { id: 123456789 }, text: "/mail 請求書 3月" } };
+    const resp = await worker.fetch(webhookRequest(update), env);
+
+    expect(resp.status).toBe(200);
+    expect(searchEmails).toHaveBeenCalledWith(env, ["請求書", "3月"]);
+    expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("請求書の送付"));
+  });
+
+  it("/mail without keywords replies with usage", async () => {
+    const env = createMockEnv();
+    const { searchEmails } = await import("../../src/storage/d1.js");
+    const { sendMessage } = await import("../../src/clients/telegram.js");
+
+    const update = { update_id: 1011, message: { message_id: 11, chat: { id: 123456789 }, text: "/mail" } };
+    const resp = await worker.fetch(webhookRequest(update), env);
+
+    expect(resp.status).toBe(200);
+    expect(searchEmails).not.toHaveBeenCalled();
+    expect(sendMessage).toHaveBeenCalledWith(env, expect.stringContaining("使い方"));
   });
 
   it("ignores messages from wrong chat ID", async () => {

@@ -5,7 +5,7 @@ import { summarizeDay } from "../clients/gemini.js";
 import { sendMessage, escapeMd } from "../clients/telegram.js";
 import { getDailyUsage, takeEmailDigest } from "../storage/kv.js";
 import { PRIORITY_ICON } from "../utils/task.js";
-import { jstNow, toDateStr } from "../utils/jst.js";
+import { jstNow, toDateStr, toJstDateStr } from "../utils/jst.js";
 import { shouldSendBriefing } from "../utils/notification-policy.js";
 import { getEscalationNoticeText, getBacklogPromotionNoticeText } from "./escalation.js";
 import { getDueSoonNoticeText } from "./calendar.js";
@@ -19,12 +19,7 @@ function calcCost(inputTokens: number, outputTokens: number): number {
 }
 
 function jstDateStr(): string {
-  return new Date().toLocaleDateString("ja-JP", {
-    timeZone: "Asia/Tokyo",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).replace(/\//g, "-");
+  return toJstDateStr(new Date()).replace(/\//g, "-");
 }
 
 function formatEventTime(start: string): string {

@@ -78,6 +78,7 @@ Gmail・Google Calendar・Telegram を連携し、タスク抽出と日次ブリ
 | `/skip <番号>` | タスクを中止にし、送信者をブロック |
 | `/add <タスク名>` | タスクを追加する |
 | `/due <番号> <日付>` | 期限を変更（例: `/due 3 2026-03-25`） |
+| `/mail <キーワード>` | 取り込んだメールを部分一致で検索（複数語は AND、`"..."` でフレーズ） |
 | `/briefing` | 日次ブリーフィングを今すぐ実行 |
 | `/blocklist` | ブロック中の送信者一覧 |
 | `/unblock <メール>` | 送信者のブロックを解除 |
@@ -111,6 +112,14 @@ Gmail・Google Calendar・Telegram を連携し、タスク抽出と日次ブリ
 
 メール経由（`hourly_gmail`）は **1 メール = 1 タスク** に固定し、サブタスクへは分割しない。用件が複数あってもタイトル（Gemini の用件要約）＋本文だけを持つ 1 タスクにまとめる。
 
+## メール検索（`/mail`）
+
+Gmail API の検索は語の**前方一致**しかできず、日本語の文中の語では目的のメールに辿り着けない。そのため取り込んだメールを AGENT_DB の `emails` テーブルに保管し、`/mail` では `LIKE '%キーワード%'` の**部分一致**で検索する。
+
+- 保管対象は `hourly_gmail` が処理したメール（招待メール・ブロック送信者は除く）。本文は先頭 20,000 文字、保持期間は 180 日
+- 複数キーワードは AND、`"..."` で囲むとフレーズ 1 語として扱う（最大 5 語）
+- 保管側のヒットが 3 件未満のときは Gmail API 検索も併用し、前方一致である旨を添えて別セクションで併記する（導入以前の過去メール向け）
+
 ## ファイル構成
 
 ```
@@ -133,6 +142,7 @@ ambient-agent/
 │   │   │   ├── geofence-actions.ts # ジオフェンス アクション レジストリ
 │   │   │   ├── gmail.ts          # Gmail 処理・ブロックリスト学習
 │   │   │   ├── home-arrival.ts   # 帰宅トリガー（共通ランナーの薄いラッパ）
+│   │   │   ├── mail-search.ts    # /mail のメール検索・結果整形
 │   │   │   ├── location.ts       # OwnTracks 位置情報受信・ジオフェンス判定
 │   │   │   ├── office-leave.ts   # 退社トリガー（共通ランナーの薄いラッパ）
 │   │   │   ├── notification-trigger.ts # 帰宅/退社 共通の通知フロー
@@ -145,11 +155,13 @@ ambient-agent/
 │   │       ├── geofence.ts       # ジオフェンス純粋関数（haversine・isInside・detectTransition）
 │   │       ├── holiday.ts        # 土日・祝日判定（JST）
 │   │       ├── jst.ts            # JST 日時ヘルパー（jstNow/jstDateStr/toDateStr 等）
+│   │       ├── search.ts         # メール検索のキーワード解析・LIKE 句組み立て
 │   │       └── task.ts           # 優先度定数・最優先タスク選択
 │   ├── test/                     # Vitest テスト（242件）
 │   ├── migrations/               # D1 スキーマ
 │   │   ├── 0001_initial.sql      # Gmail・Calendar・タスク関連テーブル
-│   │   └── 0002_location_history.sql # 位置情報履歴テーブル
+│   │   ├── 0002_location_history.sql # 位置情報履歴テーブル
+│   │   └── 0003_email_archive.sql    # メール保管テーブル（/mail 検索用）
 │   ├── scripts/
 │   │   ├── push-secrets.mjs       # Worker Secrets 一括登録
 │   │   ├── setup-dev-tunnel.mjs   # dev 用 Cloudflare Named Tunnel + DNS をセットアップ
@@ -184,6 +196,7 @@ npm run kv -- namespace create AGENT_KV
 
 npm run d1 -- execute ambient-agent-db --remote --file=migrations/0001_initial.sql
 npm run d1 -- execute ambient-agent-db --remote --file=migrations/0002_location_history.sql
+npm run d1 -- execute ambient-agent-db --remote --file=migrations/0003_email_archive.sql
 ```
 
 ### 2. Google OAuth 認証情報の取得

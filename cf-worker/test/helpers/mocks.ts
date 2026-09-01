@@ -30,24 +30,27 @@ export function createMockKV(): KVNamespace {
 
 // ─── In-memory D1 mock ───────────────────────────────────────────────────────
 
-export function createMockD1(): D1Database {
-  const tables: Record<string, Record<string, unknown>[]> = {
-    gmail_thread_map: [],
-    task_sender_map: [],
-    calendar_sync: [],
-    processed_messages: [],
-  };
+export interface MockD1Options {
+  /** all() が返す行。SQL は解釈しないので、テスト側が期待する行をそのまま渡す。 */
+  rows?: Record<string, unknown>[];
+  /** 発行された SQL とバインド値の記録先。 */
+  capture?: Array<{ sql: string; binds: unknown[] }>;
+}
+
+export function createMockD1(options: MockD1Options = {}): D1Database {
+  const rows = options.rows ?? [];
 
   const stub = {
     prepare(sql: string) {
       return {
         bind(...args: unknown[]) {
+          options.capture?.push({ sql, binds: args });
           return {
             async first<T>() {
               return null as T | null;
             },
             async all<T>() {
-              return { results: [] as T[], success: true, meta: {} };
+              return { results: rows as T[], success: true, meta: {} };
             },
             async run() {
               return { success: true, meta: {} };

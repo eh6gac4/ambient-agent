@@ -9,7 +9,7 @@ import { handleOfficeLeave } from "./handlers/office-leave.js";
 import { handleOwnTracksLocation } from "./handlers/location.js";
 import { sendMessage } from "./clients/telegram.js";
 import { isHoliday } from "./utils/holiday.js";
-import { cleanOldProcessed, cleanOldLocations, cleanOldAppLogs, insertAppLog } from "./storage/d1.js";
+import { cleanOldProcessed, cleanOldLocations, cleanOldAppLogs, cleanOldEmails, insertAppLog } from "./storage/d1.js";
 import { reportError } from "./handlers/error-handler.js";
 
 // 無料プランの Cron 上限は5個（現状4ジョブ使用）
@@ -32,6 +32,7 @@ async function morningPrep(env: Env): Promise<void> {
     await cleanOldProcessed(env);
     await cleanOldLocations(env);
     await cleanOldAppLogs(env);
+    await cleanOldEmails(env);
   } catch (err) {
     await reportError(env, "morningPrep: cleanup", err);
   }
