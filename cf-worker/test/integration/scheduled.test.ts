@@ -81,6 +81,26 @@ describe("scheduled handler - cron dispatch", () => {
     expect(syncCalendar).toHaveBeenCalledWith(env);
   });
 
+  it("pauses scheduled Gmail extraction while continuing calendar sync", async () => {
+    const env = createMockEnv();
+    env.GMAIL_EXTRACTION_ENABLED = "false";
+    const { checkGmail } = await import("../../src/handlers/gmail.js");
+    const { syncCalendar } = await import("../../src/handlers/calendar.js");
+
+    await worker.scheduled(makeScheduledEvent("30 22-23,0-12 * * *"), env);
+    expect(checkGmail).not.toHaveBeenCalled();
+    expect(syncCalendar).toHaveBeenCalledWith(env);
+  });
+
+  it("resumes scheduled Gmail extraction when enabled", async () => {
+    const env = createMockEnv();
+    env.GMAIL_EXTRACTION_ENABLED = "true";
+    const { checkGmail } = await import("../../src/handlers/gmail.js");
+
+    await worker.scheduled(makeScheduledEvent("30 22-23,0-12 * * *"), env);
+    expect(checkGmail).toHaveBeenCalledWith(env, { silent: true });
+  });
+
   it("dispatches sendStaleTasksNotice for 0 0 * * MON", async () => {
     const env = createMockEnv();
     const { sendStaleTasksNotice } = await import("../../src/handlers/escalation.js");

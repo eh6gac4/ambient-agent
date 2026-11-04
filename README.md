@@ -37,7 +37,7 @@ Gmail・Google Calendar・Telegram を連携し、タスク抽出と日次ブリ
 
 | 時刻 (JST) | ジョブ | 内容 | 休日スキップ |
 |---|---|---|---|
-| 07:30〜21:30 毎時 | hourly_gmail | Gmail 未読を少しずつサイレント処理（通知せず KV に蓄積） + カレンダー同期 | なし（バックグラウンド処理のため） |
+| 07:30〜21:30 毎時 | hourly_gmail | カレンダー同期（Gmail からのタスク抽出は一時停止中） | なし（バックグラウンド処理のため） |
 | 05:20 | morning_prep | ①ブロックリスト学習 → ②カレンダー同期 → ③バックログ昇格 → ④優先度昇格 | あり |
 | 日 05:30 | weekly_cost_report | 直近1週間の Gemini API 呼び出しコストレポートを Telegram 送信 | あり |
 | 月 09:00 | stale_tasks | 14日以上未更新タスクを通知 | あり |
@@ -47,6 +47,7 @@ Gmail・Google Calendar・Telegram を連携し、タスク抽出と日次ブリ
 > **休日スキップ**: 土日および日本の祝日（`holidays-jp.github.io` API 参照）は通知系ジョブを実行しない。帰宅通知（`/home-arrival`）・退社通知（`/office-leave`）も同様にスキップ。
 
 **hourly_gmail の詳細:**
+- メールからの定期タスク抽出は一時停止中。`cf-worker/wrangler.toml` の `GMAIL_EXTRACTION_ENABLED = "false"` で制御し、再開時は `"true"` に変更してデプロイする。停止中も毎時のカレンダー同期は継続する。
 - 未読メールを要約し、タスクストアに **1 メール = 1 タスク** で登録（サブタスクには分割しない。返信スレッドは新規タスクを作らず既存タスクの Priority / Due 更新と本文追記のみ）
 - タスクのタイトルは Gemini が生成する「誰から何の用件か分かる短文」を使う（メール件名そのままは避ける）
 - Telegram 通知はせず、結果を `email_digest:pending` (KV) に追記
