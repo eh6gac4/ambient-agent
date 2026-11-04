@@ -17,6 +17,7 @@ export interface Env {
   OPERATING_END_HOUR?: string;
   GMAIL_TASK_LABEL?: string;
   GMAIL_ACCOUNT_INDEX?: string;
+  GMAIL_EXTRACTION_ENABLED?: string;
   GITHUB_PAT?: string;
   GITHUB_REPO?: string;
   QUIET_HOURS_START?: string;

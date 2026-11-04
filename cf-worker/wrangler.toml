@@ -4,6 +4,10 @@ compatibility_date = "2024-11-01"
 compatibility_flags = ["nodejs_compat"]
 logpush = true
 
+[vars]
+# メールからの定期タスク抽出を一時停止。再開時は "true" に変更する。
+GMAIL_EXTRACTION_ENABLED = "false"
+
 [triggers]
 crons = [
   "30 22-23,0-12 * * *",  # 毎時30分 (JST 07:30-21:30): hourly_gmail (silent batch)
