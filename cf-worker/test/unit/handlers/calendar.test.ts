@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { getDueSoonNoticeText, syncTaskCalendarEvent, syncCalendar } from "../../../src/handlers/calendar.js";
+import { getDueSoonNoticeText, syncTaskCalendarEvent, syncTaskCalendarEventSafe, deleteCalendarEventForTask, syncCalendar } from "../../../src/handlers/calendar.js";
 import { createMockEnv } from "../../helpers/mocks.js";
 import type { Task } from "../../../src/types.js";
 
@@ -26,6 +26,30 @@ vi.mock("../../../src/storage/d1.js", () => ({
   setCalendarSync: vi.fn().mockResolvedValue(undefined),
   deleteCalendarSync: vi.fn().mockResolvedValue(undefined),
 }));
+
+describe("paused calendar sync", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it.each(["scheduled", "task", "safe task", "delete"])("skips %s sync without accessing Calendar or sync records", async (entry) => {
+    const env = createMockEnv();
+    env.CALENDAR_SYNC_ENABLED = "false";
+    const task = { pageId: "p1", title: "予定", due: "2099-05-17T17:00:00" };
+    const { getOpenTasks } = await import("../../../src/clients/tasks.js");
+    const { insertEvent, updateEventDateTime, deleteEvent } = await import("../../../src/clients/gcal-api.js");
+    const { getAllCalendarSync, getCalendarSync, setCalendarSync, deleteCalendarSync } = await import("../../../src/storage/d1.js");
+
+    if (entry === "scheduled") await syncCalendar(env);
+    if (entry === "task") await syncTaskCalendarEvent(env, task);
+    if (entry === "safe task") await syncTaskCalendarEventSafe(env, task);
+    if (entry === "delete") await deleteCalendarEventForTask(env, task.pageId);
+
+    for (const operation of [getOpenTasks, insertEvent, updateEventDateTime, deleteEvent, getAllCalendarSync, getCalendarSync, setCalendarSync, deleteCalendarSync]) {
+      expect(operation).not.toHaveBeenCalled();
+    }
+  });
+});
 
 describe("getDueSoonNoticeText", () => {
   beforeEach(() => {

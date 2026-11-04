@@ -6,6 +6,7 @@ import { getCalendarSync, setCalendarSync, deleteCalendarSync, getAllCalendarSyn
 import { jstNow } from "../utils/jst.js";
 
 export async function syncCalendar(env: Env): Promise<void> {
+  if (env.CALENDAR_SYNC_ENABLED === "false") return;
   const tasks = await getOpenTasks(env);
   const pendingIds = new Set(tasks.map((t) => t.pageId));
   const store = await getAllCalendarSync(env);
@@ -37,6 +38,7 @@ export async function syncTaskCalendarEvent(
   env: Env,
   task: Pick<Task, "pageId" | "title" | "due">,
 ): Promise<void> {
+  if (env.CALENDAR_SYNC_ENABLED === "false") return;
   if (!task.due) return;
 
   const today = new Date().toISOString().slice(0, 10);
@@ -90,6 +92,7 @@ export async function syncTaskCalendarEventSafe(
 }
 
 export async function deleteCalendarEventForTask(env: Env, pageId: string): Promise<void> {
+  if (env.CALENDAR_SYNC_ENABLED === "false") return;
   const record = await getCalendarSync(env, pageId);
   if (!record) return;
   try {
