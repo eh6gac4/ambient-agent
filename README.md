@@ -37,7 +37,7 @@ Gmail・Google Calendar・Telegram を連携し、タスク抽出と日次ブリ
 
 | 時刻 (JST) | ジョブ | 内容 | 休日スキップ |
 |---|---|---|---|
-| 07:30〜21:30 毎時 | hourly_gmail | カレンダー同期（Gmail からのタスク抽出は一時停止中） | なし（バックグラウンド処理のため） |
+| 07:30〜21:30 毎時 | hourly_gmail | Gmail からのタスク抽出・カレンダー同期ともに一時停止中 | なし（バックグラウンド処理のため） |
 | 05:20 | morning_prep | ①ブロックリスト学習 → ②カレンダー同期 → ③バックログ昇格 → ④優先度昇格 | あり |
 | 日 05:30 | weekly_cost_report | 直近1週間の Gemini API 呼び出しコストレポートを Telegram 送信 | あり |
 | 月 09:00 | stale_tasks | 14日以上未更新タスクを通知 | あり |
@@ -47,7 +47,7 @@ Gmail・Google Calendar・Telegram を連携し、タスク抽出と日次ブリ
 > **休日スキップ**: 土日および日本の祝日（`holidays-jp.github.io` API 参照）は通知系ジョブを実行しない。帰宅通知（`/home-arrival`）・退社通知（`/office-leave`）も同様にスキップ。
 
 **hourly_gmail の詳細:**
-- メールからの定期タスク抽出は一時停止中。`cf-worker/wrangler.toml` の `GMAIL_EXTRACTION_ENABLED = "false"` で制御し、再開時は `"true"` に変更してデプロイする。停止中も毎時のカレンダー同期は継続する。
+- メールからの定期タスク抽出は一時停止中。`cf-worker/wrangler.toml` の `GMAIL_EXTRACTION_ENABLED = "false"` で制御し、再開時は `"true"` に変更してデプロイする。カレンダー同期も下記の設定で一時停止中。
 - 未読メールを要約し、タスクストアに **1 メール = 1 タスク** で登録（サブタスクには分割しない。返信スレッドは新規タスクを作らず既存タスクの Priority / Due 更新と本文追記のみ）
 - タスクのタイトルは Gemini が生成する「誰から何の用件か分かる短文」を使う（メール件名そのままは避ける）
 - Telegram 通知はせず、結果を `email_digest:pending` (KV) に追記
@@ -57,11 +57,12 @@ Gmail・Google Calendar・Telegram を連携し、タスク抽出と日次ブリ
 
 **morning_prep の詳細:**
 - ブロックリスト学習: `sender_map` を走査し、ステータスが「中止」のタスクの送信者を `no_task_senders` (KV) に追加。完了済みは `sender_map` から外すだけ
-- カレンダー同期: 完了済みタスクのカレンダーイベントを削除、未着手タスクを Calendar に登録
+- カレンダー同期（一時停止中）: 完了済みタスクのカレンダーイベントを削除、未着手タスクを Calendar に登録
 - バックログ昇格: 期限3日以内（過去 due 含む）の「バックログ」ステータスのタスクを「未着手」に昇格。Due 未設定のバックログは対象外
 - 優先度昇格: 期限3日以内の medium タスクを high に昇格
 
 **カレンダー登録のタイミング:**
+- カレンダー反映は一時停止中。`cf-worker/wrangler.toml` の `CALENDAR_SYNC_ENABLED = "false"` で、定期同期とタスク作成・更新・完了・中止時の予定の作成・更新・削除を停止する。既存の予定と同期記録は保持する。再開時は `"true"` に変更してデプロイする。以下は有効時の動作。
 - 期日付きタスクは作成時（Gmail / Telegram テキスト・画像・URL）に即座に Calendar へ登録（同日時刻指定タスクの取りこぼし防止）
 - 返信メールで Due が前倒しされたときも、その場で Calendar イベントを差し替える
 - hourly_gmail / morning_prep の同期は補完用。重複防止は D1 `calendar_sync` で行い、dedup キーは「期日時刻」単位（同一日付で時刻だけ変わっても反映）

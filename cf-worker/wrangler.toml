@@ -7,6 +7,8 @@ logpush = true
 [vars]
 # メールからの定期タスク抽出を一時停止。再開時は "true" に変更する。
 GMAIL_EXTRACTION_ENABLED = "false"
+# 定期同期・タスク作成/更新/完了時のカレンダー反映を一時停止。
+CALENDAR_SYNC_ENABLED = "false"
 
 [triggers]
 crons = [
